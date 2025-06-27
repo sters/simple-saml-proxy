@@ -1,43 +1,60 @@
 package main
 
 import (
-	// "crypto/rand" // No longer used for dynamic cert generation
+	// "crypto/rand" // No longer used for dynamic cert generation.
 	"crypto/rsa"
 	"crypto/x509"
-	// "crypto/x509/pkix" // No longer used for dynamic cert generation
+	// "crypto/x509/pkix" // No longer used for dynamic cert generation.
 	"encoding/pem" // Needed for parsing PEM encoded key/cert files
 	"encoding/xml" // For xml.MarshalIndent
 	"errors"       // For custom errors
 	"fmt"
 	"log"
-	// "math/big" // No longer used for dynamic cert generation
+	// "math/big" // No longer used for dynamic cert generation.
 	"net/http"
 	"net/url"
-	"os" // For os.Getenv and os.ReadFile
-	// "time" // No longer used for dynamic cert generation
+	"os"
+	"time" // For http.Server timeouts
 
 	"github.com/crewjam/saml"
 	"github.com/kelseyhightower/envconfig" // Added for envconfig
 )
 
+const (
+	serverReadTimeout  = 5 * time.Second
+	serverWriteTimeout = 10 * time.Second
+	serverIdleTimeout  = 120 * time.Second
+)
+
+var (
+	ErrFailedToDecodePEMBlock    = errors.New("failed to decode PEM block")
+	ErrFailedToParsePrivateKey   = errors.New("failed to parse private key (tried PKCS#1 and PKCS#8)")
+	ErrPrivateKeyNotRSA          = errors.New("private key is not an RSA private key")
+	ErrFailedToParseCertificate  = errors.New("failed to parse certificate")
+	ErrProxyPrivateKeyNotLoaded  = errors.New("proxy private key not loaded in config")
+	ErrProxyCertificateNotLoaded = errors.New("proxy certificate not loaded in config")
+	ErrProxyMetadataURLNotLoaded = errors.New("proxy metadata URL not loaded in config")
+	ErrProxyAcsURLNotLoaded      = errors.New("proxy ACS URL not loaded in config")
+)
+
 // Config holds all configuration for the application, loaded from environment variables.
 type Config struct {
 	// Proxy SP Settings
-	ProxyEntityID      string `envconfig:"PROXY_ENTITY_ID" default:"http://localhost:8080/metadata"`
-	ProxyAcsURLStr     string `envconfig:"PROXY_ACS_URL" default:"http://localhost:8080/sso/acs"`
-	ProxyMetadataURLStr string `envconfig:"PROXY_METADATA_URL" default:"http://localhost:8080/metadata"`
-	ProxyPrivateKeyPath string `envconfig:"PROXY_PRIVATE_KEY_PATH" required:"true"`
-	ProxyCertificatePath string `envconfig:"PROXY_CERTIFICATE_PATH" required:"true"`
+	ProxyEntityID        string `default:"http://localhost:8080/metadata" envconfig:"PROXY_ENTITY_ID"`
+	ProxyAcsURLStr       string `default:"http://localhost:8080/sso/acs"  envconfig:"PROXY_ACS_URL"`
+	ProxyMetadataURLStr  string `default:"http://localhost:8080/metadata" envconfig:"PROXY_METADATA_URL"`
+	ProxyPrivateKeyPath  string `envconfig:"PROXY_PRIVATE_KEY_PATH"       required:"true"`
+	ProxyCertificatePath string `envconfig:"PROXY_CERTIFICATE_PATH"       required:"true"`
 
 	// Parsed values (not directly from envconfig)
-	ProxyAcsURL        *url.URL          `ignored:"true"`
-	ProxyMetadataURL   *url.URL          `ignored:"true"`
-	ProxyPrivateKey    *rsa.PrivateKey   `ignored:"true"`
-	ProxyCertificate   *x509.Certificate `ignored:"true"`
+	ProxyAcsURL      *url.URL          `ignored:"true"`
+	ProxyMetadataURL *url.URL          `ignored:"true"`
+	ProxyPrivateKey  *rsa.PrivateKey   `ignored:"true"`
+	ProxyCertificate *x509.Certificate `ignored:"true"`
 
 	// Upstream IdP Settings (optional for now)
-	IdpEntityID    string `envconfig:"IDP_ENTITY_ID"`
-	IdpSsoURLStr   string `envconfig:"IDP_SSO_URL"`
+	IdpEntityID        string `envconfig:"IDP_ENTITY_ID"`
+	IdpSsoURLStr       string `envconfig:"IDP_SSO_URL"`
 	IdpCertificatePath string `envconfig:"IDP_CERTIFICATE_PATH"`
 
 	// Parsed IdP values (not directly from envconfig)
@@ -45,7 +62,7 @@ type Config struct {
 	IdpCertificate *x509.Certificate `ignored:"true"`
 
 	// Server Settings
-	ServerListenAddress string `envconfig:"SERVER_LISTEN_ADDRESS" default:":8080"`
+	ServerListenAddress string `default:":8080" envconfig:"SERVER_LISTEN_ADDRESS"`
 }
 
 // loadConfig loads configuration from environment variables and returns a Config struct.
@@ -73,18 +90,19 @@ func loadConfig() (*Config, error) {
 	}
 	block, _ := pem.Decode(keyData)
 	if block == nil {
-		return nil, fmt.Errorf("failed to decode PEM block from private key file '%s'", cfg.ProxyPrivateKeyPath)
+		return nil, fmt.Errorf("%w: private key file '%s'", ErrFailedToDecodePEMBlock, cfg.ProxyPrivateKeyPath)
 	}
 	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	if err != nil {
 		pkcs8Key, errPkcs8 := x509.ParsePKCS8PrivateKey(block.Bytes)
 		if errPkcs8 != nil {
-			return nil, fmt.Errorf("failed to parse private key (tried PKCS#1 and PKCS#8) from '%s': pkcs1_err=%v, pkcs8_err=%v", cfg.ProxyPrivateKeyPath, err, errPkcs8)
+			return nil, fmt.Errorf("%w: file '%s', pkcs1_err=%w, pkcs8_err=%w",
+				ErrFailedToParsePrivateKey, cfg.ProxyPrivateKeyPath, err, errPkcs8)
 		}
 		var ok bool
 		privKey, ok = pkcs8Key.(*rsa.PrivateKey)
 		if !ok {
-			return nil, fmt.Errorf("private key in '%s' is not an RSA private key (type: %T)", cfg.ProxyPrivateKeyPath, pkcs8Key)
+			return nil, fmt.Errorf("%w: file '%s', key type %T", ErrPrivateKeyNotRSA, cfg.ProxyPrivateKeyPath, pkcs8Key)
 		}
 	}
 	cfg.ProxyPrivateKey = privKey
@@ -96,11 +114,11 @@ func loadConfig() (*Config, error) {
 	}
 	certBlock, _ := pem.Decode(certData)
 	if certBlock == nil {
-		return nil, fmt.Errorf("failed to decode PEM block from certificate file '%s'", cfg.ProxyCertificatePath)
+		return nil, fmt.Errorf("%w: certificate file '%s'", ErrFailedToDecodePEMBlock, cfg.ProxyCertificatePath)
 	}
 	cert, err := x509.ParseCertificate(certBlock.Bytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse certificate from '%s': %w", cfg.ProxyCertificatePath, err)
+		return nil, fmt.Errorf("%w: file '%s', %w", ErrFailedToParseCertificate, cfg.ProxyCertificatePath, err)
 	}
 	cfg.ProxyCertificate = cert
 
@@ -113,28 +131,51 @@ func loadConfig() (*Config, error) {
 		}
 	}
 
-	if cfg.IdpCertificatePath != "" {
-		idpCertData, err := os.ReadFile(cfg.IdpCertificatePath)
-		if err != nil {
-			log.Printf("Warning: Failed to read IdP certificate file '%s': %v. It will be ignored.", cfg.IdpCertificatePath, err)
-		} else {
-			idpCertBlock, _ := pem.Decode(idpCertData)
-			if idpCertBlock == nil {
-				log.Printf("Warning: Failed to decode PEM block from IdP certificate file '%s'. It will be ignored.", cfg.IdpCertificatePath)
-			} else {
-				idpCert, errParseCert := x509.ParseCertificate(idpCertBlock.Bytes) // Use new error variable
-				if errParseCert != nil { // Check the new error variable
-					log.Printf("Warning: Failed to parse IdP certificate from '%s': %v. It will be ignored.", cfg.IdpCertificatePath, errParseCert)
-				} else {
-					cfg.IdpCertificate = idpCert
-				}
-			}
-		}
+	if err := loadIdpCertificate(&cfg); err != nil {
+		// loadIdpCertificate already logs warnings, so just return the config or handle critical error
+		// For now, we assume warnings are acceptable and proceed.
+		// If loadIdpCertificate were to return a critical error, we might handle it here.
+		log.Printf("Note: Problem loading IdP certificate: %v", err) // Example of further logging if needed
 	}
 
 	return &cfg, nil // Return address of cfg
 }
 
+// loadIdpCertificate handles loading and parsing the IdP certificate.
+// It logs warnings for non-critical issues and allows the application to proceed.
+func loadIdpCertificate(cfg *Config) error {
+	if cfg.IdpCertificatePath == "" {
+		return nil // No path provided, nothing to do.
+	}
+
+	idpCertData, err := os.ReadFile(cfg.IdpCertificatePath)
+	if err != nil {
+		log.Printf("Warning: Failed to read IdP certificate file '%s': %v. It will be ignored.",
+			cfg.IdpCertificatePath, err)
+
+		return fmt.Errorf("read error: %w", err) // Return error for context, though main flow might ignore it
+	}
+
+	idpCertBlock, _ := pem.Decode(idpCertData)
+	if idpCertBlock == nil {
+		log.Printf("Warning: Failed to decode PEM block from IdP certificate file '%s'. It will be ignored.",
+			cfg.IdpCertificatePath)
+
+		return fmt.Errorf("decode error: %w", ErrFailedToDecodePEMBlock)
+	}
+
+	idpCert, errParseCert := x509.ParseCertificate(idpCertBlock.Bytes)
+	if errParseCert != nil {
+		log.Printf("Warning: Failed to parse IdP certificate from '%s': %v. It will be ignored.",
+			cfg.IdpCertificatePath, errParseCert)
+
+		return fmt.Errorf("parse error: %w", errParseCert)
+	}
+
+	cfg.IdpCertificate = idpCert
+
+	return nil
+}
 
 /*
 config.yml (example structure)
@@ -154,7 +195,8 @@ idp:
   sso_service_url: "https://idp.example.com/saml/sso"
   # single_logout_service_url: "https://idp.example.com/saml/slo" # Future
   certificate_path: "idp.crt" # Path to IdP's public certificate for verifying signatures
-  # metadata_url: "https://idp.example.com/saml/metadata" # Optional: if provided, other IdP settings might be fetched from here
+  # metadata_url: "https://idp.example.com/saml/metadata"
+  # Optional: if provided, other IdP settings might be fetched from here
 
 server:
   listen_address: ":8080"
@@ -169,7 +211,8 @@ func main() {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ping", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintln(w, "pong")
 	})
 
@@ -177,7 +220,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create SAML Service Provider: %v", err)
 	}
-	http.Handle("/metadata", samlSPHandler)
+	mux.Handle("/metadata", samlSPHandler)
 	// The metadata handler itself is now created by newSamlServiceProvider
 
 	log.Printf("Starting server on %s...", cfg.ServerListenAddress)
@@ -186,8 +229,15 @@ func main() {
 	// For now, assume metadata URL in config is the externally reachable one.
 	log.Printf("SAML SP Metadata: %s", cfg.ProxyMetadataURL.String())
 
+	server := &http.Server{
+		Addr:         cfg.ServerListenAddress,
+		Handler:      mux,
+		ReadTimeout:  serverReadTimeout,
+		WriteTimeout: serverWriteTimeout,
+		IdleTimeout:  serverIdleTimeout,
+	}
 
-	if err := http.ListenAndServe(cfg.ServerListenAddress, nil); err != nil {
+	if err := server.ListenAndServe(); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
@@ -197,18 +247,17 @@ func main() {
 func newSamlServiceProvider(cfg *Config) (http.Handler, error) {
 	// Dynamic key/cert generation is removed. Using values from cfg.
 	if cfg.ProxyPrivateKey == nil {
-		return nil, errors.New("proxy private key not loaded in config")
+		return nil, ErrProxyPrivateKeyNotLoaded
 	}
 	if cfg.ProxyCertificate == nil {
-		return nil, errors.New("proxy certificate not loaded in config")
+		return nil, ErrProxyCertificateNotLoaded
 	}
 	if cfg.ProxyMetadataURL == nil {
-		return nil, errors.New("proxy metadata URL not loaded in config")
+		return nil, ErrProxyMetadataURLNotLoaded
 	}
 	if cfg.ProxyAcsURL == nil {
-		return nil, errors.New("proxy ACS URL not loaded in config")
+		return nil, ErrProxyAcsURLNotLoaded
 	}
-
 
 	samlSP := saml.ServiceProvider{
 		EntityID:    cfg.ProxyEntityID,
@@ -221,12 +270,14 @@ func newSamlServiceProvider(cfg *Config) (http.Handler, error) {
 	}
 
 	// Create an http.HandlerFunc to serve the metadata
-	metadataHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		md := samlSP.Metadata() // Get metadata from saml.ServiceProvider; returns *EntityDescriptor, no error
+	metadataHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		// Get metadata from saml.ServiceProvider; returns *EntityDescriptor, no error
+		md := samlSP.Metadata()
 		xmlBytes, err := xml.MarshalIndent(md, "", "  ") // Use xml.MarshalIndent
 		if err != nil {
 			log.Printf("Error marshalling SAML metadata to XML: %v", err)
 			http.Error(w, "Failed to marshal SAML metadata", http.StatusInternalServerError)
+
 			return
 		}
 		w.Header().Set("Content-Type", "application/samlmetadata+xml")
