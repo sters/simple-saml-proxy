@@ -1,0 +1,45 @@
+run:
+  skip-dirs:
+    - bin
+    - .github
+    - tools
+
+linters-settings:
+  govet:
+    check-shadowing: true
+
+linters:
+  enable-all: true
+  disable:
+    - cyclop
+    - depguard
+    - exhaustive
+    - exhaustivestruct
+    - exhaustruct
+    - funlen
+    - gocognit
+    - godox
+    - gomnd
+    - testpackage
+    - wsl
+
+issues:
+  exclude-rules:
+    - text: "shadow: declaration of \"err\""
+      linters: ["govet"]
+    - text: "use of `fmt.Print"
+      linters: ["forbidigo"]
+    - text: "is too short for the scope of its usage"
+      linters: ["varnamelen"]
+    - path: _test\.go
+      linters:
+        - dupl
+        - funlen
+        - gocyclo
+        - gomnd
+        - lll
+        - goconst
+        - testpackage
+        - goerr113
+        - gosec
+        - paralleltest
