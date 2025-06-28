@@ -376,8 +376,11 @@ func TestMetadataEndpoint(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify the entity ID matches the configuration
-	// Note: The actual EntityID might have "/saml" added to it by the library
-	assert.Contains(t, metadata.EntityID, "localhost:8080")
+	assert.Equal(t, config.Proxy.EntityID, metadata.EntityID)
+
+	// Verify it contains the IDPSSODescriptor element (proxy now acts as an IdP)
+	assert.Contains(t, string(body), "IDPSSODescriptor")
+	assert.Contains(t, string(body), "urn:oasis:names:tc:SAML:2.0:protocol")
 }
 
 // TestSSOEndpoint tests the /sso endpoint of the SAML proxy.
@@ -434,14 +437,52 @@ func TestSSOEndpoint(t *testing.T) {
 	mockClient := NewMockSAMLClient(t)
 	defer mockClient.Close()
 
-	// Test the SSO endpoint
-	resp, err := mockClient.InitiateLogin(proxyServer.URL)
+	// Test 1: SSO endpoint with SAMLRequest parameter (should show IdP selection page)
+	resp, err := http.Get(proxyServer.URL + "/sso?SAMLRequest=request123")
 	assert.NoError(t, err)
 	defer resp.Body.Close()
 
-	// Verify it redirects to the IDP
+	// Verify it returns the IdP selection page
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	body, err := io.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.Contains(t, string(body), "Select an Identity Provider")
+	assert.Contains(t, string(body), "mock")
+
+	// Test 2: SSO endpoint without SAMLRequest parameter (should return bad request)
+	resp, err = http.Get(proxyServer.URL + "/sso")
+	assert.NoError(t, err)
+	defer resp.Body.Close()
+
+	// Verify it returns a bad request error
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	body, err = io.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.Contains(t, string(body), "Missing SAMLRequest parameter")
+
+	// Test 3: select_idp endpoint (should redirect to IdP)
+	resp, err = http.Get(proxyServer.URL + "/select_idp/mock?SAMLRequest=request123&RelayState=state123")
+	assert.NoError(t, err)
+	defer resp.Body.Close()
+
+	// Verify it redirects to the IdP
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
-	assert.Equal(t, mockProvider.ssoURL, resp.Header.Get("Location"))
+	redirectURL := resp.Header.Get("Location")
+	assert.Contains(t, redirectURL, mockProvider.ssoURL)
+	assert.Contains(t, redirectURL, "SAMLRequest=request123")
+	assert.Contains(t, redirectURL, "RelayState=state123")
+
+	// Verify the cookie was set
+	cookies := resp.Cookies()
+	var idpCookie *http.Cookie
+	for _, cookie := range cookies {
+		if cookie.Name == config.Proxy.CookieName {
+			idpCookie = cookie
+			break
+		}
+	}
+	assert.NotNil(t, idpCookie)
+	assert.Equal(t, "mock", idpCookie.Value)
 }
 
 // TestACSEndpoint tests the /sso/acs endpoint of the SAML proxy.
@@ -513,6 +554,17 @@ func TestACSEndpoint(t *testing.T) {
 
 	// Verify it returns an error status code
 	assert.GreaterOrEqual(t, resp.StatusCode, 400, "Expected error status code for POST without SAMLResponse")
+
+	// Test 3: Test the idp-initiated endpoint (should return not implemented)
+	resp, err = http.Get(proxyServer.URL + "/idp-initiated")
+	assert.NoError(t, err)
+	defer resp.Body.Close()
+
+	// Verify it returns a not implemented status code
+	assert.Equal(t, http.StatusNotImplemented, resp.StatusCode)
+	body, err := io.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.Contains(t, string(body), "IdP-Initiated flow not yet implemented")
 }
 
 // TestLinkSSOEndpoint tests the /link_sso/{idp_id} endpoint of the SAML proxy.
@@ -640,39 +692,43 @@ func TestLinkSSOEndpoint(t *testing.T) {
 	// Verify it returns an error
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 
-	// Test 4: Access the SSO endpoint with the idp1 cookie
-	// Reuse the same client
-
-	req, err := http.NewRequest(http.MethodGet, proxyServer.URL+"/sso", nil)
-	assert.NoError(t, err)
-	req.AddCookie(&http.Cookie{
-		Name:  config.Proxy.CookieName,
-		Value: "idp1",
-	})
-
-	resp, err = client.Do(req)
+	// Test 4: Access the SSO endpoint with SAMLRequest parameter (should show IdP selection page)
+	resp, err = client.Get(proxyServer.URL + "/sso?SAMLRequest=request123")
 	assert.NoError(t, err)
 	defer resp.Body.Close()
 
-	// Verify it redirects to the IdP1's SSO URL
-	assert.Equal(t, http.StatusFound, resp.StatusCode)
-	assert.Equal(t, mockProvider1.ssoURL, resp.Header.Get("Location"))
-
-	// Test 5: Access the SSO endpoint with the idp2 cookie
-	req, err = http.NewRequest(http.MethodGet, proxyServer.URL+"/sso", nil)
+	// Verify it returns the IdP selection page
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	body, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	req.AddCookie(&http.Cookie{
-		Name:  config.Proxy.CookieName,
-		Value: "idp2",
-	})
+	assert.Contains(t, string(body), "Select an Identity Provider")
+	assert.Contains(t, string(body), "idp1")
+	assert.Contains(t, string(body), "idp2")
 
-	resp, err = client.Do(req)
+	// Test 5: Access the select_idp endpoint for idp1
+	resp, err = client.Get(proxyServer.URL + "/select_idp/idp1?SAMLRequest=request123&RelayState=state123")
 	assert.NoError(t, err)
 	defer resp.Body.Close()
 
-	// Verify it redirects to the IdP2's SSO URL
+	// Verify it redirects to IdP1
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
-	assert.Equal(t, mockProvider2.ssoURL, resp.Header.Get("Location"))
+	var redirectURL string
+	redirectURL = resp.Header.Get("Location")
+	assert.Contains(t, redirectURL, mockProvider1.ssoURL)
+	assert.Contains(t, redirectURL, "SAMLRequest=request123")
+	assert.Contains(t, redirectURL, "RelayState=state123")
+
+	// Test 6: Access the select_idp endpoint for idp2
+	resp, err = client.Get(proxyServer.URL + "/select_idp/idp2?SAMLRequest=request123&RelayState=state123")
+	assert.NoError(t, err)
+	defer resp.Body.Close()
+
+	// Verify it redirects to IdP2
+	assert.Equal(t, http.StatusFound, resp.StatusCode)
+	redirectURL = resp.Header.Get("Location")
+	assert.Contains(t, redirectURL, mockProvider2.ssoURL)
+	assert.Contains(t, redirectURL, "SAMLRequest=request123")
+	assert.Contains(t, redirectURL, "RelayState=state123")
 }
 
 // TestE2EFlow tests the complete end-to-end flow: Service -> Proxy -> SAML Provider -> Proxy -> Service.
@@ -729,25 +785,56 @@ func TestE2EFlow(t *testing.T) {
 	mockClient := NewMockSAMLClient(t)
 	defer mockClient.Close()
 
-	// Step 1: Client initiates login by accessing the SSO endpoint
-	resp, err := mockClient.InitiateLogin(proxyServer.URL)
+	// Create a client that doesn't follow redirects
+	client := &http.Client{
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			// Don't follow redirects automatically
+			return http.ErrUseLastResponse
+		},
+	}
+
+	// Step 1: SP sends AuthnRequest to proxy's SSO endpoint
+	resp, err := client.Get(proxyServer.URL + "/sso?SAMLRequest=request123&RelayState=state123")
 	assert.NoError(t, err)
 	defer resp.Body.Close()
 
-	// Step 2: Proxy redirects to IDP
+	// Step 2: Proxy shows IdP selection page
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	body, err := io.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.Contains(t, string(body), "Select an Identity Provider")
+	assert.Contains(t, string(body), "mock")
+
+	// Step 3: User selects an IdP
+	resp, err = client.Get(proxyServer.URL + "/select_idp/mock?SAMLRequest=request123&RelayState=state123")
+	assert.NoError(t, err)
+	defer resp.Body.Close()
+
+	// Step 4: Proxy redirects to the selected IdP
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
-	assert.Equal(t, mockProvider.ssoURL, resp.Header.Get("Location"))
+	redirectURL := resp.Header.Get("Location")
+	assert.Contains(t, redirectURL, mockProvider.ssoURL)
+	assert.Contains(t, redirectURL, "SAMLRequest=request123")
+	assert.Contains(t, redirectURL, "RelayState=state123")
+
+	// Verify the cookie was set
+	cookies := resp.Cookies()
+	var idpCookie *http.Cookie
+	for _, cookie := range cookies {
+		if cookie.Name == config.Proxy.CookieName {
+			idpCookie = cookie
+			break
+		}
+	}
+	assert.NotNil(t, idpCookie)
+	assert.Equal(t, "mock", idpCookie.Value)
 
 	// In a real E2E test, we would:
-	// 1. Follow the redirect to the IDP
-	// 2. Parse the HTML form from the IDP response
-	// 3. Extract the SAMLResponse
-	// 4. Submit it to the ACS URL
+	// 1. Follow the redirect to the IdP
+	// 2. Authenticate at the IdP
+	// 3. IdP would redirect back to the proxy's ACS URL with a SAMLResponse
+	// 4. Proxy would process the response and redirect to the SP
 	//
-	// However, this is complex to do in a unit test and we're encountering connection issues.
-	// For simplicity, we'll just verify that the redirect URL is correct and points to our mock IDP.
-
-	// Verify that the redirect URL is correct
-	redirectURL := resp.Header.Get("Location")
-	assert.Equal(t, mockProvider.ssoURL, redirectURL, "Redirect URL should point to the IDP's SSO endpoint")
+	// However, this is complex to do in a unit test.
+	// For simplicity, we'll just verify that the redirect URL is correct and points to our mock IdP.
 }

@@ -4,7 +4,7 @@ export PATH := $(GOBIN):$(PATH)
 
 .PHONY: run
 run:
-	go run main.go $(ARGS)
+	go run cmd/simple-saml-proxy/main.go $(ARGS)
 
 .PHONY: lint
 lint:

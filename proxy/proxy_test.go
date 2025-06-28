@@ -87,6 +87,7 @@ func TestSetupHTTPHandlers(t *testing.T) {
 	config := Config{}
 	config.Proxy.EntityID = "http://test.example.com/metadata"
 	config.Proxy.CookieName = "idp_selection"
+	config.Proxy.AllowedServiceURLPrefix = []string{"https://example.com", "https://test.example.com"}
 
 	// Add multiple IDP
 	config.IDP = []IDPConfig{
@@ -119,43 +120,33 @@ func TestSetupHTTPHandlers(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "pong", w.Body.String())
 
-	// Test the SSO endpoint with no cookie (should use default IDP)
+	// Test the SSO endpoint with SAMLRequest parameter (should show IdP selection page)
+	req = httptest.NewRequest(http.MethodGet, "/sso?SAMLRequest=request123", nil)
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "Select an Identity Provider")
+	assert.Contains(t, w.Body.String(), "idp1")
+	assert.Contains(t, w.Body.String(), "idp2")
+
+	// Test the SSO endpoint without SAMLRequest parameter (should return bad request)
 	req = httptest.NewRequest(http.MethodGet, "/sso", nil)
 	w = httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
-	assert.Equal(t, http.StatusFound, w.Code)
-	assert.Equal(t, "https://idp1.example.com/saml/sso", w.Header().Get("Location"))
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Missing SAMLRequest parameter")
 
-	// Test the SSO endpoint with a cookie for idp2
-	req = httptest.NewRequest(http.MethodGet, "/sso", nil)
-	req.AddCookie(&http.Cookie{
-		Name:  config.Proxy.CookieName,
-		Value: "idp2",
-	})
-	w = httptest.NewRecorder()
-	mux.ServeHTTP(w, req)
-	assert.Equal(t, http.StatusFound, w.Code)
-	assert.Equal(t, "https://idp2.example.com/saml/sso", w.Header().Get("Location"))
-
-	// Test the metadata endpoint with no cookie (should use default IDP)
+	// Test the metadata endpoint (should return IdP metadata)
 	req = httptest.NewRequest(http.MethodGet, "/metadata", nil)
 	w = httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), "EntityDescriptor")
+	assert.Contains(t, w.Body.String(), "IDPSSODescriptor")
+	assert.Contains(t, w.Body.String(), config.Proxy.EntityID)
+	assert.Equal(t, "application/xml", w.Header().Get("Content-Type"))
 
-	// Test the metadata endpoint with a cookie for idp2
-	req = httptest.NewRequest(http.MethodGet, "/metadata", nil)
-	req.AddCookie(&http.Cookie{
-		Name:  config.Proxy.CookieName,
-		Value: "idp2",
-	})
-	w = httptest.NewRecorder()
-	mux.ServeHTTP(w, req)
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Contains(t, w.Body.String(), "EntityDescriptor")
-
-	// Test the link_sso endpoint for idp1
+	// Test the link_sso endpoint for idp1 with allowed service URL
 	req = httptest.NewRequest(http.MethodGet, "/link_sso/idp1?service=https://example.com", nil)
 	w = httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
@@ -175,11 +166,69 @@ func TestSetupHTTPHandlers(t *testing.T) {
 	assert.NotNil(t, idpCookie)
 	assert.Equal(t, "idp1", idpCookie.Value)
 
+	// Test the link_sso endpoint with disallowed service URL
+	req = httptest.NewRequest(http.MethodGet, "/link_sso/idp1?service=https://malicious.com", nil)
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Invalid service URL")
+
 	// Test the link_sso endpoint with an invalid IDP
 	req = httptest.NewRequest(http.MethodGet, "/link_sso/invalid", nil)
 	w = httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	// Test the select_idp endpoint for idp1
+	req = httptest.NewRequest(http.MethodGet, "/select_idp/idp1?SAMLRequest=request123&RelayState=state123", nil)
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusFound, w.Code)
+	redirectURL := w.Header().Get("Location")
+	assert.Contains(t, redirectURL, "https://idp1.example.com/saml/sso")
+	assert.Contains(t, redirectURL, "SAMLRequest=request123")
+	assert.Contains(t, redirectURL, "RelayState=state123")
+
+	// Verify the cookie was set
+	cookies = w.Result().Cookies()
+	idpCookie = nil
+	for _, cookie := range cookies {
+		if cookie.Name == config.Proxy.CookieName {
+			idpCookie = cookie
+			break
+		}
+	}
+	assert.NotNil(t, idpCookie)
+	assert.Equal(t, "idp1", idpCookie.Value)
+
+	// Test the select_idp endpoint with an invalid IDP
+	req = httptest.NewRequest(http.MethodGet, "/select_idp/invalid?SAMLRequest=request123", nil)
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Invalid IDP ID")
+
+	// Test the idp-initiated endpoint
+	req = httptest.NewRequest(http.MethodGet, "/idp-initiated", nil)
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusNotImplemented, w.Code)
+	assert.Contains(t, w.Body.String(), "IdP-Initiated flow not yet implemented")
+}
+
+func TestServiceURLValidation(t *testing.T) {
+	// Test with allowed prefixes
+	allowedPrefixes := []string{"https://example.com", "https://test.example.com"}
+
+	// URL that matches an allowed prefix
+	assert.True(t, isAllowedServiceURL("https://example.com/path", allowedPrefixes))
+
+	// URL that doesn't match any allowed prefix
+	assert.False(t, isAllowedServiceURL("https://malicious.com", allowedPrefixes))
+
+	// Test with no allowed prefixes (all URLs are allowed)
+	assert.True(t, isAllowedServiceURL("https://any.domain.com", nil))
+	assert.True(t, isAllowedServiceURL("https://any.domain.com", []string{}))
 }
 
 func TestStartServer(t *testing.T) {

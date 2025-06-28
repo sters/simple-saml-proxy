@@ -14,37 +14,43 @@ or use specific version from [Releases](https://github.com/sters/simple-saml-pro
 
 ## Usage
 
-Simple SAML Proxy acts as a Service Provider (SP) that can authenticate users against an Identity Provider (IdP).
+Simple SAML Proxy acts as a SAML Identity Provider (IdP) proxy:
+- To Service Providers (SPs), it appears as an IdP
+- To Identity Providers (IdPs), it appears as an SP
+
+This allows for a centralized authentication flow where:
+1. Users access a Service Provider (SP)
+2. SP redirects to this proxy for authentication
+3. User selects an Identity Provider (IdP) on the proxy's selection page
+4. User is redirected to the selected IdP for authentication
+5. After authentication, user is redirected back to the proxy
+6. Proxy forwards the authentication response to the original SP
+
+Note: IdP-Initiated flow is not yet implemented.
 
 ### Configuration
 
 The application is configured using environment variables:
 
 #### Proxy SP Settings
-- `PROXY_ENTITY_ID` - Entity ID for the proxy SP (default: "http://localhost:8080/metadata")
+- `PROXY_ENTITY_ID` - Entity ID for the proxy SP (default: "SimpleSamlProxy")
 - `PROXY_ACS_URL` - Assertion Consumer Service URL (default: "http://localhost:8080/sso/acs")
 - `PROXY_METADATA_URL` - Metadata URL (default: "http://localhost:8080/metadata")
 - `PROXY_PRIVATE_KEY_PATH` - Path to the private key file (required)
 - `PROXY_CERTIFICATE_PATH` - Path to the certificate file (required)
 
 #### IdP Settings
-##### Single IdP (Legacy Mode)
-- `IDP_ID` - Unique identifier for the IdP (required for multiple IdP support)
-- `IDP_ENTITY_ID` - Entity ID for the upstream IdP
-- `IDP_SSO_URL` - Single Sign-On URL for the upstream IdP
-- `IDP_CERTIFICATE_PATH` - Path to the IdP's certificate file
-
-##### Multiple IdPs
 You can configure multiple IdPs using environment variables with indexed suffixes:
-- `IDPS_0_ID` - Unique identifier for the first IdP
-- `IDPS_0_ENTITY_ID` - Entity ID for the first IdP
-- `IDPS_0_SSO_URL` - Single Sign-On URL for the first IdP
-- `IDPS_0_CERTIFICATE_PATH` - Path to the first IdP's certificate file
-
-- `IDPS_1_ID` - Unique identifier for the second IdP
-- `IDPS_1_ENTITY_ID` - Entity ID for the second IdP
-- `IDPS_1_SSO_URL` - Single Sign-On URL for the second IdP
-- `IDPS_1_CERTIFICATE_PATH` - Path to the second IdP's certificate file
+- For the first IdP
+  - `IDP_0_ID` - Unique identifier (it should not use sequential number)
+  - `IDP_0_ENTITY_ID` - Entity ID
+  - `IDP_0_SSO_URL` - Single Sign-On URL
+  - `IDP_0_CERTIFICATE_PATH` - Path to the certificate file
+- For the second IdP
+  - `IDP_1_ID` - Unique identifier (it should not use sequential number)
+  - `IDP_1_ENTITY_ID` - Entity ID
+  - `IDP_1_SSO_URL` - Single Sign-On URL
+  - `IDP_1_CERTIFICATE_PATH` - Path to the certificate file
 
 And so on for additional IdPs.
 
@@ -53,11 +59,22 @@ And so on for additional IdPs.
 
 ### Endpoints
 
-- `/metadata` - SAML metadata endpoint
-- `/sso` - Single Sign-On initiation endpoint
-- `/sso/acs` - Assertion Consumer Service endpoint
+#### For Service Providers (SPs)
+- `/metadata` - SAML metadata endpoint (proxy acts as IdP)
+- `/sso` - Single Sign-On endpoint where SPs send AuthnRequests (shows IdP selection page)
+
+#### For Identity Providers (IdPs)
+- `/sso/acs` - Assertion Consumer Service endpoint where IdPs send SAML responses
+
+#### IdP Selection
+- `/select_idp/{idp_id}?SAMLRequest={saml_request}&RelayState={relay_state}` - Endpoint to select an IdP and forward the SAML request
+
+#### Legacy Endpoints (for backward compatibility)
+- `/link_sso/{idp_id}?service={service_url}` - Legacy endpoint to select an IdP and set a cookie, then redirect to the service URL
+
+#### Other Endpoints
 - `/ping` - Health check endpoint
-- `/link_sso/{idp_id}?service={service_url}` - Endpoint to select an IdP and set a cookie, then redirect to the service URL
+- `/idp-initiated` - IdP-Initiated flow endpoint (not yet implemented)
 
 ### Example Usage
 
@@ -68,32 +85,21 @@ And so on for additional IdPs.
 
 2. Set environment variables:
 
-   #### Single IdP (Legacy Mode)
-   ```shell
-   export PROXY_PRIVATE_KEY_PATH=./proxy.key
-   export PROXY_CERTIFICATE_PATH=./proxy.crt
-   export IDP_ID=example
-   export IDP_ENTITY_ID=https://idp.example.com/saml/metadata
-   export IDP_SSO_URL=https://idp.example.com/saml/sso
-   export IDP_CERTIFICATE_PATH=./idp.crt
-   ```
-
-   #### Multiple IdPs
    ```shell
    export PROXY_PRIVATE_KEY_PATH=./proxy.key
    export PROXY_CERTIFICATE_PATH=./proxy.crt
 
    # First IdP
-   export IDPS_0_ID=example1
-   export IDPS_0_ENTITY_ID=https://idp1.example.com/saml/metadata
-   export IDPS_0_SSO_URL=https://idp1.example.com/saml/sso
-   export IDPS_0_CERTIFICATE_PATH=./idp1.crt
+   export IDP_0_ID=example1
+   export IDP_0_ENTITY_ID=https://idp1.example.com/saml/metadata
+   export IDP_0_SSO_URL=https://idp1.example.com/saml/sso
+   export IDP_0_CERTIFICATE_PATH=./idp1.crt
 
    # Second IdP
-   export IDPS_1_ID=example2
-   export IDPS_1_ENTITY_ID=https://idp2.example.com/saml/metadata
-   export IDPS_1_SSO_URL=https://idp2.example.com/saml/sso
-   export IDPS_1_CERTIFICATE_PATH=./idp2.crt
+   export IDP_1_ID=example2
+   export IDP_1_ENTITY_ID=https://idp2.example.com/saml/metadata
+   export IDP_1_SSO_URL=https://idp2.example.com/saml/sso
+   export IDP_1_CERTIFICATE_PATH=./idp2.crt
    ```
 
 3. Run the proxy:
@@ -103,12 +109,26 @@ And so on for additional IdPs.
 
 4. Access the metadata at http://localhost:8080/metadata
 
-5. To initiate authentication:
-   - For the default IdP: redirect users to http://localhost:8080/sso
-   - For a specific IdP: first redirect users to http://localhost:8080/link_sso/{idp_id}?service=http://your-service.com, then they will be redirected to the service URL
+5. To initiate authentication (SP-Initiated flow):
+   1. Configure your SP to use the proxy as an IdP (using the metadata at http://localhost:8080/metadata)
+   2. When a user accesses your SP, it will redirect them to the proxy's SSO endpoint (http://localhost:8080/sso)
+   3. The proxy will show an IdP selection page where the user can choose which IdP to use
+   4. After selecting an IdP, the user will be redirected to that IdP for authentication
+   5. After successful authentication, the IdP will redirect the user back to the proxy
+   6. The proxy will process the SAML response and forward it to your SP
+   7. Your SP will receive the authentication information and grant access to the user
 
-### Integration with IdPs
+   Note: The legacy flow using `/link_sso/{idp_id}?service=http://your-service.com` is still supported for backward compatibility.
 
-1. Register the SP with your IdP using the metadata URL (http://localhost:8080/metadata)
-2. Configure the IdP to send responses to the ACS URL (http://localhost:8080/sso/acs)
-3. Obtain the IdP's metadata or certificate and configure the proxy with it
+### Integration
+
+#### Integration with Service Providers (SPs)
+1. Configure your SP to use the proxy as an IdP
+2. Use the proxy's metadata URL (http://localhost:8080/metadata) to configure your SP
+3. Set your SP to send AuthnRequests to the proxy's SSO URL (http://localhost:8080/sso)
+
+#### Integration with Identity Providers (IdPs)
+1. Register the proxy as an SP with your IdP
+2. Use the proxy's entity ID in the IdP configuration
+3. Configure the IdP to send responses to the proxy's ACS URL (http://localhost:8080/sso/acs)
+4. Obtain the IdP's metadata or certificate and configure the proxy with it
