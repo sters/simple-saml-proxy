@@ -1,314 +1,178 @@
 package main
 
 import (
-	// "crypto/rand" // No longer used for dynamic cert generation.
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
-	// "crypto/x509/pkix" // No longer used for dynamic cert generation.
-	"encoding/pem" // Needed for parsing PEM encoded key/cert files
-	"encoding/xml" // For xml.MarshalIndent
-	"errors"       // For custom errors
-	"fmt"
 	"log"
-	// "math/big" // No longer used for dynamic cert generation.
 	"net/http"
 	"net/url"
-	"os"
-	"time" // For http.Server timeouts
 
 	"github.com/crewjam/saml"
-	"github.com/kelseyhightower/envconfig" // Added for envconfig
+	"github.com/crewjam/saml/samlsp"
+	"github.com/kelseyhightower/envconfig"
 )
 
-const (
-	serverReadTimeout  = 5 * time.Second
-	serverWriteTimeout = 10 * time.Second
-	serverIdleTimeout  = 120 * time.Second
-)
-
-var (
-	ErrFailedToDecodePEMBlock    = errors.New("failed to decode PEM block")
-	ErrFailedToParsePrivateKey   = errors.New("failed to parse private key (tried PKCS#1 and PKCS#8)")
-	ErrPrivateKeyNotRSA          = errors.New("private key is not an RSA private key")
-	ErrFailedToParseCertificate  = errors.New("failed to parse certificate")
-	ErrProxyPrivateKeyNotLoaded  = errors.New("proxy private key not loaded in config")
-	ErrProxyCertificateNotLoaded = errors.New("proxy certificate not loaded in config")
-	ErrProxyMetadataURLNotLoaded = errors.New("proxy metadata URL not loaded in config")
-	ErrProxyAcsURLNotLoaded      = errors.New("proxy ACS URL not loaded in config")
-)
-
-// Config holds all configuration for the application, loaded from environment variables.
+// Config holds all the configuration parameters for the SAML proxy
 type Config struct {
-	// Proxy SP Settings
-	ProxyEntityID        string `default:"http://localhost:8080/metadata" envconfig:"PROXY_ENTITY_ID"`
-	ProxyAcsURLStr       string `default:"http://localhost:8080/sso/acs"  envconfig:"PROXY_ACS_URL"`
-	ProxyMetadataURLStr  string `default:"http://localhost:8080/metadata" envconfig:"PROXY_METADATA_URL"`
-	ProxyPrivateKeyPath  string `envconfig:"PROXY_PRIVATE_KEY_PATH"       required:"true"`
-	ProxyCertificatePath string `envconfig:"PROXY_CERTIFICATE_PATH"       required:"true"`
+	Proxy struct {
+		EntityID        string `envconfig:"ENTITY_ID" default:"http://localhost:8080/metadata"`
+		AcsURL          string `envconfig:"ACS_URL" default:"http://localhost:8080/sso/acs"`
+		MetadataURL     string `envconfig:"METADATA_URL" default:"http://localhost:8080/metadata"`
+		PrivateKeyPath  string `envconfig:"PRIVATE_KEY_PATH" required:"true"`
+		CertificatePath string `envconfig:"CERTIFICATE_PATH" required:"true"`
+	} `envconfig:"PROXY"`
 
-	// Parsed values (not directly from envconfig)
-	ProxyAcsURL      *url.URL          `ignored:"true"`
-	ProxyMetadataURL *url.URL          `ignored:"true"`
-	ProxyPrivateKey  *rsa.PrivateKey   `ignored:"true"`
-	ProxyCertificate *x509.Certificate `ignored:"true"`
+	IdP struct {
+		EntityID        string `envconfig:"ENTITY_ID" required:"true"`
+		SSOURL          string `envconfig:"SSO_URL" required:"true"`
+		CertificatePath string `envconfig:"CERTIFICATE_PATH" required:"true"`
+	} `envconfig:"IDP"`
 
-	// Upstream IdP Settings (optional for now)
-	IdpEntityID        string `envconfig:"IDP_ENTITY_ID"`
-	IdpSsoURLStr       string `envconfig:"IDP_SSO_URL"`
-	IdpCertificatePath string `envconfig:"IDP_CERTIFICATE_PATH"`
-
-	// Parsed IdP values (not directly from envconfig)
-	IdpSsoURL      *url.URL          `ignored:"true"`
-	IdpCertificate *x509.Certificate `ignored:"true"`
-
-	// Server Settings
-	ServerListenAddress string `default:":8080" envconfig:"SERVER_LISTEN_ADDRESS"`
+	Server struct {
+		ListenAddress string `envconfig:"LISTEN_ADDRESS" default:":8080"`
+	} `envconfig:"SERVER"`
 }
 
-// loadConfig loads configuration from environment variables and returns a Config struct.
-func loadConfig() (*Config, error) {
-	var cfg Config
-	err := envconfig.Process("", &cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to process environment variables: %w", err)
-	}
-
-	// Parse URLs
-	cfg.ProxyAcsURL, err = url.Parse(cfg.ProxyAcsURLStr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse PROXY_ACS_URL_STR '%s': %w", cfg.ProxyAcsURLStr, err)
-	}
-	cfg.ProxyMetadataURL, err = url.Parse(cfg.ProxyMetadataURLStr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse PROXY_METADATA_URL_STR '%s': %w", cfg.ProxyMetadataURLStr, err)
-	}
-
-	// Load and parse Proxy Private Key
-	keyData, err := os.ReadFile(cfg.ProxyPrivateKeyPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read private key file '%s': %w", cfg.ProxyPrivateKeyPath, err)
-	}
-	block, _ := pem.Decode(keyData)
-	if block == nil {
-		return nil, fmt.Errorf("%w: private key file '%s'", ErrFailedToDecodePEMBlock, cfg.ProxyPrivateKeyPath)
-	}
-	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-	if err != nil {
-		pkcs8Key, errPkcs8 := x509.ParsePKCS8PrivateKey(block.Bytes)
-		if errPkcs8 != nil {
-			return nil, fmt.Errorf("%w: file '%s', pkcs1_err=%w, pkcs8_err=%w",
-				ErrFailedToParsePrivateKey, cfg.ProxyPrivateKeyPath, err, errPkcs8)
-		}
-		var ok bool
-		privKey, ok = pkcs8Key.(*rsa.PrivateKey)
-		if !ok {
-			return nil, fmt.Errorf("%w: file '%s', key type %T", ErrPrivateKeyNotRSA, cfg.ProxyPrivateKeyPath, pkcs8Key)
-		}
-	}
-	cfg.ProxyPrivateKey = privKey
-
-	// Load and parse Proxy Certificate
-	certData, err := os.ReadFile(cfg.ProxyCertificatePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read certificate file '%s': %w", cfg.ProxyCertificatePath, err)
-	}
-	certBlock, _ := pem.Decode(certData)
-	if certBlock == nil {
-		return nil, fmt.Errorf("%w: certificate file '%s'", ErrFailedToDecodePEMBlock, cfg.ProxyCertificatePath)
-	}
-	cert, err := x509.ParseCertificate(certBlock.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("%w: file '%s', %w", ErrFailedToParseCertificate, cfg.ProxyCertificatePath, err)
-	}
-	cfg.ProxyCertificate = cert
-
-	// Load and parse IdP Certificate (if path is provided)
-	if cfg.IdpSsoURLStr != "" {
-		cfg.IdpSsoURL, err = url.Parse(cfg.IdpSsoURLStr)
-		if err != nil {
-			log.Printf("Warning: Failed to parse IDP_SSO_URL_STR '%s': %v. It will be ignored.", cfg.IdpSsoURLStr, err)
-			cfg.IdpSsoURL = nil
-		}
-	}
-
-	if err := loadIdpCertificate(&cfg); err != nil {
-		// loadIdpCertificate already logs warnings, so just return the config or handle critical error
-		// For now, we assume warnings are acceptable and proceed.
-		// If loadIdpCertificate were to return a critical error, we might handle it here.
-		log.Printf("Note: Problem loading IdP certificate: %v", err) // Example of further logging if needed
-	}
-
-	return &cfg, nil // Return address of cfg
+// LoadConfig loads configuration from environment variables
+func LoadConfig() (Config, error) {
+	var config Config
+	err := envconfig.Process("", &config)
+	return config, err
 }
 
-// loadIdpCertificate handles loading and parsing the IdP certificate.
-// It logs warnings for non-critical issues and allows the application to proceed.
-func loadIdpCertificate(cfg *Config) error {
-	if cfg.IdpCertificatePath == "" {
-		return nil // No path provided, nothing to do.
-	}
-
-	idpCertData, err := os.ReadFile(cfg.IdpCertificatePath)
+// LoadCertificate loads and parses the SP certificate and private key
+func LoadCertificate(certPath, keyPath string) (tls.Certificate, error) {
+	keyPair, err := tls.LoadX509KeyPair(certPath, keyPath)
 	if err != nil {
-		log.Printf("Warning: Failed to read IdP certificate file '%s': %v. It will be ignored.",
-			cfg.IdpCertificatePath, err)
-
-		return fmt.Errorf("read error: %w", err) // Return error for context, though main flow might ignore it
+		return tls.Certificate{}, err
 	}
 
-	idpCertBlock, _ := pem.Decode(idpCertData)
-	if idpCertBlock == nil {
-		log.Printf("Warning: Failed to decode PEM block from IdP certificate file '%s'. It will be ignored.",
-			cfg.IdpCertificatePath)
-
-		return fmt.Errorf("decode error: %w", ErrFailedToDecodePEMBlock)
-	}
-
-	idpCert, errParseCert := x509.ParseCertificate(idpCertBlock.Bytes)
-	if errParseCert != nil {
-		log.Printf("Warning: Failed to parse IdP certificate from '%s': %v. It will be ignored.",
-			cfg.IdpCertificatePath, errParseCert)
-
-		return fmt.Errorf("parse error: %w", errParseCert)
-	}
-
-	cfg.IdpCertificate = idpCert
-
-	return nil
+	keyPair.Leaf, err = x509.ParseCertificate(keyPair.Certificate[0])
+	return keyPair, err
 }
 
-/*
-config.yml (example structure)
+// CreateSAMLServiceProvider creates a new SAML Service Provider
+func CreateSAMLServiceProvider(config Config, keyPair tls.Certificate) (*samlsp.Middleware, error) {
+	// Note: In a production environment, you would load and validate the IdP certificate
+	// For simplicity, we're skipping this step in this example
 
-# Proxy (This Service Provider) settings
-proxy:
-  entity_id: "http://localhost:8080/metadata"
-  assertion_consumer_service_url: "http://localhost:8080/sso/acs"
-  # single_logout_service_url: "http://localhost:8080/sso/slo" # Future
-  private_key_path: "proxy.key"
-  certificate_path: "proxy.crt"
-  metadata_url: "http://localhost:8080/metadata" # Should match entity_id typically
+	return samlsp.New(samlsp.Options{
+		URL:               *mustParseURL(config.Proxy.EntityID),
+		Key:               keyPair.PrivateKey.(*rsa.PrivateKey),
+		Certificate:       keyPair.Leaf,
+		IDPMetadata:       &saml.EntityDescriptor{EntityID: config.IdP.EntityID},
+		AllowIDPInitiated: true,
+	})
+}
 
-# Upstream Identity Provider settings
-idp:
-  entity_id: "https://idp.example.com/saml/metadata" # Example IdP
-  sso_service_url: "https://idp.example.com/saml/sso"
-  # single_logout_service_url: "https://idp.example.com/saml/slo" # Future
-  certificate_path: "idp.crt" # Path to IdP's public certificate for verifying signatures
-  # metadata_url: "https://idp.example.com/saml/metadata"
-  # Optional: if provided, other IdP settings might be fetched from here
-
-server:
-  listen_address: ":8080"
-
-*/
-
-// Placeholder for configuration values have been removed as they are now loaded from env vars.
-
-func main() {
-	cfg, err := loadConfig()
+// ConfigureIdPMetadata configures the IdP metadata for the SAML Service Provider
+func ConfigureIdPMetadata(samlSP *samlsp.Middleware, idpSSOURL string) (*url.URL, error) {
+	idpMetadataURL, err := url.Parse(idpSSOURL)
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		return nil, err
 	}
 
+	samlSP.ServiceProvider.IDPMetadata.IDPSSODescriptors = []saml.IDPSSODescriptor{
+		{
+			SingleSignOnServices: []saml.Endpoint{
+				{
+					Binding:  saml.HTTPRedirectBinding,
+					Location: idpSSOURL,
+				},
+			},
+		},
+	}
+
+	return idpMetadataURL, nil
+}
+
+// SetupHTTPHandlers sets up the HTTP handlers for the SAML proxy
+func SetupHTTPHandlers(samlSP *samlsp.Middleware, idpMetadataURL *url.URL) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/ping", func(w http.ResponseWriter, _ *http.Request) {
-		fmt.Fprintln(w, "pong")
+
+	// Metadata endpoint
+	mux.HandleFunc("/metadata", func(w http.ResponseWriter, r *http.Request) {
+		samlSP.ServeMetadata(w, r)
 	})
 
-	samlSPHandler, err := newSamlServiceProvider(cfg)
-	if err != nil {
-		log.Fatalf("Failed to create SAML Service Provider: %v", err)
-	}
-	mux.Handle("/metadata", samlSPHandler)
-	// The metadata handler itself is now created by newSamlServiceProvider
+	// SSO initiation endpoint
+	mux.HandleFunc("/sso", func(w http.ResponseWriter, r *http.Request) {
+		relayState := r.URL.Query().Get("RelayState")
+		if relayState == "" {
+			relayState = "/"
+		}
 
-	log.Printf("Starting server on %s...", cfg.ServerListenAddress)
-	log.Printf("Ping endpoint: http://localhost%s/ping", cfg.ServerListenAddress) // Assuming localhost for ping
-	// Construct metadata URL carefully based on listen address if it's not always localhost
-	// For now, assume metadata URL in config is the externally reachable one.
-	log.Printf("SAML SP Metadata: %s", cfg.ProxyMetadataURL.String())
+		// Redirect to the IdP for authentication
+		http.Redirect(w, r, idpMetadataURL.String(), http.StatusFound)
+	})
 
+	// ACS (Assertion Consumer Service) endpoint
+	mux.HandleFunc("/sso/acs", samlSP.ServeACS)
+
+	// Health check endpoint
+	mux.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("pong"))
+	})
+
+	return mux
+}
+
+// StartServer starts the HTTP server with the given configuration and handler
+func StartServer(config Config, handler http.Handler) error {
 	server := &http.Server{
-		Addr:         cfg.ServerListenAddress,
-		Handler:      mux,
-		ReadTimeout:  serverReadTimeout,
-		WriteTimeout: serverWriteTimeout,
-		IdleTimeout:  serverIdleTimeout,
+		Addr:    config.Server.ListenAddress,
+		Handler: handler,
 	}
 
-	if err := server.ListenAndServe(); err != nil {
+	log.Printf("Starting SAML proxy on %s", config.Server.ListenAddress)
+	log.Printf("Metadata URL: %s", config.Proxy.MetadataURL)
+	log.Printf("ACS URL: %s", config.Proxy.AcsURL)
+	log.Printf("SSO URL: %s/sso", config.Proxy.EntityID)
+
+	return server.ListenAndServe()
+}
+
+func main() {
+	// Load configuration
+	config, err := LoadConfig()
+	if err != nil {
+		log.Fatalf("Failed to process config: %v", err)
+	}
+
+	// Load certificates
+	keyPair, err := LoadCertificate(config.Proxy.CertificatePath, config.Proxy.PrivateKeyPath)
+	if err != nil {
+		log.Fatalf("Failed to load SP certificate and key: %v", err)
+	}
+
+	// Create SAML Service Provider
+	samlSP, err := CreateSAMLServiceProvider(config, keyPair)
+	if err != nil {
+		log.Fatalf("Failed to create SAML SP: %v", err)
+	}
+
+	// Configure IdP metadata
+	idpMetadataURL, err := ConfigureIdPMetadata(samlSP, config.IdP.SSOURL)
+	if err != nil {
+		log.Fatalf("Failed to parse IdP SSO URL: %v", err)
+	}
+
+	// Set up HTTP handlers
+	mux := SetupHTTPHandlers(samlSP, idpMetadataURL)
+
+	// Start the server
+	err = StartServer(config, mux)
+	if err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
 
-// newSamlServiceProvider creates and configures a new SAML ServiceProvider http.Handler instance
-// using the provided configuration.
-func newSamlServiceProvider(cfg *Config) (http.Handler, error) {
-	// Dynamic key/cert generation is removed. Using values from cfg.
-	if cfg.ProxyPrivateKey == nil {
-		return nil, ErrProxyPrivateKeyNotLoaded
+// Helper function to parse URLs and panic on error
+func mustParseURL(s string) *url.URL {
+	u, err := url.Parse(s)
+	if err != nil {
+		panic(err)
 	}
-	if cfg.ProxyCertificate == nil {
-		return nil, ErrProxyCertificateNotLoaded
-	}
-	if cfg.ProxyMetadataURL == nil {
-		return nil, ErrProxyMetadataURLNotLoaded
-	}
-	if cfg.ProxyAcsURL == nil {
-		return nil, ErrProxyAcsURLNotLoaded
-	}
-
-	samlSP := saml.ServiceProvider{
-		EntityID:    cfg.ProxyEntityID,
-		Key:         cfg.ProxyPrivateKey,
-		Certificate: cfg.ProxyCertificate,
-		MetadataURL: *cfg.ProxyMetadataURL,
-		AcsURL:      *cfg.ProxyAcsURL,
-		// AuthnRequestsSigned: true, // Future consideration
-		// WantAssertionsSigned: true, // Future consideration
-	}
-
-	// Create an http.HandlerFunc to serve the metadata
-	metadataHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		// Get metadata from saml.ServiceProvider; returns *EntityDescriptor, no error
-		md := samlSP.Metadata()
-		xmlBytes, err := xml.MarshalIndent(md, "", "  ") // Use xml.MarshalIndent
-		if err != nil {
-			log.Printf("Error marshalling SAML metadata to XML: %v", err)
-			http.Error(w, "Failed to marshal SAML metadata", http.StatusInternalServerError)
-
-			return
-		}
-		w.Header().Set("Content-Type", "application/samlmetadata+xml")
-		_, _ = w.Write(xmlBytes)
-	})
-
-	// For the ACS endpoint later, we will likely use `samlsp.Middleware`
-	// and mount it at a suitable path (e.g., "/sso/acs" directly or "/sso/" and let it handle "acs").
-	// For now, only metadata is served.
-	return metadataHandler, nil
-
-	// --- Old approach using samlsp.New() or direct samlsp.ServiceProvider (kept for reference) ---
-	// The core issue was that `samlsp.Middleware` (returned by `samlsp.New`) hardcodes
-	// path prefixes like "/saml/". If we want different paths like "/metadata",
-	// we might need to wrap it or handle routing carefully.
-	//
-	// opts := samlsp.Options{
-	// 	EntityID: proxyEntityID,
-	// 	Key: privKey,
-	// 	Certificate: certPem, // samlsp.Options expects PEM bytes for Certificate
-	// 	AcsURL: parsedAcsURL,
-	// 	MetadataURL: parsedMetadataURL,
-	// 	// BaseURL can be tricky. If set, it might override AcsURL/MetadataURL path construction.
-	// 	// For example, if BaseURL is http://localhost:8080, AcsURL might become http://localhost:8080/saml/acs
-	// 	// Let's try with it commented out first, relying on explicit AcsURL/MetadataURL.
-	// 	// URL: *baseURL, // Example: http://localhost:8080
-	// }
-	//
-	// samlMiddleware, err := samlsp.New(opts)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to create samlsp.Middleware: %w", err)
-	// }
-	// return samlMiddleware, nil
+	return u
 }
