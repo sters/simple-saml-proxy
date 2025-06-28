@@ -19,7 +19,6 @@ jobs:
       with:
         go-version-file: ./go.mod
 
-    - run: make bootstrap-tools
     - run: make lint
     - run: make cover
 
