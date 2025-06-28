@@ -45,7 +45,7 @@ func TestCreateSAMLServiceProviders(t *testing.T) {
 		config.Proxy.CookieName = "idp_selection"
 
 		// Add a single IDP
-		config.IDPs = []IDPConfig{
+		config.IDP = []IDPConfig{
 			{
 				ID:              "idp1",
 				EntityID:        "https://idp1.example.com/saml/metadata",
@@ -74,14 +74,14 @@ func TestCreateSAMLServiceProviders(t *testing.T) {
 		assert.Equal(t, "https://idp1.example.com/saml/metadata", provider.Middleware.ServiceProvider.IDPMetadata.EntityID)
 	})
 
-	t.Run("Multiple IDPs", func(t *testing.T) {
-		// Create a test config with multiple IDPs
+	t.Run("Multiple IDP", func(t *testing.T) {
+		// Create a test config with multiple IDP
 		config := Config{}
 		config.Proxy.EntityID = "http://test.example.com/metadata"
 		config.Proxy.CookieName = "idp_selection"
 
-		// Add multiple IDPs
-		config.IDPs = []IDPConfig{
+		// Add multiple IDP
+		config.IDP = []IDPConfig{
 			{
 				ID:              "idp1",
 				EntityID:        "https://idp1.example.com/saml/metadata",
@@ -101,7 +101,7 @@ func TestCreateSAMLServiceProviders(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, providers)
 
-		// Verify the providers map contains both IDPs
+		// Verify the providers map contains both IDP
 		assert.Len(t, providers.Providers, 2)
 		assert.Contains(t, providers.Providers, "idp1")
 		assert.Contains(t, providers.Providers, "idp2")

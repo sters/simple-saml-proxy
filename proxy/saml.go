@@ -53,13 +53,13 @@ func (s *SAMLServiceProviders) GetProvider(id string) *IDPServiceProvider {
 	return s.Default
 }
 
-// CreateSAMLServiceProviders creates SAML Service Providers for all configured IDPs.
+// CreateSAMLServiceProviders creates SAML Service Providers for all configured IDP.
 func CreateSAMLServiceProviders(config Config, keyPair tls.Certificate) (*SAMLServiceProviders, error) {
 	providers := &SAMLServiceProviders{
 		Providers: make(map[string]*IDPServiceProvider),
 	}
 
-	for _, idpConfig := range config.IDPs {
+	for _, idpConfig := range config.IDP {
 		// Create a new SAML Service Provider for this IDP
 		key, ok := keyPair.PrivateKey.(*rsa.PrivateKey)
 		if !ok {

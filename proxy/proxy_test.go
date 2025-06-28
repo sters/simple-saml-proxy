@@ -83,13 +83,13 @@ func TestSetupHTTPHandlers(t *testing.T) {
 	cert, err := LoadCertificate(certPath, keyPath)
 	require.NoError(t, err)
 
-	// Create a test config with multiple IDPs
+	// Create a test config with multiple IDP
 	config := Config{}
 	config.Proxy.EntityID = "http://test.example.com/metadata"
 	config.Proxy.CookieName = "idp_selection"
 
-	// Add multiple IDPs
-	config.IDPs = []IDPConfig{
+	// Add multiple IDP
+	config.IDP = []IDPConfig{
 		{
 			ID:              "idp1",
 			EntityID:        "https://idp1.example.com/saml/metadata",

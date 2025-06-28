@@ -113,9 +113,9 @@ func StartServer(config Config, handler http.Handler) error {
 	slog.Info("ACS URL", slog.String("url", config.Proxy.AcsURL))
 	slog.Info("SSO URL", slog.String("url", config.Proxy.EntityID+"/sso"))
 
-	// Log information about configured IDPs
-	slog.Info("Configured IDPs")
-	for _, idp := range config.IDPs {
+	// Log information about configured IDP
+	slog.Info("Configured IDP")
+	for _, idp := range config.IDP {
 		slog.Info("IDP details",
 			slog.String("entityID", idp.EntityID),
 			slog.String("id", idp.ID),

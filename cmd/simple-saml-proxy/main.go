@@ -9,7 +9,7 @@ import (
 	"github.com/sters/simple-saml-proxy/proxy"
 )
 
-// This SAML proxy supports multiple IDPs with the following flow:
+// This SAML proxy supports multiple IDP with the following flow:
 // 1. Browser accesses /link_sso/{idp_id} which sets a cookie to identify the IDP and redirects to the service URL
 // 2. Browser redirects to the service URL and initiates SAML SSO
 // 3. Browser accesses the proxy, the IDP is determined from the cookie, and redirects to the IDP
@@ -36,7 +36,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create SAML Service Providers for all IDPs
+	// Create SAML Service Providers for all IDP
 	providers, err := proxy.CreateSAMLServiceProviders(config, keyPair)
 	if err != nil {
 		slog.Error("Failed to create SAML SPs", slog.Any("error", err))

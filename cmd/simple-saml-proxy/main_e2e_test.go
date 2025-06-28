@@ -329,7 +329,7 @@ func TestMetadataEndpoint(t *testing.T) {
 	mockProvider := NewMockSAMLProvider(t)
 	defer mockProvider.Close()
 
-	// Create a test config with multiple IDPs
+	// Create a test config with multiple IDP
 	config := proxy.Config{}
 	config.Proxy.EntityID = "http://localhost:8080/metadata"
 	config.Proxy.AcsURL = "http://localhost:8080/sso/acs"
@@ -337,7 +337,7 @@ func TestMetadataEndpoint(t *testing.T) {
 	config.Proxy.CookieName = "idp_selection"
 
 	// Add the mock provider as an IDP
-	config.IDPs = []proxy.IDPConfig{
+	config.IDP = []proxy.IDPConfig{
 		{
 			ID:              "mock",
 			EntityID:        mockProvider.entityID,
@@ -401,7 +401,7 @@ func TestSSOEndpoint(t *testing.T) {
 	mockProvider := NewMockSAMLProvider(t)
 	defer mockProvider.Close()
 
-	// Create a test config with multiple IDPs
+	// Create a test config with multiple IDP
 	config := proxy.Config{}
 	config.Proxy.EntityID = "http://localhost:8080/metadata"
 	config.Proxy.AcsURL = "http://localhost:8080/sso/acs"
@@ -409,7 +409,7 @@ func TestSSOEndpoint(t *testing.T) {
 	config.Proxy.CookieName = "idp_selection"
 
 	// Add the mock provider as an IDP
-	config.IDPs = []proxy.IDPConfig{
+	config.IDP = []proxy.IDPConfig{
 		{
 			ID:              "mock",
 			EntityID:        mockProvider.entityID,
@@ -469,7 +469,7 @@ func TestACSEndpoint(t *testing.T) {
 	mockProvider := NewMockSAMLProvider(t)
 	defer mockProvider.Close()
 
-	// Create a test config with multiple IDPs
+	// Create a test config with multiple IDP
 	config := proxy.Config{}
 	config.Proxy.EntityID = "http://localhost:8080/metadata"
 	config.Proxy.AcsURL = "http://localhost:8080/sso/acs"
@@ -477,7 +477,7 @@ func TestACSEndpoint(t *testing.T) {
 	config.Proxy.CookieName = "idp_selection"
 
 	// Add the mock provider as an IDP
-	config.IDPs = []proxy.IDPConfig{
+	config.IDP = []proxy.IDPConfig{
 		{
 			ID:              "mock",
 			EntityID:        mockProvider.entityID,
@@ -543,15 +543,15 @@ func TestLinkSSOEndpoint(t *testing.T) {
 	mockProvider2.entityID = "https://idp2.example.com/saml/metadata"
 	mockProvider2.ssoURL = "https://idp2.example.com/saml/sso"
 
-	// Create a test config with multiple IDPs
+	// Create a test config with multiple IDP
 	config := proxy.Config{}
 	config.Proxy.EntityID = "http://localhost:8080/metadata"
 	config.Proxy.AcsURL = "http://localhost:8080/sso/acs"
 	config.Proxy.MetadataURL = "http://localhost:8080/metadata"
 	config.Proxy.CookieName = "idp_selection"
 
-	// Add multiple IDPs
-	config.IDPs = []proxy.IDPConfig{
+	// Add multiple IDP
+	config.IDP = []proxy.IDPConfig{
 		{
 			ID:              "idp1",
 			EntityID:        mockProvider1.entityID,
@@ -696,7 +696,7 @@ func TestE2EFlow(t *testing.T) {
 	mockProvider := NewMockSAMLProvider(t)
 	defer mockProvider.Close()
 
-	// Create a test config with multiple IDPs
+	// Create a test config with multiple IDP
 	config := proxy.Config{}
 	config.Proxy.EntityID = "http://localhost:8080/metadata"
 	config.Proxy.AcsURL = "http://localhost:8080/sso/acs"
@@ -704,7 +704,7 @@ func TestE2EFlow(t *testing.T) {
 	config.Proxy.CookieName = "idp_selection"
 
 	// Add the mock provider as an IDP
-	config.IDPs = []proxy.IDPConfig{
+	config.IDP = []proxy.IDPConfig{
 		{
 			ID:              "mock",
 			EntityID:        mockProvider.entityID,
