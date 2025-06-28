@@ -1,4 +1,4 @@
-module github.com/sters/go-project-boilerplate
+module github.com/sters/simple-saml-proxy
 
 go 1.24
 

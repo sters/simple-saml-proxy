@@ -3,11 +3,14 @@ linters:
   disable:
     - cyclop
     - depguard
+    - err113
     - exhaustive
     - exhaustruct
     - funlen
     - gocognit
     - godox
+    - mnd
+    - testifylint
     - testpackage
     - wsl
 
