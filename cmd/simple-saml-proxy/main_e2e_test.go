@@ -334,7 +334,6 @@ func TestMetadataEndpoint(t *testing.T) {
 	config.Proxy.EntityID = "http://localhost:8080/metadata"
 	config.Proxy.AcsURL = "http://localhost:8080/sso/acs"
 	config.Proxy.MetadataURL = "http://localhost:8080/metadata"
-	config.Proxy.CookieName = "idp_selection"
 
 	// Add the mock provider as an IDP
 	config.IDP = []proxy.IDPConfig{
@@ -409,7 +408,6 @@ func TestSSOEndpoint(t *testing.T) {
 	config.Proxy.EntityID = "http://localhost:8080/metadata"
 	config.Proxy.AcsURL = "http://localhost:8080/sso/acs"
 	config.Proxy.MetadataURL = "http://localhost:8080/metadata"
-	config.Proxy.CookieName = "idp_selection"
 
 	// Add the mock provider as an IDP
 	config.IDP = []proxy.IDPConfig{
@@ -471,18 +469,6 @@ func TestSSOEndpoint(t *testing.T) {
 	assert.Contains(t, redirectURL, mockProvider.ssoURL)
 	assert.Contains(t, redirectURL, "SAMLRequest=request123")
 	assert.Contains(t, redirectURL, "RelayState=state123")
-
-	// Verify the cookie was set
-	cookies := resp.Cookies()
-	var idpCookie *http.Cookie
-	for _, cookie := range cookies {
-		if cookie.Name == config.Proxy.CookieName {
-			idpCookie = cookie
-			break
-		}
-	}
-	assert.NotNil(t, idpCookie)
-	assert.Equal(t, "mock", idpCookie.Value)
 }
 
 // TestACSEndpoint tests the /sso/acs endpoint of the SAML proxy.
@@ -515,7 +501,6 @@ func TestACSEndpoint(t *testing.T) {
 	config.Proxy.EntityID = "http://localhost:8080/metadata"
 	config.Proxy.AcsURL = "http://localhost:8080/sso/acs"
 	config.Proxy.MetadataURL = "http://localhost:8080/metadata"
-	config.Proxy.CookieName = "idp_selection"
 
 	// Add the mock provider as an IDP
 	config.IDP = []proxy.IDPConfig{
@@ -567,170 +552,6 @@ func TestACSEndpoint(t *testing.T) {
 	assert.Contains(t, string(body), "IdP-Initiated flow not yet implemented")
 }
 
-// TestLinkSSOEndpoint tests the /link_sso/{idp_id} endpoint of the SAML proxy.
-func TestLinkSSOEndpoint(t *testing.T) {
-	// Generate test certificate and key
-	certPath, keyPath := generateTestCertificate(t)
-	defer func() {
-		if certPath != "" {
-			err := os.RemoveAll(filepath.Dir(certPath))
-			if err != nil {
-				t.Logf("Failed to remove temp directory: %v", err)
-			}
-		}
-	}()
-
-	// Load the certificate
-	cert, err := proxy.LoadCertificate(certPath, keyPath)
-	assert.NoError(t, err)
-
-	// Create multiple mock SAML providers
-	mockProvider1 := NewMockSAMLProvider(t)
-	defer mockProvider1.Close()
-	mockProvider1.entityID = "https://idp1.example.com/saml/metadata"
-	mockProvider1.ssoURL = "https://idp1.example.com/saml/sso"
-
-	mockProvider2 := NewMockSAMLProvider(t)
-	defer mockProvider2.Close()
-	mockProvider2.entityID = "https://idp2.example.com/saml/metadata"
-	mockProvider2.ssoURL = "https://idp2.example.com/saml/sso"
-
-	// Create a test config with multiple IDP
-	config := proxy.Config{}
-	config.Proxy.EntityID = "http://localhost:8080/metadata"
-	config.Proxy.AcsURL = "http://localhost:8080/sso/acs"
-	config.Proxy.MetadataURL = "http://localhost:8080/metadata"
-	config.Proxy.CookieName = "idp_selection"
-
-	// Add multiple IDP
-	config.IDP = []proxy.IDPConfig{
-		{
-			ID:              "idp1",
-			EntityID:        mockProvider1.entityID,
-			SSOURL:          mockProvider1.ssoURL,
-			CertificatePath: certPath, // Not actually used in the test
-		},
-		{
-			ID:              "idp2",
-			EntityID:        mockProvider2.entityID,
-			SSOURL:          mockProvider2.ssoURL,
-			CertificatePath: certPath, // Not actually used in the test
-		},
-	}
-
-	// Create SAML service providers
-	providers, err := proxy.CreateSAMLServiceProviders(config, cert)
-	assert.NoError(t, err)
-
-	// Set up HTTP handlers
-	mux := proxy.SetupHTTPHandlers(providers, config)
-	assert.NotNil(t, mux)
-
-	// Create a test server for the proxy
-	proxyServer := httptest.NewServer(mux)
-	defer proxyServer.Close()
-
-	// Test 1: Access the link_sso endpoint for idp1
-	serviceURL := "https://example.com/service"
-
-	// Create a client that doesn't follow redirects
-	client := &http.Client{
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-			// Don't follow redirects automatically
-			return http.ErrUseLastResponse
-		},
-	}
-
-	resp, err := client.Get(proxyServer.URL + "/link_sso/idp1?service=" + url.QueryEscape(serviceURL))
-	assert.NoError(t, err)
-	defer resp.Body.Close()
-
-	// Verify it redirects to the service URL
-	assert.Equal(t, http.StatusFound, resp.StatusCode)
-	assert.Equal(t, serviceURL, resp.Header.Get("Location"))
-
-	// Verify the cookie was set
-	cookies := resp.Cookies()
-	var idpCookie *http.Cookie
-	for _, cookie := range cookies {
-		if cookie.Name == config.Proxy.CookieName {
-			idpCookie = cookie
-
-			break
-		}
-	}
-	assert.NotNil(t, idpCookie)
-	assert.Equal(t, "idp1", idpCookie.Value)
-
-	// Test 2: Access the link_sso endpoint for idp2
-	resp, err = client.Get(proxyServer.URL + "/link_sso/idp2?service=" + url.QueryEscape(serviceURL))
-	assert.NoError(t, err)
-	defer resp.Body.Close()
-
-	// Verify it redirects to the service URL
-	assert.Equal(t, http.StatusFound, resp.StatusCode)
-	assert.Equal(t, serviceURL, resp.Header.Get("Location"))
-
-	// Verify the cookie was set
-	cookies = resp.Cookies()
-	idpCookie = nil
-	for _, cookie := range cookies {
-		if cookie.Name == config.Proxy.CookieName {
-			idpCookie = cookie
-
-			break
-		}
-	}
-	assert.NotNil(t, idpCookie)
-	assert.Equal(t, "idp2", idpCookie.Value)
-
-	// Test 3: Access the link_sso endpoint with an invalid IDP
-	resp, err = client.Get(proxyServer.URL + "/link_sso/invalid?service=" + url.QueryEscape(serviceURL))
-	assert.NoError(t, err)
-	defer resp.Body.Close()
-
-	// Verify it returns an error
-	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-
-	// Test 4: Access the SSO endpoint with SAMLRequest parameter (should show IdP selection page)
-	resp, err = client.Get(proxyServer.URL + "/sso?SAMLRequest=request123")
-	assert.NoError(t, err)
-	defer resp.Body.Close()
-
-	// Verify it returns the IdP selection page
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	body, err := io.ReadAll(resp.Body)
-	assert.NoError(t, err)
-	assert.Contains(t, string(body), "Select an Identity Provider")
-	assert.Contains(t, string(body), "idp1")
-	assert.Contains(t, string(body), "idp2")
-
-	// Test 5: Access the select_idp endpoint for idp1
-	resp, err = client.Get(proxyServer.URL + "/select_idp/idp1?SAMLRequest=request123&RelayState=state123")
-	assert.NoError(t, err)
-	defer resp.Body.Close()
-
-	// Verify it redirects to IdP1
-	assert.Equal(t, http.StatusFound, resp.StatusCode)
-	var redirectURL string
-	redirectURL = resp.Header.Get("Location")
-	assert.Contains(t, redirectURL, mockProvider1.ssoURL)
-	assert.Contains(t, redirectURL, "SAMLRequest=request123")
-	assert.Contains(t, redirectURL, "RelayState=state123")
-
-	// Test 6: Access the select_idp endpoint for idp2
-	resp, err = client.Get(proxyServer.URL + "/select_idp/idp2?SAMLRequest=request123&RelayState=state123")
-	assert.NoError(t, err)
-	defer resp.Body.Close()
-
-	// Verify it redirects to IdP2
-	assert.Equal(t, http.StatusFound, resp.StatusCode)
-	redirectURL = resp.Header.Get("Location")
-	assert.Contains(t, redirectURL, mockProvider2.ssoURL)
-	assert.Contains(t, redirectURL, "SAMLRequest=request123")
-	assert.Contains(t, redirectURL, "RelayState=state123")
-}
-
 // TestE2EFlow tests the complete end-to-end flow: Service -> Proxy -> SAML Provider -> Proxy -> Service.
 func TestE2EFlow(t *testing.T) {
 	// Generate test certificate and key
@@ -757,7 +578,6 @@ func TestE2EFlow(t *testing.T) {
 	config.Proxy.EntityID = "http://localhost:8080/metadata"
 	config.Proxy.AcsURL = "http://localhost:8080/sso/acs"
 	config.Proxy.MetadataURL = "http://localhost:8080/metadata"
-	config.Proxy.CookieName = "idp_selection"
 
 	// Add the mock provider as an IDP
 	config.IDP = []proxy.IDPConfig{
@@ -816,18 +636,6 @@ func TestE2EFlow(t *testing.T) {
 	assert.Contains(t, redirectURL, mockProvider.ssoURL)
 	assert.Contains(t, redirectURL, "SAMLRequest=request123")
 	assert.Contains(t, redirectURL, "RelayState=state123")
-
-	// Verify the cookie was set
-	cookies := resp.Cookies()
-	var idpCookie *http.Cookie
-	for _, cookie := range cookies {
-		if cookie.Name == config.Proxy.CookieName {
-			idpCookie = cookie
-			break
-		}
-	}
-	assert.NotNil(t, idpCookie)
-	assert.Equal(t, "mock", idpCookie.Value)
 
 	// In a real E2E test, we would:
 	// 1. Follow the redirect to the IdP

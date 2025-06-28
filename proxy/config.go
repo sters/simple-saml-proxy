@@ -18,12 +18,11 @@ type IDPConfig struct {
 // Config holds all the configuration parameters for the SAML proxy.
 type Config struct {
 	Proxy struct {
-		EntityID                string   `env:"ENTITY_ID"                 envDefault:"SimpleSamlProxy"`
+		EntityID                string   `env:"ENTITY_ID"                 envDefault:"http://localhost:8080"`
 		AcsURL                  string   `env:"ACS_URL"                   envDefault:"http://localhost:8080/sso/acs"`
 		MetadataURL             string   `env:"METADATA_URL"              envDefault:"http://localhost:8080/metadata"`
 		PrivateKeyPath          string   `env:"PRIVATE_KEY_PATH,required"`
 		CertificatePath         string   `env:"CERTIFICATE_PATH,required"`
-		CookieName              string   `env:"COOKIE_NAME"               envDefault:"idp_selection"`
 		AllowedServiceURLPrefix []string `env:"ALLOWED_SERVICE_URL_PREFIX" envSeparator:","`
 	} `envPrefix:"PROXY_"`
 

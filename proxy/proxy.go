@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"encoding/base64"
 	"fmt"
 	"html/template"
 	"log/slog"
@@ -69,12 +70,58 @@ func SetupHTTPHandlers(providers *SAMLServiceProviders, config Config) http.Hand
 		// Handle different endpoints
 		switch {
 		case r.URL.Path == "/metadata":
-			// Metadata endpoint - This endpoint now serves metadata for SPs
+			// Metadata endpoint - This endpoint serves metadata for SPs
 			// The proxy acts as an IdP from the SP's perspective
-			// TODO: Implement IdP metadata generation
 			slog.Info("Serving IdP metadata to SP")
-			w.Header().Set("Content-Type", "application/xml")
-			w.Write([]byte("<EntityDescriptor xmlns=\"urn:oasis:names:tc:SAML:2.0:metadata\" entityID=\"" + config.Proxy.EntityID + "\"><IDPSSODescriptor protocolSupportEnumeration=\"urn:oasis:names:tc:SAML:2.0:protocol\"></IDPSSODescriptor></EntityDescriptor>"))
+
+			// Get the certificate from the default provider
+			var certData string
+			if providers.Default != nil && providers.Default.Middleware != nil && providers.Default.Middleware.ServiceProvider.Certificate != nil {
+				// Get the certificate data in base64 format
+				certData = base64.StdEncoding.EncodeToString(providers.Default.Middleware.ServiceProvider.Certificate.Raw)
+			} else {
+				// Fallback to loading from file if no provider is available
+				cert, err := LoadCertificate(config.Proxy.CertificatePath, config.Proxy.PrivateKeyPath)
+				if err != nil {
+					slog.Error("Failed to load certificate for metadata", slog.String("error", err.Error()))
+					http.Error(w, "Internal server error", http.StatusInternalServerError)
+					return
+				}
+				certData = base64.StdEncoding.EncodeToString(cert.Leaf.Raw)
+			}
+
+			// Generate the metadata XML directly
+			validUntil := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
+			metadataXML := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" 
+                  xmlns:ds="http://www.w3.org/2000/09/xmldsig#" 
+                  entityID="%s" 
+                  validUntil="%s">
+  <IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <KeyDescriptor use="signing">
+      <ds:KeyInfo>
+        <ds:X509Data>
+          <ds:X509Certificate>%s</ds:X509Certificate>
+        </ds:X509Data>
+      </ds:KeyInfo>
+    </KeyDescriptor>
+    <KeyDescriptor use="encryption">
+      <ds:KeyInfo>
+        <ds:X509Data>
+          <ds:X509Certificate>%s</ds:X509Certificate>
+        </ds:X509Data>
+      </ds:KeyInfo>
+    </KeyDescriptor>
+    <SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="%s/sso"/>
+    <NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress</NameIDFormat>
+    <NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:transient</NameIDFormat>
+    <NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:persistent</NameIDFormat>
+  </IDPSSODescriptor>
+</EntityDescriptor>`, config.Proxy.EntityID, validUntil, certData, certData, config.Proxy.EntityID)
+
+			// Serve the metadata
+			w.Header().Set("Content-Type", "application/samlmetadata+xml")
+			w.Write([]byte(metadataXML))
 
 		case r.URL.Path == "/sso":
 			// SSO endpoint - This is where SPs send AuthnRequests
@@ -122,18 +169,6 @@ func SetupHTTPHandlers(providers *SAMLServiceProviders, config Config) http.Hand
 			if provider, ok := providers.Providers[idpID]; ok {
 				slog.Info("IDP found", slog.String("idp", idpID))
 
-				// Set the cookie with the IDP ID
-				cookie := &http.Cookie{
-					Name:     config.Proxy.CookieName,
-					Value:    idpID,
-					Path:     "/",
-					HttpOnly: true,
-					Secure:   r.TLS != nil,
-					SameSite: http.SameSiteLaxMode,
-				}
-				http.SetCookie(w, cookie)
-				slog.Info("Set cookie", slog.String("name", cookie.Name), slog.String("value", cookie.Value))
-
 				// Forward the SAML request to the selected IdP
 				// Build the redirect URL to the IdP's SSO URL with the SAML request and relay state
 				redirectURL := provider.Middleware.ServiceProvider.GetSSOBindingLocation(saml.HTTPRedirectBinding)
@@ -152,12 +187,7 @@ func SetupHTTPHandlers(providers *SAMLServiceProviders, config Config) http.Hand
 		case r.URL.Path == "/sso/acs":
 			// ACS endpoint - This is where IdPs send SAML responses
 			// The proxy acts as an SP from the IdP's perspective
-			cookie, err := r.Cookie(config.Proxy.CookieName)
-			var idpID string
-			if err == nil {
-				idpID = cookie.Value
-			}
-			provider := providers.GetProvider(idpID)
+			provider := providers.Default
 
 			// Process the SAML response from the IdP
 			// This is a simplified implementation - in a real-world scenario,
@@ -173,7 +203,7 @@ func SetupHTTPHandlers(providers *SAMLServiceProviders, config Config) http.Hand
 			// 2. Redirect the user to the SP with a success message
 
 			// TODO: Implement full SAML response processing and forwarding
-			slog.Info("Processing SAML response from IdP", slog.String("idp", idpID))
+			slog.Info("Processing SAML response from IdP")
 
 			// Get the relay state, which should contain the SP's ACS URL
 			relayState := r.URL.Query().Get("RelayState")
@@ -187,54 +217,7 @@ func SetupHTTPHandlers(providers *SAMLServiceProviders, config Config) http.Hand
 			// In a real implementation, we would redirect to the SP's ACS URL with the processed SAML response
 			// For now, we'll just log that we processed the response
 			slog.Info("Processed SAML response from IdP",
-				slog.String("idp", idpID),
 				slog.String("relayState", relayState))
-
-		case strings.HasPrefix(r.URL.Path, "/link_sso/"):
-			// Legacy Link SSO endpoint for IDP selection
-			// This is kept for backward compatibility
-			idpID := r.URL.Path[len("/link_sso/"):]
-			slog.Info("Legacy Link SSO request", slog.String("idp", idpID))
-
-			// Check if the IDP exists
-			if _, ok := providers.Providers[idpID]; ok {
-				slog.Info("IDP found", slog.String("idp", idpID))
-
-				// Set the cookie with the IDP ID
-				cookie := &http.Cookie{
-					Name:     config.Proxy.CookieName,
-					Value:    idpID,
-					Path:     "/",
-					HttpOnly: true,
-					Secure:   r.TLS != nil,
-					SameSite: http.SameSiteLaxMode,
-				}
-				http.SetCookie(w, cookie)
-				slog.Info("Set cookie", slog.String("name", cookie.Name), slog.String("value", cookie.Value))
-
-				// Get the service URL from the query parameter
-				serviceURL := r.URL.Query().Get("service")
-				if serviceURL == "" {
-					serviceURL = "/"
-				}
-				slog.Info("Service URL", slog.String("url", serviceURL))
-
-				// Validate the service URL against allowed prefixes
-				if !isAllowedServiceURL(serviceURL, config.Proxy.AllowedServiceURLPrefix) {
-					slog.Info("Invalid service URL", slog.String("url", serviceURL))
-					http.Error(w, "Invalid service URL", http.StatusBadRequest)
-					return
-				}
-
-				// Redirect to the service URL
-				slog.Info("Redirecting", slog.String("url", serviceURL))
-				w.Header().Set("Location", serviceURL)
-				w.WriteHeader(http.StatusFound)
-				slog.Info("Redirect sent", slog.Int("status", http.StatusFound))
-			} else {
-				slog.Info("Invalid IDP ID", slog.String("idp", idpID))
-				http.Error(w, "Invalid IDP ID", http.StatusBadRequest)
-			}
 
 		case r.URL.Path == "/ping":
 			// Health check endpoint
@@ -295,7 +278,7 @@ func StartServer(config Config, handler http.Handler) error {
 			slog.String("entityID", idp.EntityID),
 			slog.String("id", idp.ID),
 			slog.String("ssoURL", idp.SSOURL),
-			slog.String("linkSSOURL", config.Proxy.EntityID+"/link_sso/"+idp.ID))
+		)
 	}
 
 	err := server.ListenAndServe()

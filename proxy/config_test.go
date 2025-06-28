@@ -30,7 +30,6 @@ func TestLoadConfig(t *testing.T) {
 		t.Setenv("PROXY_METADATA_URL", "http://test.example.com/metadata")
 		t.Setenv("PROXY_PRIVATE_KEY_PATH", "/path/to/key.pem")
 		t.Setenv("PROXY_CERTIFICATE_PATH", "/path/to/cert.pem")
-		t.Setenv("PROXY_COOKIE_NAME", "test_idp_selection")
 		t.Setenv("IDP_0_ID", "default")
 		t.Setenv("IDP_0_ENTITY_ID", "https://idp.example.com/saml/metadata")
 		t.Setenv("IDP_0_SSO_URL", "https://idp.example.com/saml/sso")
@@ -45,7 +44,6 @@ func TestLoadConfig(t *testing.T) {
 		assert.Equal(t, "http://test.example.com/metadata", config.Proxy.MetadataURL)
 		assert.Equal(t, "/path/to/key.pem", config.Proxy.PrivateKeyPath)
 		assert.Equal(t, "/path/to/cert.pem", config.Proxy.CertificatePath)
-		assert.Equal(t, "test_idp_selection", config.Proxy.CookieName)
 
 		// Verify the IDP was added to the IDP slice
 		assert.Len(t, config.IDP, 1)
@@ -64,7 +62,6 @@ func TestLoadConfig(t *testing.T) {
 		t.Setenv("PROXY_METADATA_URL", "http://test.example.com/metadata")
 		t.Setenv("PROXY_PRIVATE_KEY_PATH", "/path/to/key.pem")
 		t.Setenv("PROXY_CERTIFICATE_PATH", "/path/to/cert.pem")
-		t.Setenv("PROXY_COOKIE_NAME", "test_idp_selection")
 		t.Setenv("IDP_0_ID", "idp1")
 		t.Setenv("IDP_0_ENTITY_ID", "https://idp1.example.com/saml/metadata")
 		t.Setenv("IDP_0_SSO_URL", "https://idp1.example.com/saml/sso")
@@ -84,7 +81,6 @@ func TestLoadConfig(t *testing.T) {
 		assert.Equal(t, "http://test.example.com/metadata", config.Proxy.MetadataURL)
 		assert.Equal(t, "/path/to/key.pem", config.Proxy.PrivateKeyPath)
 		assert.Equal(t, "/path/to/cert.pem", config.Proxy.CertificatePath)
-		assert.Equal(t, "test_idp_selection", config.Proxy.CookieName)
 
 		// Verify multiple IDP were loaded
 		assert.Len(t, config.IDP, 2)

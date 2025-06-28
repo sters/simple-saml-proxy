@@ -69,9 +69,6 @@ And so on for additional IdPs.
 #### IdP Selection
 - `/select_idp/{idp_id}?SAMLRequest={saml_request}&RelayState={relay_state}` - Endpoint to select an IdP and forward the SAML request
 
-#### Legacy Endpoints (for backward compatibility)
-- `/link_sso/{idp_id}?service={service_url}` - Legacy endpoint to select an IdP and set a cookie, then redirect to the service URL
-
 #### Other Endpoints
 - `/ping` - Health check endpoint
 - `/idp-initiated` - IdP-Initiated flow endpoint (not yet implemented)
@@ -117,8 +114,6 @@ And so on for additional IdPs.
    5. After successful authentication, the IdP will redirect the user back to the proxy
    6. The proxy will process the SAML response and forward it to your SP
    7. Your SP will receive the authentication information and grant access to the user
-
-   Note: The legacy flow using `/link_sso/{idp_id}?service=http://your-service.com` is still supported for backward compatibility.
 
 ### Integration
 

@@ -9,14 +9,6 @@ import (
 	"github.com/sters/simple-saml-proxy/proxy"
 )
 
-// This SAML proxy supports multiple IDP with the following flow:
-// 1. Browser accesses /link_sso/{idp_id} which sets a cookie to identify the IDP and redirects to the service URL
-// 2. Browser redirects to the service URL and initiates SAML SSO
-// 3. Browser accesses the proxy, the IDP is determined from the cookie, and redirects to the IDP
-// 4. Browser accesses the IDP for authentication/authorization and redirects back to the proxy
-// 5. Browser opens the proxy, which redirects to the service
-// 6. Browser opens the service, is authenticated, and can access the service
-
 func main() {
 	// Initialize the default logger
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))

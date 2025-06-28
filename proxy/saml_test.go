@@ -42,7 +42,6 @@ func TestCreateSAMLServiceProviders(t *testing.T) {
 		// Create a test config with a single IDP
 		config := Config{}
 		config.Proxy.EntityID = "http://test.example.com/metadata"
-		config.Proxy.CookieName = "idp_selection"
 
 		// Add a single IDP
 		config.IDP = []IDPConfig{
@@ -78,7 +77,6 @@ func TestCreateSAMLServiceProviders(t *testing.T) {
 		// Create a test config with multiple IDP
 		config := Config{}
 		config.Proxy.EntityID = "http://test.example.com/metadata"
-		config.Proxy.CookieName = "idp_selection"
 
 		// Add multiple IDP
 		config.IDP = []IDPConfig{

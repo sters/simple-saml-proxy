@@ -86,7 +86,6 @@ func TestSetupHTTPHandlers(t *testing.T) {
 	// Create a test config with multiple IDP
 	config := Config{}
 	config.Proxy.EntityID = "http://test.example.com/metadata"
-	config.Proxy.CookieName = "idp_selection"
 	config.Proxy.AllowedServiceURLPrefix = []string{"https://example.com", "https://test.example.com"}
 
 	// Add multiple IDP
@@ -146,39 +145,6 @@ func TestSetupHTTPHandlers(t *testing.T) {
 	assert.Contains(t, w.Body.String(), config.Proxy.EntityID)
 	assert.Equal(t, "application/xml", w.Header().Get("Content-Type"))
 
-	// Test the link_sso endpoint for idp1 with allowed service URL
-	req = httptest.NewRequest(http.MethodGet, "/link_sso/idp1?service=https://example.com", nil)
-	w = httptest.NewRecorder()
-	mux.ServeHTTP(w, req)
-	assert.Equal(t, http.StatusFound, w.Code)
-	assert.Equal(t, "https://example.com", w.Header().Get("Location"))
-
-	// Verify the cookie was set
-	cookies := w.Result().Cookies()
-	var idpCookie *http.Cookie
-	for _, cookie := range cookies {
-		if cookie.Name == config.Proxy.CookieName {
-			idpCookie = cookie
-
-			break
-		}
-	}
-	assert.NotNil(t, idpCookie)
-	assert.Equal(t, "idp1", idpCookie.Value)
-
-	// Test the link_sso endpoint with disallowed service URL
-	req = httptest.NewRequest(http.MethodGet, "/link_sso/idp1?service=https://malicious.com", nil)
-	w = httptest.NewRecorder()
-	mux.ServeHTTP(w, req)
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Contains(t, w.Body.String(), "Invalid service URL")
-
-	// Test the link_sso endpoint with an invalid IDP
-	req = httptest.NewRequest(http.MethodGet, "/link_sso/invalid", nil)
-	w = httptest.NewRecorder()
-	mux.ServeHTTP(w, req)
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-
 	// Test the select_idp endpoint for idp1
 	req = httptest.NewRequest(http.MethodGet, "/select_idp/idp1?SAMLRequest=request123&RelayState=state123", nil)
 	w = httptest.NewRecorder()
@@ -188,18 +154,6 @@ func TestSetupHTTPHandlers(t *testing.T) {
 	assert.Contains(t, redirectURL, "https://idp1.example.com/saml/sso")
 	assert.Contains(t, redirectURL, "SAMLRequest=request123")
 	assert.Contains(t, redirectURL, "RelayState=state123")
-
-	// Verify the cookie was set
-	cookies = w.Result().Cookies()
-	idpCookie = nil
-	for _, cookie := range cookies {
-		if cookie.Name == config.Proxy.CookieName {
-			idpCookie = cookie
-			break
-		}
-	}
-	assert.NotNil(t, idpCookie)
-	assert.Equal(t, "idp1", idpCookie.Value)
 
 	// Test the select_idp endpoint with an invalid IDP
 	req = httptest.NewRequest(http.MethodGet, "/select_idp/invalid?SAMLRequest=request123", nil)
