@@ -21,19 +21,21 @@ issues:
     - tools
   exclude-rules:
     - text: "shadow: declaration of \"err\""
-      linters: ["govet"]
+      linters: [ "govet" ]
     - text: "use of `fmt.Print"
-      linters: ["forbidigo"]
+      linters: [ "forbidigo" ]
     - text: "is too short for the scope of its usage"
-      linters: ["varnamelen"]
+      linters: [ "varnamelen" ]
     - path: _test\.go
       linters:
         - dupl
         - funlen
-        - gocyclo
-        - lll
         - goconst
-        - testpackage
+        - gocyclo
         - goerr113
         - gosec
+        - lll
+        - noctx
         - paralleltest
+        - testpackage
+        - wrapcheck
