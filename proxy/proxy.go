@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"html/template"
+	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -37,12 +38,19 @@ const idpSelectionTemplate = `
             background-color: #e0e0e0;
         }
     </style>
+	<script>
+		const onClick = (id) => {
+			const url = "{{$.SelectURL}}/" + id;
+			window.location.href = url + location.search;
+			return false;
+		};
+	</script>
 </head>
 <body>
     <h1>Select an Identity Provider</h1>
     <div class="idp-list">
         {{range .Providers}}
-        <a href="{{$.SelectURL}}/{{.ID}}?SAMLRequest={{$.SAMLRequest}}&RelayState={{$.RelayState}}" class="idp-button">
+        <a href="#" class="idp-button" onclick="onClick('{{.ID}}')">
             {{.ID}}
         </a>
         {{end}}
@@ -56,8 +64,7 @@ const idpSelectionTemplate = `
 // - To Service Providers (SPs), it appears as an IdP
 // - To Identity Providers (IdPs), it appears as an SP
 // It allows users to select which IdP they want to use for authentication.
-// TODO: Support IdP-Initiated flow
-func SetupHTTPHandlers(providers *SAMLServiceProviders, config Config) http.Handler {
+func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) http.Handler {
 	// Parse the IdP selection template
 	tmpl, err := template.New("idpSelection").Parse(idpSelectionTemplate)
 	if err != nil {
@@ -70,82 +77,28 @@ func SetupHTTPHandlers(providers *SAMLServiceProviders, config Config) http.Hand
 		// Handle different endpoints
 		switch {
 		case r.URL.Path == "/metadata":
-			// Metadata endpoint - This endpoint serves metadata for SPs
-			// The proxy acts as an IdP from the SP's perspective
-			slog.Info("Serving IdP metadata to SP")
-
-			// Get the certificate from the default provider
-			var certData string
-			if providers.Default != nil && providers.Default.Middleware != nil && providers.Default.Middleware.ServiceProvider.Certificate != nil {
-				// Get the certificate data in base64 format
-				certData = base64.StdEncoding.EncodeToString(providers.Default.Middleware.ServiceProvider.Certificate.Raw)
-			} else {
-				// Fallback to loading from file if no provider is available
-				cert, err := LoadCertificate(config.Proxy.CertificatePath, config.Proxy.PrivateKeyPath)
-				if err != nil {
-					slog.Error("Failed to load certificate for metadata", slog.String("error", err.Error()))
-					http.Error(w, "Internal server error", http.StatusInternalServerError)
-					return
-				}
-				certData = base64.StdEncoding.EncodeToString(cert.Leaf.Raw)
-			}
-
-			// Generate the metadata XML directly
-			validUntil := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
-			metadataXML := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
-<EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" 
-                  xmlns:ds="http://www.w3.org/2000/09/xmldsig#" 
-                  entityID="%s" 
-                  validUntil="%s">
-  <IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
-    <KeyDescriptor use="signing">
-      <ds:KeyInfo>
-        <ds:X509Data>
-          <ds:X509Certificate>%s</ds:X509Certificate>
-        </ds:X509Data>
-      </ds:KeyInfo>
-    </KeyDescriptor>
-    <KeyDescriptor use="encryption">
-      <ds:KeyInfo>
-        <ds:X509Data>
-          <ds:X509Certificate>%s</ds:X509Certificate>
-        </ds:X509Data>
-      </ds:KeyInfo>
-    </KeyDescriptor>
-    <SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="%s/sso"/>
-    <NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress</NameIDFormat>
-    <NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:transient</NameIDFormat>
-    <NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:persistent</NameIDFormat>
-  </IDPSSODescriptor>
-</EntityDescriptor>`, config.Proxy.EntityID, validUntil, certData, certData, config.Proxy.EntityID)
-
-			// Serve the metadata
-			w.Header().Set("Content-Type", "application/samlmetadata+xml")
-			w.Write([]byte(metadataXML))
+			idp.Server.IDP.ServeMetadata(w, r)
 
 		case r.URL.Path == "/sso":
 			// SSO endpoint - This is where SPs send AuthnRequests
 			// The proxy acts as an IdP from the SP's perspective
 			samlRequest := r.URL.Query().Get("SAMLRequest")
-			relayState := r.URL.Query().Get("RelayState")
-
 			if samlRequest == "" {
 				http.Error(w, "Missing SAMLRequest parameter", http.StatusBadRequest)
 				return
 			}
 
+			// TODO: ServeSSOして idp.SessionProvider.GetSession の中でHTMLを返してselect_idpに遷移するほうがいい
+			// idp.Server.IDP.ServeSSO()
+
 			// Show IdP selection page
 			slog.Info("Showing IdP selection page")
 			data := struct {
-				Providers   map[string]*IDPServiceProvider
-				SelectURL   string
-				SAMLRequest string
-				RelayState  string
+				Providers map[string]*ServiceProvider
+				SelectURL string
 			}{
-				Providers:   providers.Providers,
-				SelectURL:   "/select_idp",
-				SAMLRequest: samlRequest,
-				RelayState:  relayState,
+				Providers: providers.Providers,
+				SelectURL: "/select_idp",
 			}
 
 			err = tmpl.Execute(w, data)
@@ -157,34 +110,37 @@ func SetupHTTPHandlers(providers *SAMLServiceProviders, config Config) http.Hand
 		case strings.HasPrefix(r.URL.Path, "/select_idp/"):
 			// IdP selection endpoint - User selects an IdP and is redirected to it
 			idpID := r.URL.Path[len("/select_idp/"):]
-			samlRequest := r.URL.Query().Get("SAMLRequest")
-			relayState := r.URL.Query().Get("RelayState")
+			query := r.URL.Query()
 
 			slog.Info("IdP selection",
 				slog.String("idp", idpID),
-				slog.String("samlRequest", samlRequest),
-				slog.String("relayState", relayState))
+				slog.Any("query", query),
+			)
 
 			// Check if the IDP exists
-			if provider, ok := providers.Providers[idpID]; ok {
-				slog.Info("IDP found", slog.String("idp", idpID))
-
-				// Forward the SAML request to the selected IdP
-				// Build the redirect URL to the IdP's SSO URL with the SAML request and relay state
-				redirectURL := provider.Middleware.ServiceProvider.GetSSOBindingLocation(saml.HTTPRedirectBinding)
-				redirectURL += "?SAMLRequest=" + samlRequest
-				if relayState != "" {
-					redirectURL += "&RelayState=" + relayState
-				}
-
-				slog.Info("Redirecting to IdP", slog.String("url", redirectURL))
-				http.Redirect(w, r, redirectURL, http.StatusFound)
-			} else {
+			provider, ok := providers.Providers[idpID]
+			if !ok {
 				slog.Info("Invalid IDP ID", slog.String("idp", idpID))
 				http.Error(w, "Invalid IDP ID", http.StatusBadRequest)
+				return
 			}
 
-		case r.URL.Path == "/sso/acs":
+			slog.Info("IDP found", slog.String("idp", idpID))
+
+			relayState := base64.RawURLEncoding.EncodeToString(randomBytes(42))
+			redirectURL, err := provider.Middleware.ServiceProvider.MakeRedirectAuthenticationRequest(relayState)
+			if err != nil {
+				slog.Error("Failed to create redirect URL", slog.String("error", err.Error()))
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+
+			w.Header().Add("Location", redirectURL.String())
+			w.WriteHeader(http.StatusFound)
+
+			slog.Info("Redirecting to IdP", slog.String("url", redirectURL.String()))
+
+		case r.URL.Path == "/saml/acs":
 			// ACS endpoint - This is where IdPs send SAML responses
 			// The proxy acts as an SP from the IdP's perspective
 			provider := providers.Default
@@ -202,22 +158,22 @@ func SetupHTTPHandlers(providers *SAMLServiceProviders, config Config) http.Hand
 			// 1. Use the existing ACS handler to process the response from the IdP
 			// 2. Redirect the user to the SP with a success message
 
-			// TODO: Implement full SAML response processing and forwarding
 			slog.Info("Processing SAML response from IdP")
 
-			// Get the relay state, which should contain the SP's ACS URL
-			relayState := r.URL.Query().Get("RelayState")
-			if relayState == "" {
-				relayState = r.FormValue("RelayState")
-			}
+			// NOTE: seems it needs to confiure NotOnOrAfter in Conditions. :thinking:
+			// NotOnOrAfter="2025-12-31T19:58:38.464Z"
 
 			// Use the existing ACS handler to process the response
+			// TODO: 問題がなかったときにリダイレクトしないでおきたい。プロキシ上でSAMLアサーションを出して、元のSPに戻したい。
+			//       wをダミーに置き換えて、もしエラーを返すようなら、そのままwにバイパス、という作りにしないとだめか。
 			provider.Middleware.ServeACS(w, r)
+
+			// これをしたいけれどrから読み取ってしまうのでダメかも？
+			// idp.Server.IDP.ServeSSO()
 
 			// In a real implementation, we would redirect to the SP's ACS URL with the processed SAML response
 			// For now, we'll just log that we processed the response
-			slog.Info("Processed SAML response from IdP",
-				slog.String("relayState", relayState))
+			slog.Info("Processed SAML response from IdP")
 
 		case r.URL.Path == "/ping":
 			// Health check endpoint
@@ -275,9 +231,7 @@ func StartServer(config Config, handler http.Handler) error {
 	slog.Info("Configured IDP")
 	for _, idp := range config.IDP {
 		slog.Info("IDP details",
-			slog.String("entityID", idp.EntityID),
 			slog.String("id", idp.ID),
-			slog.String("ssoURL", idp.SSOURL),
 		)
 	}
 
@@ -287,4 +241,13 @@ func StartServer(config Config, handler http.Handler) error {
 	}
 
 	return nil
+}
+
+func randomBytes(n int) []byte {
+	rv := make([]byte, n)
+
+	if _, err := io.ReadFull(saml.RandReader, rv); err != nil {
+		panic(err)
+	}
+	return rv
 }

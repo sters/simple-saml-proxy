@@ -346,7 +346,7 @@ func TestMetadataEndpoint(t *testing.T) {
 	}
 
 	// Create SAML service providers
-	providers, err := proxy.CreateSAMLServiceProviders(config, cert)
+	providers, err := proxy.CreateServiceProviders(config)
 	assert.NoError(t, err)
 
 	// Set up HTTP handlers
@@ -363,7 +363,7 @@ func TestMetadataEndpoint(t *testing.T) {
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Equal(t, "application/samlmetadata+xml", resp.Header.Get("Content-Type"))
+	assert.Equal(t, "application/xml", resp.Header.Get("Content-Type"))
 
 	// Read the metadata
 	body, err := io.ReadAll(resp.Body)
@@ -420,7 +420,7 @@ func TestSSOEndpoint(t *testing.T) {
 	}
 
 	// Create SAML service providers
-	providers, err := proxy.CreateSAMLServiceProviders(config, cert)
+	providers, err := proxy.CreateServiceProviders(config)
 	assert.NoError(t, err)
 
 	// Set up HTTP handlers
@@ -513,7 +513,7 @@ func TestACSEndpoint(t *testing.T) {
 	}
 
 	// Create SAML service providers
-	providers, err := proxy.CreateSAMLServiceProviders(config, cert)
+	providers, err := proxy.CreateServiceProviders(config)
 	assert.NoError(t, err)
 
 	// Set up HTTP handlers
@@ -590,7 +590,7 @@ func TestE2EFlow(t *testing.T) {
 	}
 
 	// Create SAML service providers
-	providers, err := proxy.CreateSAMLServiceProviders(config, cert)
+	providers, err := proxy.CreateServiceProviders(config)
 	assert.NoError(t, err)
 
 	// Set up HTTP handlers

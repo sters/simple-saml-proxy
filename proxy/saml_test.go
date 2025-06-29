@@ -54,7 +54,7 @@ func TestCreateSAMLServiceProviders(t *testing.T) {
 		}
 
 		// Test creating SAML service providers
-		providers, err := CreateSAMLServiceProviders(config, cert)
+		providers, err := CreateServiceProviders(config, cert)
 		require.NoError(t, err)
 		assert.NotNil(t, providers)
 
@@ -95,7 +95,7 @@ func TestCreateSAMLServiceProviders(t *testing.T) {
 		}
 
 		// Test creating SAML service providers
-		providers, err := CreateSAMLServiceProviders(config, cert)
+		providers, err := CreateServiceProviders(config, cert)
 		require.NoError(t, err)
 		assert.NotNil(t, providers)
 
@@ -119,18 +119,5 @@ func TestCreateSAMLServiceProviders(t *testing.T) {
 		assert.Equal(t, "idp2", provider2.ID)
 		assert.NotNil(t, provider2.Middleware)
 		assert.Equal(t, "https://idp2.example.com/saml/metadata", provider2.Middleware.ServiceProvider.IDPMetadata.EntityID)
-	})
-}
-
-func TestMustParseURL(t *testing.T) {
-	// Test valid URL
-	url := mustParseURL("http://example.com")
-	assert.NotNil(t, url)
-	assert.Equal(t, "http", url.Scheme)
-	assert.Equal(t, "example.com", url.Host)
-
-	// Test invalid URL (should panic)
-	assert.Panics(t, func() {
-		mustParseURL("://invalid-url")
 	})
 }

@@ -105,7 +105,7 @@ func TestSetupHTTPHandlers(t *testing.T) {
 	}
 
 	// Create SAML service providers
-	providers, err := CreateSAMLServiceProviders(config, cert)
+	providers, err := CreateServiceProviders(config, cert)
 	require.NoError(t, err)
 
 	// Test setting up HTTP handlers
