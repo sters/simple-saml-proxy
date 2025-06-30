@@ -29,6 +29,9 @@ type ProxyStorage struct {
 	// Cache for auth requests
 	authRequests     map[string]*AuthRequest
 	authRequestsLock sync.RWMutex
+
+	entityIDByAppID     map[string]string
+	entityIDByAppIDLock sync.RWMutex
 }
 
 // NewProxyStorage creates a new ProxyStorage.
@@ -39,10 +42,11 @@ func NewProxyStorage(config Config) (*ProxyStorage, error) {
 	}
 
 	return &ProxyStorage{
-		config:       config,
-		cert:         cert,
-		spCache:      make(map[string]*serviceprovider.ServiceProvider),
-		authRequests: make(map[string]*AuthRequest),
+		config:          config,
+		cert:            cert,
+		spCache:         make(map[string]*serviceprovider.ServiceProvider),
+		authRequests:    make(map[string]*AuthRequest),
+		entityIDByAppID: make(map[string]string),
 	}, nil
 }
 
@@ -170,8 +174,15 @@ func (s *ProxyStorage) GetEntityByID(ctx context.Context, entityID string) (*ser
 }
 
 func (s *ProxyStorage) GetEntityIDByAppID(ctx context.Context, appID string) (string, error) {
-	// For simplicity, we'll use the appID as the entityID
-	return appID, nil
+	s.entityIDByAppIDLock.RLock()
+	entityID, ok := s.entityIDByAppID[appID]
+	s.entityIDByAppIDLock.RUnlock()
+
+	if !ok {
+		return "", fmt.Errorf("entity not found: %s", appID)
+	}
+
+	return entityID, nil
 }
 
 func (s *ProxyStorage) GetResponseSigningKey(ctx context.Context) (*key.CertificateAndKey, error) {
@@ -200,6 +211,10 @@ func (s *ProxyStorage) CreateAuthRequest(ctx context.Context, authnRequest *saml
 	s.authRequests[id] = authRequest
 	s.authRequestsLock.Unlock()
 
+	s.entityIDByAppIDLock.Lock()
+	s.entityIDByAppID[appID] = authnRequest.Issuer.Text
+	s.entityIDByAppIDLock.Unlock()
+
 	return authRequest, nil
 }
 
@@ -218,7 +233,7 @@ func (s *ProxyStorage) AuthRequestByID(ctx context.Context, id string) (models.A
 // UserStorage interface implementation
 
 func (s *ProxyStorage) SetUserinfoWithUserID(ctx context.Context, applicationID string, userinfo models.AttributeSetter, userID string, attributes []int) (err error) {
-	// Set user attributes
+	// TODO: Set user attributes
 	userinfo.SetUserID(userID)
 	userinfo.SetUsername(userID)
 	userinfo.SetEmail(userID + "@example.com")
@@ -230,7 +245,7 @@ func (s *ProxyStorage) SetUserinfoWithUserID(ctx context.Context, applicationID 
 }
 
 func (s *ProxyStorage) SetUserinfoWithLoginName(ctx context.Context, userinfo models.AttributeSetter, loginName string, attributes []int) (err error) {
-	// Set user attributes
+	// TODO: Set user attributes
 	userinfo.SetUserID(loginName)
 	userinfo.SetUsername(loginName)
 	userinfo.SetEmail(loginName + "@example.com")
@@ -241,7 +256,6 @@ func (s *ProxyStorage) SetUserinfoWithLoginName(ctx context.Context, userinfo mo
 	return nil
 }
 
-// Health implements the Health method required by the Storage interface.
 func (s *ProxyStorage) Health(ctx context.Context) error {
 	return nil
 }

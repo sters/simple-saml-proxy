@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"html/template"
 	"io"
@@ -37,9 +38,10 @@ const idpSelectionTemplate = `
         }
     </style>
 	<script>
-		const onClick = (id) => {
-			const url = "{{$.SelectURL}}/" + id;
-			window.location.href = url + location.search;
+		const onClick = (idpID) => {
+			const url = new URL("{{$.SelectURL}}", location.origin);
+			url.searchParams.append("idpID", idpID);
+			window.location.href = url.toString();
 			return false;
 		};
 	</script>
@@ -56,6 +58,9 @@ const idpSelectionTemplate = `
 </body>
 </html>
 `
+
+const cookieNameAuthRequestID = "authID"
+const cookieNameIDPID = "idpID"
 
 // handlePing handles the /ping health check endpoint
 func handlePing(w http.ResponseWriter, r *http.Request) {
@@ -78,8 +83,31 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 	mux.HandleFunc("/ping", handlePing)
 	mux.Handle("/metadata", idp.idp.HttpHandler())
 	mux.Handle("/sso", idp.idp.HttpHandler())
+	mux.Handle("/callback", idp.idp.HttpHandler())
 
-	idpSelectHandler := func(w http.ResponseWriter, _ *http.Request) {
+	idpSelectHandler := func(w http.ResponseWriter, r *http.Request) {
+		authRequestID := r.FormValue("id")
+		if authRequestID == "" {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+		_, err := idp.idpStorage.AuthRequestByID(r.Context(), authRequestID)
+		if err != nil {
+			slog.Error("Failed to get auth request",
+				slog.String("id", authRequestID),
+				slog.String("error", err.Error()),
+			)
+			http.Error(w, "Invalid request", http.StatusInternalServerError)
+			return
+		}
+		http.SetCookie(w, &http.Cookie{
+			Name:     cookieNameAuthRequestID,
+			Value:    authRequestID,
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   true,
+		})
+
 		data := struct {
 			Providers map[string]*ServiceProvider
 			SelectURL string
@@ -106,7 +134,28 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 	idpSelectedHandler := func(w http.ResponseWriter, r *http.Request) {
 		// NOTE: sso request is already authenticated by /sso endpoint.
 
-		idpID := r.URL.Path[len("/idp_selected/"):]
+		authRequestIDCookie, err := r.Cookie(cookieNameAuthRequestID)
+		if err != nil {
+			slog.Error("Failed to get auth request ID cookie", slog.String("error", err.Error()))
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+		authRequestID := authRequestIDCookie.Value
+		if authRequestID == "" {
+			slog.Error("Auth request ID cookie is empty")
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+		if _, err = idp.idpStorage.AuthRequestByID(r.Context(), authRequestID); err != nil {
+			slog.Error("Failed to get auth request",
+				slog.String("id", authRequestID),
+				slog.String("error", err.Error()),
+			)
+			http.Error(w, "Invalid request", http.StatusInternalServerError)
+			return
+		}
+
+		idpID := r.FormValue("idpID")
 
 		slog.Info("IdP selection",
 			slog.String("idp", idpID),
@@ -120,22 +169,109 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 			http.Error(w, "Invalid IDP ID", http.StatusBadRequest)
 			return
 		}
+		http.SetCookie(w, &http.Cookie{
+			Name:     cookieNameIDPID,
+			Value:    idpID,
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   true,
+		})
 
 		slog.Info("IDP found", slog.String("idp", idpID))
 
-		// TODO: Implement to call SAML IdP as a SP using `provider`
+		relayState := base64.RawURLEncoding.EncodeToString(randomBytes(42))
+		redirectURL, err := provider.Middleware.ServiceProvider.MakeRedirectAuthenticationRequest(relayState)
+		if err != nil {
+			slog.Error("Failed to create redirect URL", slog.String("error", err.Error()))
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Add("Location", redirectURL.String())
+		w.WriteHeader(http.StatusFound)
+
+		slog.Info("Redirecting to IdP", slog.String("url", redirectURL.String()))
 	}
 
 	mux.HandleFunc("/saml/acs", func(w http.ResponseWriter, r *http.Request) {
 		slog.Info("Processing SAML response from actual IdP")
 
-		// Use the default provider for now
-		provider := providers.Default
-		if provider != nil && provider.Handler != nil {
-			provider.Handler.ServeHTTP(w, r)
-		} else {
-			http.Error(w, "Default IDP not configured", http.StatusInternalServerError)
+		authRequestIDCookie, err := r.Cookie(cookieNameAuthRequestID)
+		if err != nil {
+			slog.Error("Failed to get auth request ID cookie", slog.String("error", err.Error()))
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
 		}
+		authRequestID := authRequestIDCookie.Value
+		if authRequestID == "" {
+			slog.Error("Auth request ID cookie is empty")
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+		authRequest, err := idp.idpStorage.AuthRequestByID(r.Context(), authRequestID)
+		if err != nil {
+			slog.Error("Failed to get auth request",
+				slog.String("id", authRequestID),
+				slog.String("error", err.Error()),
+			)
+			http.Error(w, "Invalid request", http.StatusInternalServerError)
+			return
+		}
+		authRequest.(*AuthRequest).IsDone = true // 自分でDone=trueにしないといけない
+
+		idpIDCookie, err := r.Cookie(cookieNameIDPID)
+		if err != nil {
+			slog.Error("Failed to get IDP ID cookie", slog.String("error", err.Error()))
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+		idpID := idpIDCookie.Value
+		if idpID == "" {
+			slog.Error("IDP ID cookie is empty")
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+		provider, ok := providers.Providers[idpID]
+		if !ok {
+			slog.Error("Invalid IDP ID", slog.String("idp", idpID))
+			http.Error(w, "Invalid IDP ID", http.StatusBadRequest)
+			return
+		}
+
+		// NOTE: SAMLKitはConditions.NotOnOrAfterがないらしく、XMLバリデーションに引っかかる
+		if err := r.ParseForm(); err != nil {
+			slog.Error("Failed to parse form", slog.String("error", err.Error()))
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+
+		trackedRequests := provider.Middleware.RequestTracker.GetTrackedRequests(r)
+		possibleRequestIDs := make([]string, len(trackedRequests))
+		for i, tr := range trackedRequests {
+			possibleRequestIDs[i] = tr.SAMLRequestID
+		}
+		assertion, err := provider.Middleware.ServiceProvider.ParseResponse(r, possibleRequestIDs)
+		if err != nil {
+			slog.Error("Failed to parse response", slog.String("error", err.Error()))
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+		slog.Info(
+			"Assertion",
+			slog.Any("subject", assertion.Subject),
+			slog.Any("attributes", assertion.AttributeStatements),
+		)
+
+		// nameID is required
+		if assertion.Subject == nil || assertion.Subject.NameID == nil {
+			slog.Error("Assertion does not contain NameID")
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+
+		// move to /callback to response original SP
+		callbackURL := idp.idp.AuthCallbackURL()(r.Context(), authRequestID)
+		http.Redirect(w, r, callbackURL, http.StatusFound)
 	})
 
 	// Create a middleware that logs all requests

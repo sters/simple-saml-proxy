@@ -21,6 +21,8 @@ func main() {
 	os.Setenv("IDP_0_ENTITY_ID", "https://samlkit.com/saml2/idp/adhoc")
 	os.Setenv("IDP_0_SSO_URL", "https://samlkit.com/saml2/receive")
 	os.Setenv("IDP_0_CERTIFICATE_PATH", "/Users/sters/go/src/github.com/sters/simple-saml-proxy/e2e/samlkit1.crt")
+	os.Setenv("IDP_1_ID", "local saml-idp")
+	os.Setenv("IDP_1_METADATA_URL", "http://localhost:7000/metadata")
 	os.Setenv("SERVER_LISTEN_ADDRESS", "localhost:8080")
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
