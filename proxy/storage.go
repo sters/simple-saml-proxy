@@ -8,8 +8,8 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
-	"time"
 
+	"github.com/google/uuid"
 	"github.com/zitadel/saml/pkg/provider/key"
 	"github.com/zitadel/saml/pkg/provider/models"
 	"github.com/zitadel/saml/pkg/provider/serviceprovider"
@@ -125,7 +125,7 @@ func (s *ProxyStorage) GetEntityByID(ctx context.Context, entityID string) (*ser
 	// If not in cache, create a new one
 	for _, allowedSP := range s.config.Proxy.AllowedSP {
 		if allowedSP.EntityID == entityID {
-			// Create a service provider config
+			// Create a service provider config for requester info
 			var metadataBytes []byte
 			if allowedSP.MetadataURL != "" {
 				b, err := xml.ReadMetadataFromURL(http.DefaultClient, allowedSP.MetadataURL)
@@ -145,10 +145,10 @@ func (s *ProxyStorage) GetEntityByID(ctx context.Context, entityID string) (*ser
 				Metadata: metadataBytes,
 			}
 
-			// TODO: Create a login URL function for IdP Initiated???
+			// loginURL for Proxy IdP (Not for SP, Not for actual IdP)
 			loginURL := func(id string) string {
 				slog.Info("login URL", slog.String("id", id))
-				return id
+				return "/idp_select?id=" + id
 			}
 
 			// Create a new service provider
@@ -181,7 +181,7 @@ func (s *ProxyStorage) GetResponseSigningKey(ctx context.Context) (*key.Certific
 // AuthStorage interface implementation
 
 func (s *ProxyStorage) CreateAuthRequest(ctx context.Context, authnRequest *samlp.AuthnRequestType, appID, bindingType, relayState, userID string) (models.AuthRequestInt, error) {
-	id := fmt.Sprintf("auth_%d", time.Now().UnixNano())
+	id := uuid.New().String()
 
 	authRequest := &AuthRequest{
 		ID:                       id,

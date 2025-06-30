@@ -458,8 +458,8 @@ func TestSSOEndpoint(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, string(body), "Missing SAMLRequest parameter")
 
-	// Test 3: select_idp endpoint (should redirect to IdP)
-	resp, err = http.Get(proxyServer.URL + "/select_idp/mock?SAMLRequest=request123&RelayState=state123")
+	// Test 3: idp_selected endpoint (should redirect to IdP)
+	resp, err = http.Get(proxyServer.URL + "/idp_selected/mock?SAMLRequest=request123&RelayState=state123")
 	assert.NoError(t, err)
 	defer resp.Body.Close()
 
@@ -626,7 +626,7 @@ func TestE2EFlow(t *testing.T) {
 	assert.Contains(t, string(body), "mock")
 
 	// Step 3: User selects an IdP
-	resp, err = client.Get(proxyServer.URL + "/select_idp/mock?SAMLRequest=request123&RelayState=state123")
+	resp, err = client.Get(proxyServer.URL + "/idp_selected/mock?SAMLRequest=request123&RelayState=state123")
 	assert.NoError(t, err)
 	defer resp.Body.Close()
 

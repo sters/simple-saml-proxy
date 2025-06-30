@@ -67,7 +67,7 @@ And so on for additional IdPs.
 - `/sso/acs` - Assertion Consumer Service endpoint where IdPs send SAML responses
 
 #### IdP Selection
-- `/select_idp/{idp_id}?SAMLRequest={saml_request}&RelayState={relay_state}` - Endpoint to select an IdP and forward the SAML request
+- `/idp_selected/{idp_id}?SAMLRequest={saml_request}&RelayState={relay_state}` - Endpoint to select an IdP and forward the SAML request
 
 #### Other Endpoints
 - `/ping` - Health check endpoint

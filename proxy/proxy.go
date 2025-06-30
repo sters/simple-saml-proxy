@@ -3,6 +3,7 @@ package proxy
 import (
 	"crypto/rand"
 	"fmt"
+	"html/template"
 	"io"
 	"log/slog"
 	"net/http"
@@ -74,19 +75,38 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 	// Create a router to handle different paths
 	mux := http.NewServeMux()
 
-	// Add the ping handler
 	mux.HandleFunc("/ping", handlePing)
+	mux.Handle("/metadata", idp.idp.HttpHandler())
+	mux.Handle("/sso", idp.idp.HttpHandler())
 
-	// Add the IDP handler for metadata and SSO endpoints
-	if idp != nil && idp.Handler != nil {
-		// The IDP handler will handle /metadata and /sso endpoints
-		mux.Handle("/metadata", idp.Handler)
-		mux.Handle("/sso", idp.Handler)
+	idpSelectHandler := func(w http.ResponseWriter, _ *http.Request) {
+		data := struct {
+			Providers map[string]*ServiceProvider
+			SelectURL string
+		}{
+			Providers: providers.Providers,
+			SelectURL: "/idp_selected",
+		}
+
+		// Parse the IdP selection template
+		tmpl, err := template.New("idpSelection").Parse(idpSelectionTemplate)
+		if err != nil {
+			slog.Error("Failed to parse IdP selection template", slog.String("error", err.Error()))
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		err = tmpl.Execute(w, data)
+		if err != nil {
+			slog.Error("Failed to execute template", slog.String("error", err.Error()))
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
 	}
 
-	// Add a handler for selecting an IDP
-	mux.HandleFunc("/select_idp/", func(w http.ResponseWriter, r *http.Request) {
-		idpID := r.URL.Path[len("/select_idp/"):]
+	idpSelectedHandler := func(w http.ResponseWriter, r *http.Request) {
+		// NOTE: sso request is already authenticated by /sso endpoint.
+
+		idpID := r.URL.Path[len("/idp_selected/"):]
 
 		slog.Info("IdP selection",
 			slog.String("idp", idpID),
@@ -103,17 +123,11 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 
 		slog.Info("IDP found", slog.String("idp", idpID))
 
-		// Redirect to the SP handler
-		if provider.Handler != nil {
-			provider.Handler.ServeHTTP(w, r)
-		} else {
-			http.Error(w, "IDP not configured", http.StatusInternalServerError)
-		}
-	})
+		// TODO: Implement to call SAML IdP as a SP using `provider`
+	}
 
-	// Add a handler for the ACS endpoint
 	mux.HandleFunc("/saml/acs", func(w http.ResponseWriter, r *http.Request) {
-		slog.Info("Processing SAML response from IdP")
+		slog.Info("Processing SAML response from actual IdP")
 
 		// Use the default provider for now
 		provider := providers.Default
@@ -127,6 +141,16 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 	// Create a middleware that logs all requests
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		slog.Info("Received request", slog.String("path", r.URL.Path))
+
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/idp_selected"):
+			idpSelectedHandler(w, r)
+			return
+		case strings.HasPrefix(r.URL.Path, "/idp_select"):
+			idpSelectHandler(w, r)
+			return
+		}
+
 		mux.ServeHTTP(w, r)
 	})
 }
@@ -161,7 +185,7 @@ func StartServer(config Config, handler http.Handler) error {
 	slog.Info("Metadata URL (for SPs)", slog.String("url", config.Proxy.MetadataURL))
 	slog.Info("SSO URL (for SPs)", slog.String("url", config.Proxy.EntityID+"/sso"))
 	slog.Info("ACS URL (for IdPs)", slog.String("url", config.Proxy.AcsURL))
-	slog.Info("IdP Selection URL", slog.String("url", config.Proxy.EntityID+"/select_idp"))
+	slog.Info("IdP Selection URL", slog.String("url", config.Proxy.EntityID+"/idp_selected"))
 
 	// Log information about configured IDP
 	slog.Info("Configured IDP")

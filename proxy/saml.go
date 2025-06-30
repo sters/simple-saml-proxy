@@ -32,13 +32,13 @@ func LoadCertificate(certPath, keyPath string) (tls.Certificate, error) {
 type IDP struct {
 	// Using zitadel/saml
 	EntityID string
-	Handler  http.Handler
+	idp      *provider.Provider
 }
 
 // ServiceProvider represents a SAML Service Provider for a specific IDP.
 type ServiceProvider struct {
-	ID      string
-	Handler http.Handler
+	ID string
+	sp *serviceprovider.ServiceProvider
 }
 
 // ServiceProviders manages multiple SAML Service Providers.
@@ -106,6 +106,7 @@ func CreateProxyIDP(config Config) (*IDP, error) {
 	// Create issuer function
 	issuerFunc := func(insecure bool) (provider.IssuerFromRequest, error) {
 		return func(r *http.Request) string {
+			r.FormValue("SAMLRequest")
 			return config.Proxy.EntityID
 		}, nil
 	}
@@ -123,11 +124,11 @@ func CreateProxyIDP(config Config) (*IDP, error) {
 
 	return &IDP{
 		EntityID: config.Proxy.EntityID,
-		Handler:  p.HttpHandler(),
+		idp:      p,
 	}, nil
 }
 
-// CreateServiceProviders creates IDP Service Providers for all configured IDP.
+// CreateServiceProviders creates Service Providers for all configured IDP.
 func CreateServiceProviders(ctx context.Context, config Config) (*ServiceProviders, error) {
 	providers := &ServiceProviders{
 		Providers: make(map[string]*ServiceProvider),
@@ -165,22 +166,15 @@ func CreateServiceProviders(ctx context.Context, config Config) (*ServiceProvide
 		}
 
 		// Create a service provider
-		_, err := serviceprovider.NewServiceProvider(idpConfig.ID, spConfig, loginURL)
+		sp, err := serviceprovider.NewServiceProvider(idpConfig.ID, spConfig, loginURL)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create service provider: %w", err)
 		}
 
-		// Create a handler for the SP
-		// For simplicity, we'll just use a handler that redirects to the IDP's SSO URL
-		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Redirect to the IDP's SSO URL
-			http.Redirect(w, r, idpConfig.SSOURL, http.StatusFound)
-		})
-
 		// Create a service provider
 		provider := &ServiceProvider{
-			ID:      idpConfig.ID,
-			Handler: handler,
+			ID: idpConfig.ID,
+			sp: sp,
 		}
 
 		providers.Providers[idpConfig.ID] = provider

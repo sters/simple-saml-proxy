@@ -10,9 +10,10 @@ import (
 // IDPConfig holds the configuration for a single Identity Provider.
 type IDPConfig struct {
 	ID              string `env:"ID,required"`
-	EntityID        string `env:"ENTITY_ID,required"`
-	SSOURL          string `env:"SSO_URL,required"`
-	CertificatePath string `env:"CERTIFICATE_PATH,required"`
+	EntityID        string `env:"ENTITY_ID"`
+	SSOURL          string `env:"SSO_URL"`
+	CertificatePath string `env:"CERTIFICATE_PATH"`
+	MetadataURL     string `env:"METADATA_URL"`
 }
 
 type SPConfig struct {

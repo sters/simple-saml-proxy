@@ -152,8 +152,8 @@ func TestSetupHTTPHandlers(t *testing.T) {
 	assert.Contains(t, w.Body.String(), config.Proxy.EntityID)
 	assert.Equal(t, "application/xml", w.Header().Get("Content-Type"))
 
-	// Test the select_idp endpoint for idp1
-	req = httptest.NewRequest(http.MethodGet, "/select_idp/idp1?SAMLRequest=request123&RelayState=state123", nil)
+	// Test the idp_selected endpoint for idp1
+	req = httptest.NewRequest(http.MethodGet, "/idp_selected/idp1?SAMLRequest=request123&RelayState=state123", nil)
 	w = httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusFound, w.Code)
@@ -162,8 +162,8 @@ func TestSetupHTTPHandlers(t *testing.T) {
 	assert.Contains(t, redirectURL, "SAMLRequest=request123")
 	assert.Contains(t, redirectURL, "RelayState=state123")
 
-	// Test the select_idp endpoint with an invalid IDP
-	req = httptest.NewRequest(http.MethodGet, "/select_idp/invalid?SAMLRequest=request123", nil)
+	// Test the idp_selected endpoint with an invalid IDP
+	req = httptest.NewRequest(http.MethodGet, "/idp_selected/invalid?SAMLRequest=request123", nil)
 	w = httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
