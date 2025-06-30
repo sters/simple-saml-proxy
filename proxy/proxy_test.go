@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -79,14 +80,16 @@ func TestSetupHTTPHandlers(t *testing.T) {
 		}
 	}()
 
-	// Load the certificate
-	cert, err := LoadCertificate(certPath, keyPath)
+	// Verify that the certificate can be loaded
+	_, err := LoadCertificate(certPath, keyPath)
 	require.NoError(t, err)
 
 	// Create a test config with multiple IDP
 	config := Config{}
 	config.Proxy.EntityID = "http://test.example.com/metadata"
 	config.Proxy.AllowedServiceURLPrefix = []string{"https://example.com", "https://test.example.com"}
+	config.Proxy.CertificatePath = certPath
+	config.Proxy.PrivateKeyPath = keyPath
 
 	// Add multiple IDP
 	config.IDP = []IDPConfig{
@@ -105,11 +108,15 @@ func TestSetupHTTPHandlers(t *testing.T) {
 	}
 
 	// Create SAML service providers
-	providers, err := CreateServiceProviders(config, cert)
+	providers, err := CreateServiceProviders(context.Background(), config)
+	require.NoError(t, err)
+
+	// Create SAML IDP
+	idp, err := CreateProxyIDP(config)
 	require.NoError(t, err)
 
 	// Test setting up HTTP handlers
-	mux := SetupHTTPHandlers(providers, config)
+	mux := SetupHTTPHandlers(idp, providers, config)
 	assert.NotNil(t, mux)
 
 	// Test the health check endpoint

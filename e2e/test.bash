@@ -5,6 +5,8 @@
 #export PROXY_METADATA_URL= # use default
 export PROXY_PRIVATE_KEY_PATH=$(pwd)/proxy.key
 export PROXY_CERTIFICATE_PATH=$(pwd)/proxy.crt
+export PROXY_ALLOWED_SP_0_ENTITY_ID=urn:example:sp
+export PROXY_ALLOWED_SP_0_METADATA_URL=http://localhost:7070/metadata
 export IDP_0_ID=SAMLKit1
 export IDP_0_ENTITY_ID=https://samlkit.com/saml2/idp/adhoc
 export IDP_0_SSO_URL=https://samlkit.com/saml2/receive

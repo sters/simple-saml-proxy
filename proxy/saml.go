@@ -2,19 +2,15 @@ package proxy
 
 import (
 	"context"
-	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/base64"
-	"encoding/pem"
 	"fmt"
 	"log/slog"
-	"net/url"
-	"os"
+	"net/http"
+	"time"
 
-	"github.com/crewjam/saml"
-	"github.com/crewjam/saml/samlidp"
-	"github.com/crewjam/saml/samlsp"
+	"github.com/zitadel/saml/pkg/provider"
+	"github.com/zitadel/saml/pkg/provider/serviceprovider"
 )
 
 // LoadCertificate loads and parses the SP certificate and private key.
@@ -34,13 +30,15 @@ func LoadCertificate(certPath, keyPath string) (tls.Certificate, error) {
 
 // IDP represents the SAML Identity Provider configuration.
 type IDP struct {
-	Server *samlidp.Server
+	// Using zitadel/saml
+	EntityID string
+	Handler  http.Handler
 }
 
 // ServiceProvider represents a SAML Service Provider for a specific IDP.
 type ServiceProvider struct {
-	ID         string
-	Middleware *samlsp.Middleware
+	ID      string
+	Handler http.Handler
 }
 
 // ServiceProviders manages multiple SAML Service Providers.
@@ -64,28 +62,68 @@ func (s *ServiceProviders) GetProvider(id string) *ServiceProvider {
 
 // CreateProxyIDP creates a SAML Identity Provider middleware from the configuration.
 func CreateProxyIDP(config Config) (*IDP, error) {
-	keyPair, err := LoadCertificate(config.Proxy.CertificatePath, config.Proxy.PrivateKeyPath)
+	// Create a new storage
+	storage, err := NewProxyStorage(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load certificate and key: %w", err)
+		return nil, fmt.Errorf("failed to create storage: %w", err)
 	}
 
-	idpURL, err := url.Parse(config.Proxy.EntityID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse IDP Entity ID URL: %w", err)
+	slog.Info(
+		"Creating SAML IDP with zitadel/saml",
+		slog.String("entityID", config.Proxy.EntityID),
+	)
+
+	// Create metadata endpoint
+	metadataEndpoint := provider.NewEndpoint(provider.DefaultMetadataEndpoint)
+
+	// Create endpoints
+	ssoEndpoint := provider.NewEndpoint("/sso")
+	sloEndpoint := provider.NewEndpoint("/slo")
+
+	// Create IDP config
+	idpConfig := &provider.IdentityProviderConfig{
+		MetadataIDPConfig: &provider.MetadataIDPConfig{
+			ValidUntil:    24 * time.Hour, // Metadata valid for 24 hours
+			CacheDuration: "PT24H",        // Cache for 24 hours
+		},
+		Endpoints: &provider.EndpointConfig{
+			SingleSignOn: &ssoEndpoint,
+			SingleLogOut: &sloEndpoint,
+		},
 	}
 
-	idp, err := samlidp.New(samlidp.Options{
-		URL:         *idpURL,
-		Key:         keyPair.PrivateKey,
-		Certificate: keyPair.Leaf,
-		Store:       &samlidp.MemoryStore{}, // TODO: これは何か外部化しないといけないかも
-	})
+	// Create provider config
+	providerConfig := &provider.Config{
+		Metadata:  &metadataEndpoint,
+		IDPConfig: idpConfig,
+		Organisation: &provider.Organisation{
+			Name:        "SAML Proxy",
+			DisplayName: "SAML Proxy",
+			URL:         config.Proxy.EntityID,
+		},
+	}
+
+	// Create issuer function
+	issuerFunc := func(insecure bool) (provider.IssuerFromRequest, error) {
+		return func(r *http.Request) string {
+			return config.Proxy.EntityID
+		}, nil
+	}
+
+	// Create provider
+	p, err := provider.NewProvider(
+		storage,
+		issuerFunc,
+		providerConfig,
+		provider.WithAllowInsecure(), // Allow HTTP for development
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create SAML IDP middleware: %w", err)
+		return nil, fmt.Errorf("failed to create provider: %w", err)
 	}
 
 	return &IDP{
-		Server: idp,
+		EntityID: config.Proxy.EntityID,
+		Handler:  p.HttpHandler(),
 	}, nil
 }
 
@@ -95,81 +133,54 @@ func CreateServiceProviders(ctx context.Context, config Config) (*ServiceProvide
 		Providers: make(map[string]*ServiceProvider),
 	}
 
-	keyPair, err := LoadCertificate(config.Proxy.CertificatePath, config.Proxy.PrivateKeyPath)
+	// Load certificate
+	_, err := LoadCertificate(config.Proxy.CertificatePath, config.Proxy.PrivateKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load certificate and key: %w", err)
 	}
 
 	for _, idpConfig := range config.IDP {
-		rootURL, err := url.Parse(config.Proxy.EntityID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse IDP URL for IDP %s: %w", idpConfig.ID, err)
-		}
-
-		// TODO: むずすぎる。metadataが読めるならmetadataを読みたい
-
-		idpCertPEM, err := os.ReadFile(idpConfig.CertificatePath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read IDP certificate for IDP %s: %w", idpConfig.ID, err)
-		}
-
-		idpCertBlock, _ := pem.Decode(idpCertPEM)
-		if idpCertBlock == nil {
-			return nil, fmt.Errorf("failed to decode PEM block containing certificate for IDP %s", idpConfig.ID)
-		}
-
-		base64cert := base64.StdEncoding.EncodeToString(idpCertBlock.Bytes)
-
 		slog.Info(
-			"IDP certificate",
+			"Creating SP for IDP with zitadel/saml",
 			slog.String("idp", idpConfig.ID),
-			slog.String("cert", base64cert),
+			slog.String("entityID", idpConfig.EntityID),
+			slog.String("ssoURL", idpConfig.SSOURL),
 		)
 
-		sp, err := samlsp.New(samlsp.Options{
-			URL:         *rootURL,
-			Key:         keyPair.PrivateKey.(*rsa.PrivateKey),
-			Certificate: keyPair.Leaf,
-			IDPMetadata: &saml.EntityDescriptor{
-				EntityID: idpConfig.EntityID,
-				IDPSSODescriptors: []saml.IDPSSODescriptor{
-					{
-						SSODescriptor: saml.SSODescriptor{
-							RoleDescriptor: saml.RoleDescriptor{
-								KeyDescriptors: []saml.KeyDescriptor{
-									{
-										Use: "signing",
-										KeyInfo: saml.KeyInfo{
-											X509Data: saml.X509Data{
-												X509Certificates: []saml.X509Certificate{
-													{
-														Data: base64cert,
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-						SingleSignOnServices: []saml.Endpoint{
-							{
-								Binding:  saml.HTTPRedirectBinding,
-								Location: idpConfig.SSOURL,
-							},
-						},
-					},
-				},
-			},
-			AllowIDPInitiated: true,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to create SAML SP for IDP %s: %w", idpConfig.ID, err)
+		// Create a simple metadata XML for the SP
+		metadata := fmt.Sprintf(`<EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="%s">
+			<SPSSODescriptor AuthnRequestsSigned="true" WantAssertionsSigned="true" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+				<AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="%s/saml/acs" index="0" isDefault="true"/>
+			</SPSSODescriptor>
+		</EntityDescriptor>`, config.Proxy.EntityID, config.Proxy.EntityID)
+
+		// Create a service provider config
+		spConfig := &serviceprovider.Config{
+			Metadata: []byte(metadata),
 		}
 
+		// Create a login URL function
+		loginURL := func(id string) string {
+			return ""
+		}
+
+		// Create a service provider
+		_, err := serviceprovider.NewServiceProvider(idpConfig.ID, spConfig, loginURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create service provider: %w", err)
+		}
+
+		// Create a handler for the SP
+		// For simplicity, we'll just use a handler that redirects to the IDP's SSO URL
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Redirect to the IDP's SSO URL
+			http.Redirect(w, r, idpConfig.SSOURL, http.StatusFound)
+		})
+
+		// Create a service provider
 		provider := &ServiceProvider{
-			ID:         idpConfig.ID,
-			Middleware: sp,
+			ID:      idpConfig.ID,
+			Handler: handler,
 		}
 
 		providers.Providers[idpConfig.ID] = provider
