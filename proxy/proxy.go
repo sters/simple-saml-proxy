@@ -274,6 +274,11 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 		http.Redirect(w, r, callbackURL, http.StatusFound)
 	})
 
+	// Add handler for idp-initiated endpoint
+	mux.HandleFunc("/idp-initiated", func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "IdP-Initiated flow not yet implemented", http.StatusNotImplemented)
+	})
+
 	// Create a middleware that logs all requests
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		slog.Info("Received request", slog.String("path", r.URL.Path))

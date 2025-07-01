@@ -120,4 +120,110 @@ func TestLoadConfig(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "at least one IDP must be configured")
 	})
+
+	t.Run("Missing Required Fields", func(t *testing.T) {
+		// Set up test environment variables without required fields
+		os.Clearenv()
+		t.Setenv("PROXY_ENTITY_ID", "http://test.example.com/metadata")
+		t.Setenv("PROXY_ACS_URL", "http://test.example.com/sso/acs")
+		t.Setenv("PROXY_METADATA_URL", "http://test.example.com/metadata")
+		// Missing PROXY_PRIVATE_KEY_PATH and PROXY_CERTIFICATE_PATH
+		t.Setenv("IDP_0_ID", "default")
+		t.Setenv("IDP_0_ENTITY_ID", "https://idp.example.com/saml/metadata")
+		t.Setenv("IDP_0_SSO_URL", "https://idp.example.com/saml/sso")
+		t.Setenv("IDP_0_CERTIFICATE_PATH", "/path/to/idp.crt")
+
+		// Test loading config - should fail because required fields are missing
+		_, err := LoadConfig()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse environment variables")
+	})
+
+	t.Run("Default Values", func(t *testing.T) {
+		// Set up test environment variables with minimal configuration
+		os.Clearenv()
+		// Only set required fields
+		t.Setenv("PROXY_PRIVATE_KEY_PATH", "/path/to/key.pem")
+		t.Setenv("PROXY_CERTIFICATE_PATH", "/path/to/cert.pem")
+		t.Setenv("IDP_0_ID", "default")
+		t.Setenv("IDP_0_ENTITY_ID", "https://idp.example.com/saml/metadata")
+		t.Setenv("IDP_0_SSO_URL", "https://idp.example.com/saml/sso")
+		t.Setenv("IDP_0_CERTIFICATE_PATH", "/path/to/idp.crt")
+
+		// Test loading config
+		config, err := LoadConfig()
+		require.NoError(t, err)
+
+		// Verify default values are set correctly
+		assert.Equal(t, "http://localhost:8080", config.Proxy.EntityID)
+		assert.Equal(t, "http://localhost:8080/sso/acs", config.Proxy.AcsURL)
+		assert.Equal(t, "http://localhost:8080/metadata", config.Proxy.MetadataURL)
+		assert.Equal(t, ":8080", config.Server.ListenAddress)
+	})
+
+	t.Run("With Allowed Service Providers", func(t *testing.T) {
+		// Set up test environment variables with allowed SPs
+		os.Clearenv()
+		t.Setenv("PROXY_ENTITY_ID", "http://test.example.com/metadata")
+		t.Setenv("PROXY_ACS_URL", "http://test.example.com/sso/acs")
+		t.Setenv("PROXY_METADATA_URL", "http://test.example.com/metadata")
+		t.Setenv("PROXY_PRIVATE_KEY_PATH", "/path/to/key.pem")
+		t.Setenv("PROXY_CERTIFICATE_PATH", "/path/to/cert.pem")
+		t.Setenv("IDP_0_ID", "default")
+		t.Setenv("IDP_0_ENTITY_ID", "https://idp.example.com/saml/metadata")
+		t.Setenv("IDP_0_SSO_URL", "https://idp.example.com/saml/sso")
+		t.Setenv("IDP_0_CERTIFICATE_PATH", "/path/to/idp.crt")
+
+		// Configure allowed SPs
+		t.Setenv("PROXY_ALLOWED_SP_0_ENTITY_ID", "https://sp1.example.com/saml/metadata")
+		t.Setenv("PROXY_ALLOWED_SP_0_ACS_URL", "https://sp1.example.com/saml/acs")
+		t.Setenv("PROXY_ALLOWED_SP_1_ENTITY_ID", "https://sp2.example.com/saml/metadata")
+		t.Setenv("PROXY_ALLOWED_SP_1_ACS_URL", "https://sp2.example.com/saml/acs")
+		t.Setenv("PROXY_ALLOWED_SP_1_METADATA_URL", "https://sp2.example.com/saml/metadata")
+
+		// Test loading config
+		config, err := LoadConfig()
+		require.NoError(t, err)
+
+		// Verify allowed SPs are loaded correctly
+		assert.Len(t, config.Proxy.AllowedSP, 2)
+
+		// Sort allowed SPs by EntityID to ensure consistent order
+		sort.Slice(config.Proxy.AllowedSP, func(i, j int) bool {
+			return config.Proxy.AllowedSP[i].EntityID < config.Proxy.AllowedSP[j].EntityID
+		})
+
+		// First SP
+		assert.Equal(t, "https://sp1.example.com/saml/metadata", config.Proxy.AllowedSP[0].EntityID)
+		assert.Equal(t, "https://sp1.example.com/saml/acs", config.Proxy.AllowedSP[0].AcsURL)
+		assert.Empty(t, config.Proxy.AllowedSP[0].MetadataURL)
+
+		// Second SP
+		assert.Equal(t, "https://sp2.example.com/saml/metadata", config.Proxy.AllowedSP[1].EntityID)
+		assert.Equal(t, "https://sp2.example.com/saml/acs", config.Proxy.AllowedSP[1].AcsURL)
+		assert.Equal(t, "https://sp2.example.com/saml/metadata", config.Proxy.AllowedSP[1].MetadataURL)
+	})
+
+	t.Run("IDP with MetadataURL", func(t *testing.T) {
+		// Set up test environment variables with IDP using MetadataURL
+		os.Clearenv()
+		t.Setenv("PROXY_ENTITY_ID", "http://test.example.com/metadata")
+		t.Setenv("PROXY_ACS_URL", "http://test.example.com/sso/acs")
+		t.Setenv("PROXY_METADATA_URL", "http://test.example.com/metadata")
+		t.Setenv("PROXY_PRIVATE_KEY_PATH", "/path/to/key.pem")
+		t.Setenv("PROXY_CERTIFICATE_PATH", "/path/to/cert.pem")
+		t.Setenv("IDP_0_ID", "metadata-idp")
+		t.Setenv("IDP_0_METADATA_URL", "https://idp.example.com/saml/metadata")
+
+		// Test loading config
+		config, err := LoadConfig()
+		require.NoError(t, err)
+
+		// Verify IDP with MetadataURL is loaded correctly
+		assert.Len(t, config.IDP, 1)
+		assert.Equal(t, "metadata-idp", config.IDP[0].ID)
+		assert.Equal(t, "https://idp.example.com/saml/metadata", config.IDP[0].MetadataURL)
+		assert.Empty(t, config.IDP[0].EntityID)
+		assert.Empty(t, config.IDP[0].SSOURL)
+	})
 }

@@ -13,6 +13,7 @@ import (
 func main() {
 	ctx := context.Background()
 
+	// for debug
 	os.Setenv("PROXY_PRIVATE_KEY_PATH", "/Users/sters/go/src/github.com/sters/simple-saml-proxy/e2e/proxy.key")
 	os.Setenv("PROXY_CERTIFICATE_PATH", "/Users/sters/go/src/github.com/sters/simple-saml-proxy/e2e/proxy.crt")
 	os.Setenv("PROXY_ALLOWED_SP_0_ENTITY_ID", "urn:example:sp")
