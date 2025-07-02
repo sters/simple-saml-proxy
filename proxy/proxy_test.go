@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -108,7 +107,7 @@ func TestSetupHTTPHandlers(t *testing.T) {
 	}
 
 	// Create SAML service providers
-	providers, err := CreateServiceProviders(context.Background(), config)
+	providers, err := CreateServiceProviders(t.Context(), config)
 	require.NoError(t, err)
 
 	// Create SAML IDP

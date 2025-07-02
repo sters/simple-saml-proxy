@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -348,7 +347,7 @@ func TestMetadataEndpoint(t *testing.T) {
 	}
 
 	// Create SAML service providers
-	providers, err := proxy.CreateServiceProviders(context.Background(), config)
+	providers, err := proxy.CreateServiceProviders(t.Context(), config)
 	assert.NoError(t, err)
 
 	// Create proxy IDP
@@ -432,7 +431,7 @@ func TestSSOEndpoint(t *testing.T) {
 	}
 
 	// Create SAML service providers
-	providers, err := proxy.CreateServiceProviders(context.Background(), config)
+	providers, err := proxy.CreateServiceProviders(t.Context(), config)
 	assert.NoError(t, err)
 
 	// Create proxy IDP
@@ -533,7 +532,7 @@ func TestACSEndpoint(t *testing.T) {
 	}
 
 	// Create SAML service providers
-	providers, err := proxy.CreateServiceProviders(context.Background(), config)
+	providers, err := proxy.CreateServiceProviders(t.Context(), config)
 	assert.NoError(t, err)
 
 	// Create proxy IDP
@@ -623,7 +622,7 @@ func TestE2EFlow(t *testing.T) {
 	}
 
 	// Create SAML service providers
-	providers, err := proxy.CreateServiceProviders(context.Background(), config)
+	providers, err := proxy.CreateServiceProviders(t.Context(), config)
 	assert.NoError(t, err)
 
 	// Create proxy IDP
@@ -681,6 +680,7 @@ func TestE2EFlow(t *testing.T) {
 			end := strings.Index(line[start:], "\"")
 			if end > 0 {
 				idpSelectURL = line[start : start+end]
+
 				break
 			}
 		}
@@ -702,7 +702,7 @@ func TestE2EFlow(t *testing.T) {
 
 	// Set the auth request ID cookie
 	authRequestID := strings.TrimPrefix(idpSelectURL, "/idp_select?id=")
-	req, err := http.NewRequest("GET", idpSelectedURL, nil)
+	req, err := http.NewRequest(http.MethodGet, idpSelectedURL, nil)
 	assert.NoError(t, err)
 	req.AddCookie(&http.Cookie{
 		Name:  "authID",
@@ -733,7 +733,7 @@ func TestE2EFlow(t *testing.T) {
 	form.Add("RelayState", "test-relay-state")
 
 	// Send the form to the proxy's ACS endpoint
-	req, err = http.NewRequest("POST", proxyServer.URL+"/saml/acs", strings.NewReader(form.Encode()))
+	req, err = http.NewRequest(http.MethodPost, proxyServer.URL+"/saml/acs", strings.NewReader(form.Encode()))
 	assert.NoError(t, err)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{
@@ -757,7 +757,7 @@ func TestE2EFlow(t *testing.T) {
 	assert.Contains(t, location, "/callback", "Expected redirect to callback endpoint")
 
 	// Step 5: Follow the redirect to the callback endpoint
-	req, err = http.NewRequest("GET", proxyServer.URL+location, nil)
+	req, err = http.NewRequest(http.MethodGet, proxyServer.URL+location, nil)
 	assert.NoError(t, err)
 	req.AddCookie(&http.Cookie{
 		Name:  "authID",

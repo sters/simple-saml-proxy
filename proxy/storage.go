@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -152,6 +153,7 @@ func (s *ProxyStorage) GetEntityByID(ctx context.Context, entityID string) (*ser
 			// loginURL for Proxy IdP (Not for SP, Not for actual IdP)
 			loginURL := func(id string) string {
 				slog.Info("login URL", slog.String("id", id))
+
 				return "/idp_select?id=" + id
 			}
 
@@ -265,12 +267,12 @@ func (s *ProxyStorage) Health(ctx context.Context) error {
 func (s *ProxyStorage) getCertificateAndKey() (*key.CertificateAndKey, error) {
 	// Extract the certificate and private key from the tls.Certificate
 	if s.cert.PrivateKey == nil {
-		return nil, fmt.Errorf("private key is nil")
+		return nil, errors.New("private key is nil")
 	}
 
 	privateKey, ok := s.cert.PrivateKey.(*rsa.PrivateKey)
 	if !ok {
-		return nil, fmt.Errorf("private key is not an RSA key")
+		return nil, errors.New("private key is not an RSA key")
 	}
 
 	return &key.CertificateAndKey{

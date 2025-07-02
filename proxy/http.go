@@ -10,6 +10,7 @@ func mustParseURL(s string) url.URL {
 	if err != nil {
 		panic(err)
 	}
+
 	return *u
 }
 
@@ -36,5 +37,6 @@ func (w *fakeResponseWriter) WriteHeader(statusCode int) {
 
 func (w *fakeResponseWriter) Write(b []byte) (int, error) {
 	w.content = append(w.content, b...)
+
 	return 0, nil
 }

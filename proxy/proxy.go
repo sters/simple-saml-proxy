@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// idpSelectionTemplate is the HTML template for the IdP selection page
+// idpSelectionTemplate is the HTML template for the IdP selection page.
 const idpSelectionTemplate = `
 <!DOCTYPE html>
 <html>
@@ -59,10 +59,12 @@ const idpSelectionTemplate = `
 </html>
 `
 
-const cookieNameAuthRequestID = "authID"
-const cookieNameIDPID = "idpID"
+const (
+	cookieNameAuthRequestID = "authID"
+	cookieNameIDPID         = "idpID"
+)
 
-// handlePing handles the /ping health check endpoint
+// handlePing handles the /ping health check endpoint.
 func handlePing(w http.ResponseWriter, r *http.Request) {
 	// Health check endpoint
 	_, err := w.Write([]byte("pong"))
@@ -89,6 +91,7 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 		authRequestID := r.FormValue("id")
 		if authRequestID == "" {
 			http.Error(w, "Invalid request", http.StatusBadRequest)
+
 			return
 		}
 		_, err := idp.idpStorage.AuthRequestByID(r.Context(), authRequestID)
@@ -98,6 +101,7 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 				slog.String("error", err.Error()),
 			)
 			http.Error(w, "Invalid request", http.StatusInternalServerError)
+
 			return
 		}
 		http.SetCookie(w, &http.Cookie{
@@ -121,12 +125,14 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 		if err != nil {
 			slog.Error("Failed to parse IdP selection template", slog.String("error", err.Error()))
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
+
 			return
 		}
 		err = tmpl.Execute(w, data)
 		if err != nil {
 			slog.Error("Failed to execute template", slog.String("error", err.Error()))
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
+
 			return
 		}
 	}
@@ -138,12 +144,14 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 		if err != nil {
 			slog.Error("Failed to get auth request ID cookie", slog.String("error", err.Error()))
 			http.Error(w, "Invalid request", http.StatusBadRequest)
+
 			return
 		}
 		authRequestID := authRequestIDCookie.Value
 		if authRequestID == "" {
 			slog.Error("Auth request ID cookie is empty")
 			http.Error(w, "Invalid request", http.StatusBadRequest)
+
 			return
 		}
 		if _, err = idp.idpStorage.AuthRequestByID(r.Context(), authRequestID); err != nil {
@@ -152,6 +160,7 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 				slog.String("error", err.Error()),
 			)
 			http.Error(w, "Invalid request", http.StatusInternalServerError)
+
 			return
 		}
 
@@ -167,6 +176,7 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 		if !ok {
 			slog.Info("Invalid IDP ID", slog.String("idp", idpID))
 			http.Error(w, "Invalid IDP ID", http.StatusBadRequest)
+
 			return
 		}
 		http.SetCookie(w, &http.Cookie{
@@ -184,6 +194,7 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 		if err != nil {
 			slog.Error("Failed to create redirect URL", slog.String("error", err.Error()))
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
+
 			return
 		}
 
@@ -200,12 +211,14 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 		if err != nil {
 			slog.Error("Failed to get auth request ID cookie", slog.String("error", err.Error()))
 			http.Error(w, "Invalid request", http.StatusBadRequest)
+
 			return
 		}
 		authRequestID := authRequestIDCookie.Value
 		if authRequestID == "" {
 			slog.Error("Auth request ID cookie is empty")
 			http.Error(w, "Invalid request", http.StatusBadRequest)
+
 			return
 		}
 		authRequest, err := idp.idpStorage.AuthRequestByID(r.Context(), authRequestID)
@@ -215,6 +228,7 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 				slog.String("error", err.Error()),
 			)
 			http.Error(w, "Invalid request", http.StatusInternalServerError)
+
 			return
 		}
 		authRequest.(*AuthRequest).IsDone = true // 自分でDone=trueにしないといけない
@@ -223,18 +237,21 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 		if err != nil {
 			slog.Error("Failed to get IDP ID cookie", slog.String("error", err.Error()))
 			http.Error(w, "Invalid request", http.StatusBadRequest)
+
 			return
 		}
 		idpID := idpIDCookie.Value
 		if idpID == "" {
 			slog.Error("IDP ID cookie is empty")
 			http.Error(w, "Invalid request", http.StatusBadRequest)
+
 			return
 		}
 		provider, ok := providers.Providers[idpID]
 		if !ok {
 			slog.Error("Invalid IDP ID", slog.String("idp", idpID))
 			http.Error(w, "Invalid IDP ID", http.StatusBadRequest)
+
 			return
 		}
 
@@ -242,6 +259,7 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 		if err := r.ParseForm(); err != nil {
 			slog.Error("Failed to parse form", slog.String("error", err.Error()))
 			http.Error(w, "Invalid request", http.StatusBadRequest)
+
 			return
 		}
 
@@ -254,6 +272,7 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 		if err != nil {
 			slog.Error("Failed to parse response", slog.String("error", err.Error()))
 			http.Error(w, "Invalid request", http.StatusBadRequest)
+
 			return
 		}
 		slog.Info(
@@ -266,6 +285,7 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 		if assertion.Subject == nil || assertion.Subject.NameID == nil {
 			slog.Error("Assertion does not contain NameID")
 			http.Error(w, "Invalid request", http.StatusBadRequest)
+
 			return
 		}
 
@@ -286,9 +306,11 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/idp_selected"):
 			idpSelectedHandler(w, r)
+
 			return
 		case strings.HasPrefix(r.URL.Path, "/idp_select"):
 			idpSelectHandler(w, r)
+
 			return
 		}
 
@@ -349,5 +371,6 @@ func randomBytes(n int) []byte {
 	if _, err := io.ReadFull(rand.Reader, rv); err != nil {
 		panic(err)
 	}
+
 	return rv
 }

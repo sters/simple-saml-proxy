@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"context"
 	"crypto/tls"
 	"net/http"
 	"net/http/httptest"
@@ -135,7 +134,7 @@ func TestCreateServiceProviders(t *testing.T) {
 		}
 
 		// Test creating SAML service providers
-		providers, err := CreateServiceProviders(context.Background(), config)
+		providers, err := CreateServiceProviders(t.Context(), config)
 		require.NoError(t, err)
 		assert.NotNil(t, providers)
 
@@ -178,7 +177,7 @@ func TestCreateServiceProviders(t *testing.T) {
 		}
 
 		// Test creating SAML service providers
-		providers, err := CreateServiceProviders(context.Background(), config)
+		providers, err := CreateServiceProviders(t.Context(), config)
 		require.NoError(t, err)
 		assert.NotNil(t, providers)
 
@@ -254,7 +253,7 @@ m1rhMtZCwLf9bUG8OkZRnZEMIagLIPRpwVd6JvjYWp8=</X509Certificate>
 		}
 
 		// Test creating SAML service providers
-		providers, err := CreateServiceProviders(context.Background(), config)
+		providers, err := CreateServiceProviders(t.Context(), config)
 		require.NoError(t, err)
 		assert.NotNil(t, providers)
 
@@ -287,7 +286,7 @@ m1rhMtZCwLf9bUG8OkZRnZEMIagLIPRpwVd6JvjYWp8=</X509Certificate>
 		}
 
 		// Test creating SAML service providers - should fail
-		_, err := CreateServiceProviders(context.Background(), config)
+		_, err := CreateServiceProviders(t.Context(), config)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to load certificate and key")
 	})

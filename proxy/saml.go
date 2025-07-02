@@ -115,6 +115,7 @@ func CreateProxyIDP(config Config) (*IDP, error) {
 	issuerFunc := func(insecure bool) (provider.IssuerFromRequest, error) {
 		return func(r *http.Request) string {
 			r.FormValue("SAMLRequest")
+
 			return config.Proxy.EntityID
 		}, nil
 	}
