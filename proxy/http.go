@@ -2,17 +2,7 @@ package proxy
 
 import (
 	"net/http"
-	"net/url"
 )
-
-func mustParseURL(s string) url.URL {
-	u, err := url.Parse(s)
-	if err != nil {
-		panic(err)
-	}
-
-	return *u
-}
 
 type fakeResponseWriter struct {
 	content    []byte
@@ -38,5 +28,5 @@ func (w *fakeResponseWriter) WriteHeader(statusCode int) {
 func (w *fakeResponseWriter) Write(b []byte) (int, error) {
 	w.content = append(w.content, b...)
 
-	return 0, nil
+	return len(b), nil
 }

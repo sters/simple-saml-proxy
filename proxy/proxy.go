@@ -231,7 +231,7 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 
 			return
 		}
-		authRequest.(*AuthRequest).IsDone = true // 自分でDone=trueにしないといけない
+		authRequest.(*AuthRequest).IsDone = true // Must manually set Done=true
 
 		idpIDCookie, err := r.Cookie(cookieNameIDPID)
 		if err != nil {
@@ -255,7 +255,7 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 			return
 		}
 
-		// NOTE: SAMLKitはConditions.NotOnOrAfterがないらしく、XMLバリデーションに引っかかる
+		// NOTE: SAMLKit seems to lack Conditions.NotOnOrAfter, causing XML validation failures
 		if err := r.ParseForm(); err != nil {
 			slog.Error("Failed to parse form", slog.String("error", err.Error()))
 			http.Error(w, "Invalid request", http.StatusBadRequest)
@@ -369,7 +369,9 @@ func StartServer(config Config, handler http.Handler) error {
 func randomBytes(n int) []byte {
 	rv := make([]byte, n)
 	if _, err := io.ReadFull(rand.Reader, rv); err != nil {
-		panic(err)
+		// This should not happen under normal circumstances, but handle gracefully
+		slog.Error("Failed to generate random bytes", slog.String("error", err.Error()))
+		return make([]byte, n)
 	}
 
 	return rv
