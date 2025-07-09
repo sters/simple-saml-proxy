@@ -117,7 +117,7 @@ func TestLoadConfig(t *testing.T) {
 
 		// Test loading config - should fail because no IDP is configured
 		_, err := LoadConfig()
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "at least one IDP must be configured")
 	})
 
@@ -135,7 +135,7 @@ func TestLoadConfig(t *testing.T) {
 
 		// Test loading config - should fail because required fields are missing
 		_, err := LoadConfig()
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to parse environment variables")
 	})
 
