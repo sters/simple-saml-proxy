@@ -398,6 +398,7 @@ func TestIDPSelectHandler(t *testing.T) {
 	for _, cookie := range cookies {
 		if cookie.Name == cookieNameAuthRequestID {
 			authCookie = cookie
+
 			break
 		}
 	}
@@ -479,13 +480,14 @@ func TestIDPSelectedHandler(t *testing.T) {
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusFound, w.Code)
-	
+
 	// Check that the IDP ID cookie was set
 	cookies := w.Result().Cookies()
 	var idpCookie *http.Cookie
 	for _, cookie := range cookies {
 		if cookie.Name == cookieNameIDPID {
 			idpCookie = cookie
+
 			break
 		}
 	}
@@ -669,7 +671,7 @@ func TestRandomBytes(t *testing.T) {
 
 	// Test edge cases
 	result = randomBytes(0)
-	assert.Len(t, result, 0)
+	assert.Empty(t, result)
 
 	result = randomBytes(1)
 	assert.Len(t, result, 1)
@@ -740,6 +742,7 @@ func TestCookieHandling(t *testing.T) {
 	for _, cookie := range cookies {
 		if cookie.Name == cookieNameAuthRequestID {
 			authCookie = cookie
+
 			break
 		}
 	}
@@ -765,6 +768,7 @@ func TestCookieHandling(t *testing.T) {
 	for _, cookie := range cookies {
 		if cookie.Name == cookieNameIDPID {
 			idpCookie = cookie
+
 			break
 		}
 	}

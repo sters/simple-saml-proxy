@@ -822,7 +822,7 @@ func TestE2EFlow(t *testing.T) {
 	// If it's a success page, verify it contains the expected content
 	if resp.StatusCode == http.StatusOK {
 		body, err = io.ReadAll(resp.Body)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		_ = string(body)
 		// The success page might contain various information
 		// For simplicity, we won't make specific assertions about the content

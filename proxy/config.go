@@ -7,9 +7,7 @@ import (
 	"github.com/caarlos0/env/v11"
 )
 
-var (
-	ErrNoIDPConfigured = errors.New("at least one IDP must be configured")
-)
+var ErrNoIDPConfigured = errors.New("at least one IDP must be configured")
 
 // IDPConfig holds the configuration for a single Identity Provider.
 type IDPConfig struct {

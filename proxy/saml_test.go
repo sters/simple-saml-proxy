@@ -235,9 +235,6 @@ m1rhMtZCwLf9bUG8OkZRnZEMIagLIPRpwVd6JvjYWp8=</X509Certificate>
     <SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://metadata-idp.example.com/saml/sso"/>
   </IDPSSODescriptor>
 </EntityDescriptor>`))
-			if err != nil {
-				t.Errorf("Failed to write response: %v", err)
-			}
 		}))
 		defer server.Close()
 

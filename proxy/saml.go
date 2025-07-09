@@ -226,7 +226,7 @@ func CreateServiceProviders(ctx context.Context, config Config) (*ServiceProvide
 
 		privateKey, ok := keyPair.PrivateKey.(*rsa.PrivateKey)
 		if !ok {
-			return nil, fmt.Errorf("private key is not RSA for IDP %s", idpConfig.ID)
+			return nil, fmt.Errorf("%w for IDP %s", ErrPrivateKeyNotRSAKey, idpConfig.ID)
 		}
 
 		sp, err := samlsp.New(samlsp.Options{
