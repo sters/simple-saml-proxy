@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -17,6 +18,11 @@ import (
 	"github.com/crewjam/saml"
 	"github.com/crewjam/saml/samlsp"
 	"github.com/zitadel/saml/pkg/provider"
+)
+
+var (
+	ErrDecodePEMBlock      = errors.New("failed to decode PEM block containing certificate")
+	ErrPrivateKeyNotRSAKey = errors.New("private key is not an RSA key")
 )
 
 // LoadCertificate loads and parses the SP certificate and private key.
@@ -178,7 +184,7 @@ func CreateServiceProviders(ctx context.Context, config Config) (*ServiceProvide
 
 			idpCertBlock, _ := pem.Decode(idpCertPEM)
 			if idpCertBlock == nil {
-				return nil, fmt.Errorf("failed to decode PEM block containing certificate for IDP %s", idpConfig.ID)
+				return nil, fmt.Errorf("%w for IDP %s", ErrDecodePEMBlock, idpConfig.ID)
 			}
 
 			base64cert := base64.StdEncoding.EncodeToString(idpCertBlock.Bytes)

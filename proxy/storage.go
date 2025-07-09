@@ -18,6 +18,13 @@ import (
 	"github.com/zitadel/saml/pkg/provider/xml/samlp"
 )
 
+var (
+	ErrPrivateKeyIsNil     = errors.New("private key is nil")
+	ErrPrivateKeyNotRSA    = errors.New("private key is not an RSA key")
+	ErrEntityNotFound      = errors.New("entity not found")
+	ErrAuthRequestNotFound = errors.New("auth request not found")
+)
+
 // Storage implements the zitadel/saml Storage interfaces.
 type Storage struct {
 	config Config
@@ -175,7 +182,7 @@ func (s *Storage) GetEntityByID(_ context.Context, entityID string) (*servicepro
 		return sp, nil
 	}
 
-	return nil, fmt.Errorf("entity not found: %s", entityID)
+	return nil, fmt.Errorf("%w: %s", ErrEntityNotFound, entityID)
 }
 
 func (s *Storage) GetEntityIDByAppID(_ context.Context, appID string) (string, error) {
@@ -184,7 +191,7 @@ func (s *Storage) GetEntityIDByAppID(_ context.Context, appID string) (string, e
 	s.entityIDByAppIDLock.RUnlock()
 
 	if !ok {
-		return "", fmt.Errorf("entity not found: %s", appID)
+		return "", fmt.Errorf("%w: %s", ErrEntityNotFound, appID)
 	}
 
 	return entityID, nil
@@ -231,7 +238,7 @@ func (s *Storage) AuthRequestByID(_ context.Context, id string) (models.AuthRequ
 	s.authRequestsLock.RUnlock()
 
 	if !ok {
-		return nil, fmt.Errorf("auth request not found: %s", id)
+		return nil, fmt.Errorf("%w: %s", ErrAuthRequestNotFound, id)
 	}
 
 	return authRequest, nil
@@ -283,16 +290,54 @@ func (s *Storage) Health(_ context.Context) error {
 func (s *Storage) getCertificateAndKey() (*key.CertificateAndKey, error) {
 	// Extract the certificate and private key from the tls.Certificate
 	if s.cert.PrivateKey == nil {
-		return nil, errors.New("private key is nil")
+		return nil, ErrPrivateKeyIsNil
 	}
 
 	privateKey, ok := s.cert.PrivateKey.(*rsa.PrivateKey)
 	if !ok {
-		return nil, errors.New("private key is not an RSA key")
+		return nil, ErrPrivateKeyNotRSA
 	}
 
 	return &key.CertificateAndKey{
 		Certificate: s.cert.Certificate[0],
 		Key:         privateKey,
 	}, nil
+}
+
+// createServiceProvider creates a new service provider for the given allowed SP config.
+func (s *Storage) createServiceProvider(allowedSP SPConfig, entityID string) (*serviceprovider.ServiceProvider, error) {
+	// Create a service provider config for requester info
+	var metadataBytes []byte
+	if allowedSP.MetadataURL != "" {
+		b, err := xml.ReadMetadataFromURL(http.DefaultClient, allowedSP.MetadataURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read metadata from URL: %w", err)
+		}
+		metadataBytes = b
+	} else {
+		metadataBytes = []byte("<EntityDescriptor xmlns='urn:oasis:names:tc:SAML:2.0:metadata' entityID='" + entityID + "'></EntityDescriptor>")
+	}
+
+	parsedMetadata, err := xml.ParseMetadataXmlIntoStruct(metadataBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse metadata: %w", err)
+	}
+	spConfig := &serviceprovider.Config{
+		Metadata: metadataBytes,
+	}
+
+	// loginURL for Proxy IdP (Not for SP, Not for actual IdP)
+	loginURL := func(id string) string {
+		slog.Info("login URL", slog.String("id", id))
+
+		return "/idp_select?id=" + id
+	}
+
+	// Create a new service provider
+	sp, err := serviceprovider.NewServiceProvider(parsedMetadata.Id, spConfig, loginURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create service provider: %w", err)
+	}
+
+	return sp, nil
 }

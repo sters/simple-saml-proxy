@@ -271,7 +271,9 @@ func TestStartServer(t *testing.T) {
 
 	// Test the server endpoints
 	// Test ping endpoint
-	resp, err := http.Get(testServer.URL + "/ping")
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, testServer.URL+"/ping", nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body, err := io.ReadAll(resp.Body)
@@ -280,7 +282,9 @@ func TestStartServer(t *testing.T) {
 	resp.Body.Close()
 
 	// Test metadata endpoint
-	resp, err = http.Get(testServer.URL + "/metadata")
+	req, err = http.NewRequestWithContext(t.Context(), http.MethodGet, testServer.URL+"/metadata", nil)
+	require.NoError(t, err)
+	resp, err = http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, "application/xml", resp.Header.Get("Content-Type"))
@@ -290,7 +294,9 @@ func TestStartServer(t *testing.T) {
 	resp.Body.Close()
 
 	// Test non-existent endpoint
-	resp, err = http.Get(testServer.URL + "/nonexistent")
+	req, err = http.NewRequestWithContext(t.Context(), http.MethodGet, testServer.URL+"/nonexistent", nil)
+	require.NoError(t, err)
+	resp, err = http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	resp.Body.Close()
@@ -326,5 +332,564 @@ func TestStartServer(t *testing.T) {
 		t.Fatalf("Server stopped unexpectedly: %v", err)
 	default:
 		// This is expected, server is still running
+	}
+}
+
+func TestIDPSelectHandler(t *testing.T) {
+	// Generate test certificate and key
+	certPath, keyPath := generateTestCertificate(t)
+	defer func() {
+		if certPath != "" {
+			err := os.RemoveAll(filepath.Dir(certPath))
+			if err != nil {
+				t.Logf("Failed to remove temp directory: %v", err)
+			}
+		}
+	}()
+
+	// Create a test config
+	config := Config{}
+	config.Proxy.EntityID = "http://test.example.com/metadata"
+	config.Proxy.CertificatePath = certPath
+	config.Proxy.PrivateKeyPath = keyPath
+
+	// Add test IDP
+	config.IDP = []IDPConfig{
+		{
+			ID:              "idp1",
+			EntityID:        "https://idp1.example.com/saml/metadata",
+			SSOURL:          "https://idp1.example.com/saml/sso",
+			CertificatePath: certPath,
+		},
+	}
+
+	// Create SAML service providers
+	providers, err := CreateServiceProviders(t.Context(), config)
+	require.NoError(t, err)
+
+	// Create SAML IDP
+	idp, err := CreateProxyIDP(config)
+	require.NoError(t, err)
+
+	// Create a mock auth request
+	authRequestID := "test-auth-request-id"
+	idp.idpStorage.authRequestsLock.Lock()
+	idp.idpStorage.authRequests[authRequestID] = &AuthRequest{
+		ID:            authRequestID,
+		ApplicationID: "test-app-id",
+		IsDone:        false,
+	}
+	idp.idpStorage.authRequestsLock.Unlock()
+
+	// Test setting up HTTP handlers
+	mux := SetupHTTPHandlers(idp, providers, config)
+
+	// Test idp_select endpoint with valid auth request ID
+	req := httptest.NewRequest(http.MethodGet, "/idp_select?id="+authRequestID, nil)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "Select an Identity Provider")
+	assert.Contains(t, w.Body.String(), "idp1")
+
+	// Check that the auth request ID cookie was set
+	cookies := w.Result().Cookies()
+	var authCookie *http.Cookie
+	for _, cookie := range cookies {
+		if cookie.Name == cookieNameAuthRequestID {
+			authCookie = cookie
+			break
+		}
+	}
+	assert.NotNil(t, authCookie)
+	assert.Equal(t, authRequestID, authCookie.Value)
+	assert.True(t, authCookie.HttpOnly)
+	assert.True(t, authCookie.Secure)
+
+	// Test idp_select endpoint without auth request ID (should return 400)
+	req = httptest.NewRequest(http.MethodGet, "/idp_select", nil)
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Invalid request")
+
+	// Test idp_select endpoint with invalid auth request ID (should return 500)
+	req = httptest.NewRequest(http.MethodGet, "/idp_select?id=invalid-id", nil)
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Contains(t, w.Body.String(), "Invalid request")
+}
+
+func TestIDPSelectedHandler(t *testing.T) {
+	// Generate test certificate and key
+	certPath, keyPath := generateTestCertificate(t)
+	defer func() {
+		if certPath != "" {
+			err := os.RemoveAll(filepath.Dir(certPath))
+			if err != nil {
+				t.Logf("Failed to remove temp directory: %v", err)
+			}
+		}
+	}()
+
+	// Create a test config
+	config := Config{}
+	config.Proxy.EntityID = "http://test.example.com/metadata"
+	config.Proxy.CertificatePath = certPath
+	config.Proxy.PrivateKeyPath = keyPath
+
+	// Add test IDP
+	config.IDP = []IDPConfig{
+		{
+			ID:              "idp1",
+			EntityID:        "https://idp1.example.com/saml/metadata",
+			SSOURL:          "https://idp1.example.com/saml/sso",
+			CertificatePath: certPath,
+		},
+	}
+
+	// Create SAML service providers
+	providers, err := CreateServiceProviders(t.Context(), config)
+	require.NoError(t, err)
+
+	// Create SAML IDP
+	idp, err := CreateProxyIDP(config)
+	require.NoError(t, err)
+
+	// Create a mock auth request
+	authRequestID := "test-auth-request-id"
+	idp.idpStorage.authRequestsLock.Lock()
+	idp.idpStorage.authRequests[authRequestID] = &AuthRequest{
+		ID:            authRequestID,
+		ApplicationID: "test-app-id",
+		IsDone:        false,
+	}
+	idp.idpStorage.authRequestsLock.Unlock()
+
+	// Test setting up HTTP handlers
+	mux := SetupHTTPHandlers(idp, providers, config)
+
+	// Test idp_selected endpoint with valid parameters
+	req := httptest.NewRequest(http.MethodGet, "/idp_selected?idpID=idp1", nil)
+	req.AddCookie(&http.Cookie{
+		Name:  cookieNameAuthRequestID,
+		Value: authRequestID,
+	})
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusFound, w.Code)
+	
+	// Check that the IDP ID cookie was set
+	cookies := w.Result().Cookies()
+	var idpCookie *http.Cookie
+	for _, cookie := range cookies {
+		if cookie.Name == cookieNameIDPID {
+			idpCookie = cookie
+			break
+		}
+	}
+	assert.NotNil(t, idpCookie)
+	assert.Equal(t, "idp1", idpCookie.Value)
+	assert.True(t, idpCookie.HttpOnly)
+	assert.True(t, idpCookie.Secure)
+
+	// Test idp_selected endpoint without auth request ID cookie (should return 400)
+	req = httptest.NewRequest(http.MethodGet, "/idp_selected?idpID=idp1", nil)
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Invalid request")
+
+	// Test idp_selected endpoint with empty auth request ID cookie (should return 400)
+	req = httptest.NewRequest(http.MethodGet, "/idp_selected?idpID=idp1", nil)
+	req.AddCookie(&http.Cookie{
+		Name:  cookieNameAuthRequestID,
+		Value: "",
+	})
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Invalid request")
+
+	// Test idp_selected endpoint with invalid auth request ID (should return 500)
+	req = httptest.NewRequest(http.MethodGet, "/idp_selected?idpID=idp1", nil)
+	req.AddCookie(&http.Cookie{
+		Name:  cookieNameAuthRequestID,
+		Value: "invalid-id",
+	})
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Contains(t, w.Body.String(), "Invalid request")
+
+	// Test idp_selected endpoint with invalid IDP ID (should return 400)
+	req = httptest.NewRequest(http.MethodGet, "/idp_selected?idpID=invalid-idp", nil)
+	req.AddCookie(&http.Cookie{
+		Name:  cookieNameAuthRequestID,
+		Value: authRequestID,
+	})
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Invalid IDP ID")
+}
+
+func TestSAMLACSHandler(t *testing.T) {
+	// Generate test certificate and key
+	certPath, keyPath := generateTestCertificate(t)
+	defer func() {
+		if certPath != "" {
+			err := os.RemoveAll(filepath.Dir(certPath))
+			if err != nil {
+				t.Logf("Failed to remove temp directory: %v", err)
+			}
+		}
+	}()
+
+	// Create a test config
+	config := Config{}
+	config.Proxy.EntityID = "http://test.example.com/metadata"
+	config.Proxy.CertificatePath = certPath
+	config.Proxy.PrivateKeyPath = keyPath
+
+	// Add test IDP
+	config.IDP = []IDPConfig{
+		{
+			ID:              "idp1",
+			EntityID:        "https://idp1.example.com/saml/metadata",
+			SSOURL:          "https://idp1.example.com/saml/sso",
+			CertificatePath: certPath,
+		},
+	}
+
+	// Create SAML service providers
+	providers, err := CreateServiceProviders(t.Context(), config)
+	require.NoError(t, err)
+
+	// Create SAML IDP
+	idp, err := CreateProxyIDP(config)
+	require.NoError(t, err)
+
+	// Create a mock auth request
+	authRequestID := "test-auth-request-id"
+	idp.idpStorage.authRequestsLock.Lock()
+	idp.idpStorage.authRequests[authRequestID] = &AuthRequest{
+		ID:            authRequestID,
+		ApplicationID: "test-app-id",
+		IsDone:        false,
+	}
+	idp.idpStorage.authRequestsLock.Unlock()
+
+	// Test setting up HTTP handlers
+	mux := SetupHTTPHandlers(idp, providers, config)
+
+	// Test /saml/acs endpoint without auth request ID cookie (should return 400)
+	req := httptest.NewRequest(http.MethodPost, "/saml/acs", nil)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Invalid request")
+
+	// Test /saml/acs endpoint with empty auth request ID cookie (should return 400)
+	req = httptest.NewRequest(http.MethodPost, "/saml/acs", nil)
+	req.AddCookie(&http.Cookie{
+		Name:  cookieNameAuthRequestID,
+		Value: "",
+	})
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Invalid request")
+
+	// Test /saml/acs endpoint with invalid auth request ID (should return 500)
+	req = httptest.NewRequest(http.MethodPost, "/saml/acs", nil)
+	req.AddCookie(&http.Cookie{
+		Name:  cookieNameAuthRequestID,
+		Value: "invalid-id",
+	})
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Contains(t, w.Body.String(), "Invalid request")
+
+	// Test /saml/acs endpoint without IDP ID cookie (should return 400)
+	req = httptest.NewRequest(http.MethodPost, "/saml/acs", nil)
+	req.AddCookie(&http.Cookie{
+		Name:  cookieNameAuthRequestID,
+		Value: authRequestID,
+	})
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Invalid request")
+
+	// Test /saml/acs endpoint with empty IDP ID cookie (should return 400)
+	req = httptest.NewRequest(http.MethodPost, "/saml/acs", nil)
+	req.AddCookie(&http.Cookie{
+		Name:  cookieNameAuthRequestID,
+		Value: authRequestID,
+	})
+	req.AddCookie(&http.Cookie{
+		Name:  cookieNameIDPID,
+		Value: "",
+	})
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Invalid request")
+
+	// Test /saml/acs endpoint with invalid IDP ID (should return 400)
+	req = httptest.NewRequest(http.MethodPost, "/saml/acs", nil)
+	req.AddCookie(&http.Cookie{
+		Name:  cookieNameAuthRequestID,
+		Value: authRequestID,
+	})
+	req.AddCookie(&http.Cookie{
+		Name:  cookieNameIDPID,
+		Value: "invalid-idp",
+	})
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Invalid IDP ID")
+}
+
+func TestRandomBytes(t *testing.T) {
+	// Test that randomBytes returns the requested number of bytes
+	result := randomBytes(10)
+	assert.Len(t, result, 10)
+
+	// Test that randomBytes returns different values on subsequent calls
+	result1 := randomBytes(20)
+	result2 := randomBytes(20)
+	assert.Len(t, result1, 20)
+	assert.Len(t, result2, 20)
+	assert.NotEqual(t, result1, result2)
+
+	// Test edge cases
+	result = randomBytes(0)
+	assert.Len(t, result, 0)
+
+	result = randomBytes(1)
+	assert.Len(t, result, 1)
+
+	// Test with larger values
+	result = randomBytes(100)
+	assert.Len(t, result, 100)
+}
+
+func TestCookieHandling(t *testing.T) {
+	// Generate test certificate and key
+	certPath, keyPath := generateTestCertificate(t)
+	defer func() {
+		if certPath != "" {
+			err := os.RemoveAll(filepath.Dir(certPath))
+			if err != nil {
+				t.Logf("Failed to remove temp directory: %v", err)
+			}
+		}
+	}()
+
+	// Create a test config
+	config := Config{}
+	config.Proxy.EntityID = "http://test.example.com/metadata"
+	config.Proxy.CertificatePath = certPath
+	config.Proxy.PrivateKeyPath = keyPath
+
+	// Add test IDP
+	config.IDP = []IDPConfig{
+		{
+			ID:              "idp1",
+			EntityID:        "https://idp1.example.com/saml/metadata",
+			SSOURL:          "https://idp1.example.com/saml/sso",
+			CertificatePath: certPath,
+		},
+	}
+
+	// Create SAML service providers
+	providers, err := CreateServiceProviders(t.Context(), config)
+	require.NoError(t, err)
+
+	// Create SAML IDP
+	idp, err := CreateProxyIDP(config)
+	require.NoError(t, err)
+
+	// Create a mock auth request
+	authRequestID := "test-auth-request-id"
+	idp.idpStorage.authRequestsLock.Lock()
+	idp.idpStorage.authRequests[authRequestID] = &AuthRequest{
+		ID:            authRequestID,
+		ApplicationID: "test-app-id",
+		IsDone:        false,
+	}
+	idp.idpStorage.authRequestsLock.Unlock()
+
+	// Test setting up HTTP handlers
+	mux := SetupHTTPHandlers(idp, providers, config)
+
+	// Test cookie properties in idp_select endpoint
+	req := httptest.NewRequest(http.MethodGet, "/idp_select?id="+authRequestID, nil)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Check auth request ID cookie properties
+	cookies := w.Result().Cookies()
+	var authCookie *http.Cookie
+	for _, cookie := range cookies {
+		if cookie.Name == cookieNameAuthRequestID {
+			authCookie = cookie
+			break
+		}
+	}
+	assert.NotNil(t, authCookie)
+	assert.Equal(t, authRequestID, authCookie.Value)
+	assert.Equal(t, "/", authCookie.Path)
+	assert.True(t, authCookie.HttpOnly)
+	assert.True(t, authCookie.Secure)
+
+	// Test cookie properties in idp_selected endpoint
+	req = httptest.NewRequest(http.MethodGet, "/idp_selected?idpID=idp1", nil)
+	req.AddCookie(&http.Cookie{
+		Name:  cookieNameAuthRequestID,
+		Value: authRequestID,
+	})
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusFound, w.Code)
+
+	// Check IDP ID cookie properties
+	cookies = w.Result().Cookies()
+	var idpCookie *http.Cookie
+	for _, cookie := range cookies {
+		if cookie.Name == cookieNameIDPID {
+			idpCookie = cookie
+			break
+		}
+	}
+	assert.NotNil(t, idpCookie)
+	assert.Equal(t, "idp1", idpCookie.Value)
+	assert.Equal(t, "/", idpCookie.Path)
+	assert.True(t, idpCookie.HttpOnly)
+	assert.True(t, idpCookie.Secure)
+}
+
+func TestErrorHandling(t *testing.T) {
+	// Generate test certificate and key
+	certPath, keyPath := generateTestCertificate(t)
+	defer func() {
+		if certPath != "" {
+			err := os.RemoveAll(filepath.Dir(certPath))
+			if err != nil {
+				t.Logf("Failed to remove temp directory: %v", err)
+			}
+		}
+	}()
+
+	// Create a test config
+	config := Config{}
+	config.Proxy.EntityID = "http://test.example.com/metadata"
+	config.Proxy.CertificatePath = certPath
+	config.Proxy.PrivateKeyPath = keyPath
+
+	// Add test IDP
+	config.IDP = []IDPConfig{
+		{
+			ID:              "idp1",
+			EntityID:        "https://idp1.example.com/saml/metadata",
+			SSOURL:          "https://idp1.example.com/saml/sso",
+			CertificatePath: certPath,
+		},
+	}
+
+	// Create SAML service providers
+	providers, err := CreateServiceProviders(t.Context(), config)
+	require.NoError(t, err)
+
+	// Create SAML IDP
+	idp, err := CreateProxyIDP(config)
+	require.NoError(t, err)
+
+	// Test setting up HTTP handlers
+	mux := SetupHTTPHandlers(idp, providers, config)
+
+	// Test various error conditions
+	testCases := []struct {
+		name           string
+		endpoint       string
+		method         string
+		cookies        []*http.Cookie
+		expectedStatus int
+		expectedBody   string
+	}{
+		{
+			name:           "idp_select without id parameter",
+			endpoint:       "/idp_select",
+			method:         http.MethodGet,
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   "Invalid request",
+		},
+		{
+			name:           "idp_select with empty id parameter",
+			endpoint:       "/idp_select?id=",
+			method:         http.MethodGet,
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   "Invalid request",
+		},
+		{
+			name:           "idp_select with invalid id parameter",
+			endpoint:       "/idp_select?id=invalid",
+			method:         http.MethodGet,
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody:   "Invalid request",
+		},
+		{
+			name:           "idp_selected without auth cookie",
+			endpoint:       "/idp_selected?idpID=idp1",
+			method:         http.MethodGet,
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   "Invalid request",
+		},
+		{
+			name:     "idp_selected with empty auth cookie",
+			endpoint: "/idp_selected?idpID=idp1",
+			method:   http.MethodGet,
+			cookies: []*http.Cookie{
+				{Name: cookieNameAuthRequestID, Value: ""},
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   "Invalid request",
+		},
+		{
+			name:           "saml/acs without auth cookie",
+			endpoint:       "/saml/acs",
+			method:         http.MethodPost,
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   "Invalid request",
+		},
+		{
+			name:     "saml/acs with empty auth cookie",
+			endpoint: "/saml/acs",
+			method:   http.MethodPost,
+			cookies: []*http.Cookie{
+				{Name: cookieNameAuthRequestID, Value: ""},
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   "Invalid request",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(tc.method, tc.endpoint, nil)
+			for _, cookie := range tc.cookies {
+				req.AddCookie(cookie)
+			}
+			w := httptest.NewRecorder()
+			mux.ServeHTTP(w, req)
+			assert.Equal(t, tc.expectedStatus, w.Code)
+			assert.Contains(t, w.Body.String(), tc.expectedBody)
+		})
 	}
 }

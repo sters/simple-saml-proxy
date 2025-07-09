@@ -235,6 +235,9 @@ m1rhMtZCwLf9bUG8OkZRnZEMIagLIPRpwVd6JvjYWp8=</X509Certificate>
     <SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://metadata-idp.example.com/saml/sso"/>
   </IDPSSODescriptor>
 </EntityDescriptor>`))
+			if err != nil {
+				t.Errorf("Failed to write response: %v", err)
+			}
 		}))
 		defer server.Close()
 
@@ -287,7 +290,7 @@ m1rhMtZCwLf9bUG8OkZRnZEMIagLIPRpwVd6JvjYWp8=</X509Certificate>
 
 		// Test creating SAML service providers - should fail
 		_, err := CreateServiceProviders(t.Context(), config)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to load certificate and key")
 	})
 }

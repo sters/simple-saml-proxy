@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -25,7 +26,10 @@ import (
 	"github.com/crewjam/saml"
 	"github.com/sters/simple-saml-proxy/proxy"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+var ErrNoLocationHeader = errors.New("no Location header in redirect response")
 
 // generateTestCertificate generates a self-signed certificate and private key for testing.
 func generateTestCertificate(t *testing.T) (string, string) {
@@ -35,7 +39,7 @@ func generateTestCertificate(t *testing.T) (string, string) {
 
 	// Generate a private key
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create a certificate template
 	template := x509.Certificate{
@@ -52,26 +56,26 @@ func generateTestCertificate(t *testing.T) (string, string) {
 
 	// Create a self-signed certificate
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Write the certificate to a file
 	certPath = filepath.Join(tempDir, "cert.pem")
 	certOut, err := os.Create(certPath)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer certOut.Close()
 
 	err = pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Write the private key to a file
 	keyPath = filepath.Join(tempDir, "key.pem")
 	keyOut, err := os.Create(keyPath)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer keyOut.Close()
 
 	privBytes := x509.MarshalPKCS1PrivateKey(privateKey)
 	err = pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: privBytes})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	return certPath, keyPath
 }
@@ -296,17 +300,37 @@ func (c *MockSAMLClient) Close() {
 func (c *MockSAMLClient) InitiateLogin(proxyURL string) (*http.Response, error) {
 	ssoURL := proxyURL + "/sso"
 
-	return c.client.Get(ssoURL)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ssoURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp2, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to perform HTTP request: %w", err)
+	}
+
+	return resp2, nil
 }
 
 // FollowRedirect follows a redirect response.
 func (c *MockSAMLClient) FollowRedirect(resp *http.Response) (*http.Response, error) {
 	location := resp.Header.Get("Location")
 	if location == "" {
-		return nil, errors.New("no Location header in redirect response")
+		return nil, fmt.Errorf("%w: no Location header in redirect response", ErrNoLocationHeader)
 	}
 
-	return c.client.Get(location)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, location, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp2, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to perform HTTP request: %w", err)
+	}
+
+	return resp2, nil
 }
 
 // TestMetadataEndpoint tests the /metadata endpoint of the SAML proxy.
@@ -348,11 +372,11 @@ func TestMetadataEndpoint(t *testing.T) {
 
 	// Create SAML service providers
 	providers, err := proxy.CreateServiceProviders(t.Context(), config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create proxy IDP
 	idp, err := proxy.CreateProxyIDP(config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Set up HTTP handlers
 	mux := proxy.SetupHTTPHandlers(idp, providers, config)
@@ -363,8 +387,11 @@ func TestMetadataEndpoint(t *testing.T) {
 	defer proxyServer.Close()
 
 	// Test the metadata endpoint
-	resp, err := http.Get(proxyServer.URL + "/metadata")
-	assert.NoError(t, err)
+	ctx := t.Context()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, proxyServer.URL+"/metadata", nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -372,7 +399,7 @@ func TestMetadataEndpoint(t *testing.T) {
 
 	// Read the metadata
 	body, err := io.ReadAll(resp.Body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify it contains the expected elements without full XML parsing
 	// The zitadel/saml library uses a different format for CacheDuration that the crewjam/saml library can't parse
@@ -432,11 +459,11 @@ func TestSSOEndpoint(t *testing.T) {
 
 	// Create SAML service providers
 	providers, err := proxy.CreateServiceProviders(t.Context(), config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create proxy IDP
 	idp, err := proxy.CreateProxyIDP(config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Set up HTTP handlers
 	mux := proxy.SetupHTTPHandlers(idp, providers, config)
@@ -473,8 +500,10 @@ func TestSSOEndpoint(t *testing.T) {
 	ssoURL := proxyServer.URL + "/sso?SAMLRequest=" + url.QueryEscape(encoded) + "&RelayState=test-relay-state"
 
 	// Send a GET request to the SSO endpoint
-	resp, err := http.Get(ssoURL)
-	assert.NoError(t, err)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, ssoURL, nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
 	defer resp.Body.Close()
 
 	// Verify the response
@@ -482,7 +511,7 @@ func TestSSOEndpoint(t *testing.T) {
 
 	// Read the response body
 	body, err := io.ReadAll(resp.Body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify that the response contains the IdP selection page
 	bodyStr := string(body)
@@ -533,11 +562,11 @@ func TestACSEndpoint(t *testing.T) {
 
 	// Create SAML service providers
 	providers, err := proxy.CreateServiceProviders(t.Context(), config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create proxy IDP
 	idp, err := proxy.CreateProxyIDP(config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Set up HTTP handlers
 	mux := proxy.SetupHTTPHandlers(idp, providers, config)
@@ -548,30 +577,37 @@ func TestACSEndpoint(t *testing.T) {
 	defer proxyServer.Close()
 
 	// Test 1: GET request to ACS endpoint (should fail with method not allowed)
-	resp, err := http.Get(proxyServer.URL + "/sso/acs")
-	assert.NoError(t, err)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, proxyServer.URL+"/sso/acs", nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
 	defer resp.Body.Close()
 
 	// Verify it returns an error status code
 	assert.GreaterOrEqual(t, resp.StatusCode, 400, "Expected error status code for GET request to ACS endpoint")
 
 	// Test 2: POST request to ACS endpoint without SAMLResponse (should fail with bad request)
-	resp, err = http.PostForm(proxyServer.URL+"/sso/acs", url.Values{})
-	assert.NoError(t, err)
+	req, err = http.NewRequestWithContext(t.Context(), http.MethodPost, proxyServer.URL+"/sso/acs", strings.NewReader(url.Values{}.Encode()))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, err = http.DefaultClient.Do(req)
+	require.NoError(t, err)
 	defer resp.Body.Close()
 
 	// Verify it returns an error status code
 	assert.GreaterOrEqual(t, resp.StatusCode, 400, "Expected error status code for POST without SAMLResponse")
 
 	// Test 3: Test the idp-initiated endpoint (should return not implemented)
-	resp, err = http.Get(proxyServer.URL + "/idp-initiated")
-	assert.NoError(t, err)
+	req, err = http.NewRequestWithContext(t.Context(), http.MethodGet, proxyServer.URL+"/idp-initiated", nil)
+	require.NoError(t, err)
+	resp, err = http.DefaultClient.Do(req)
+	require.NoError(t, err)
 	defer resp.Body.Close()
 
 	// Verify it returns a not implemented status code
 	assert.Equal(t, http.StatusNotImplemented, resp.StatusCode)
 	body, err := io.ReadAll(resp.Body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Contains(t, string(body), "IdP-Initiated flow not yet implemented")
 }
 
@@ -623,11 +659,11 @@ func TestE2EFlow(t *testing.T) {
 
 	// Create SAML service providers
 	providers, err := proxy.CreateServiceProviders(t.Context(), config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create proxy IDP
 	idp, err := proxy.CreateProxyIDP(config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Set up HTTP handlers
 	mux := proxy.SetupHTTPHandlers(idp, providers, config)
@@ -659,14 +695,16 @@ func TestE2EFlow(t *testing.T) {
 	ssoURL := proxyServer.URL + "/sso?SAMLRequest=" + url.QueryEscape(encoded) + "&RelayState=test-relay-state"
 
 	// Step 2: Send the request to the proxy's SSO endpoint
-	resp, err := http.Get(ssoURL)
-	assert.NoError(t, err)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, ssoURL, nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
 	defer resp.Body.Close()
 
 	// Verify the response is the IdP selection page
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body, err := io.ReadAll(resp.Body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	bodyStr := string(body)
 	assert.Contains(t, bodyStr, "Select an Identity Provider")
 	assert.Contains(t, bodyStr, "mock") // The ID of our mock IdP
@@ -702,8 +740,8 @@ func TestE2EFlow(t *testing.T) {
 
 	// Set the auth request ID cookie
 	authRequestID := strings.TrimPrefix(idpSelectURL, "/idp_select?id=")
-	req, err := http.NewRequest(http.MethodGet, idpSelectedURL, nil)
-	assert.NoError(t, err)
+	req, err = http.NewRequestWithContext(t.Context(), http.MethodGet, idpSelectedURL, nil)
+	require.NoError(t, err)
 	req.AddCookie(&http.Cookie{
 		Name:  "authID",
 		Value: authRequestID,
@@ -711,7 +749,7 @@ func TestE2EFlow(t *testing.T) {
 
 	// Send the request to select the IdP
 	resp, err = client.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer resp.Body.Close()
 
 	// Verify the response is a redirect to the IdP
@@ -733,8 +771,8 @@ func TestE2EFlow(t *testing.T) {
 	form.Add("RelayState", "test-relay-state")
 
 	// Send the form to the proxy's ACS endpoint
-	req, err = http.NewRequest(http.MethodPost, proxyServer.URL+"/saml/acs", strings.NewReader(form.Encode()))
-	assert.NoError(t, err)
+	req, err = http.NewRequestWithContext(t.Context(), http.MethodPost, proxyServer.URL+"/saml/acs", strings.NewReader(form.Encode()))
+	require.NoError(t, err)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{
 		Name:  "authID",
@@ -747,7 +785,7 @@ func TestE2EFlow(t *testing.T) {
 
 	// Send the request
 	resp, err = client.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer resp.Body.Close()
 
 	// Verify the response is a redirect to the callback endpoint
@@ -757,8 +795,8 @@ func TestE2EFlow(t *testing.T) {
 	assert.Contains(t, location, "/callback", "Expected redirect to callback endpoint")
 
 	// Step 5: Follow the redirect to the callback endpoint
-	req, err = http.NewRequest(http.MethodGet, proxyServer.URL+location, nil)
-	assert.NoError(t, err)
+	req, err = http.NewRequestWithContext(t.Context(), http.MethodGet, proxyServer.URL+location, nil)
+	require.NoError(t, err)
 	req.AddCookie(&http.Cookie{
 		Name:  "authID",
 		Value: authRequestID,
@@ -766,7 +804,7 @@ func TestE2EFlow(t *testing.T) {
 
 	// Send the request
 	resp, err = client.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer resp.Body.Close()
 
 	// Verify the response is a redirect or a success page
