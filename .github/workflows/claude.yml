@@ -50,7 +50,14 @@ jobs:
           # assignee_trigger: "claude-bot"
           
           # Optional: Allow Claude to run specific commands
-          # allowed_tools: "Bash(npm install),Bash(npm run build),Bash(npm run test:*),Bash(npm run lint:*)"
+          allowed_tools: |
+            Bash,Edit,MultiEdit,Glob,Grep,LS,Read,Write,
+            mcp__github_file_ops__commit_files,
+            mcp__github_file_ops__delete_files,
+            mcp__github_file_ops__update_claude_comment,
+            mcp__github_ci__get_ci_status,
+            mcp__github_ci__get_workflow_run_details,
+            mcp__github_ci__download_job_log
           
           # Optional: Add custom instructions for Claude to customize its behavior for your project
           # custom_instructions: |
