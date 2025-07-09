@@ -41,6 +41,7 @@ const idpSelectionTemplate = `
 		const onClick = (idpID) => {
 			const url = new URL("{{$.SelectURL}}", location.origin);
 			url.searchParams.append("idpID", idpID);
+			{{if $.RelayState}}url.searchParams.append("RelayState", "{{$.RelayState}}");{{end}}
 			window.location.href = url.toString();
 			return false;
 		};
@@ -48,6 +49,7 @@ const idpSelectionTemplate = `
 </head>
 <body>
     <h1>Select an Identity Provider</h1>
+    {{if $.RelayState}}<input type="hidden" id="RelayState" value="{{$.RelayState}}">{{end}}
     <div class="idp-list">
         {{range .Providers}}
         <a href="#" class="idp-button" onclick="onClick('{{.ID}}')">
@@ -89,7 +91,7 @@ func handleIDPSelect(idp *IDP, providers *ServiceProviders) http.HandlerFunc {
 			return
 		}
 
-		_, err := idp.idpStorage.AuthRequestByID(r.Context(), authRequestID)
+		authRequest, err := idp.idpStorage.AuthRequestByID(r.Context(), authRequestID)
 		if err != nil {
 			slog.Error("Failed to get auth request",
 				slog.String("id", authRequestID),
@@ -108,12 +110,19 @@ func handleIDPSelect(idp *IDP, providers *ServiceProviders) http.HandlerFunc {
 			Secure:   isSecureCookie(r),
 		})
 
+		relayState := ""
+		if ar, ok := authRequest.(*AuthRequest); ok {
+			relayState = ar.RelayState
+		}
+
 		data := struct {
-			Providers map[string]*ServiceProvider
-			SelectURL string
+			Providers  map[string]*ServiceProvider
+			SelectURL  string
+			RelayState string
 		}{
-			Providers: providers.Providers,
-			SelectURL: "/idp_selected",
+			Providers:  providers.Providers,
+			SelectURL:  "/idp_selected",
+			RelayState: relayState,
 		}
 
 		tmpl, err := template.New("idpSelection").Parse(idpSelectionTemplate)
@@ -153,7 +162,8 @@ func handleIDPSelected(idp *IDP, providers *ServiceProviders) http.HandlerFunc {
 			return
 		}
 
-		if _, err = idp.idpStorage.AuthRequestByID(r.Context(), authRequestID); err != nil {
+		authRequest, err := idp.idpStorage.AuthRequestByID(r.Context(), authRequestID)
+		if err != nil {
 			slog.Error("Failed to get auth request",
 				slog.String("id", authRequestID),
 				slog.String("error", err.Error()),
@@ -187,7 +197,13 @@ func handleIDPSelected(idp *IDP, providers *ServiceProviders) http.HandlerFunc {
 
 		slog.Info("IDP found", slog.String("idp", idpID))
 
-		relayState := base64.RawURLEncoding.EncodeToString(randomBytes(relayStateLength))
+		// Use original relay state from auth request if available
+		var relayState string
+		if ar, ok := authRequest.(*AuthRequest); ok && ar.RelayState != "" {
+			relayState = ar.RelayState
+		} else {
+			relayState = base64.RawURLEncoding.EncodeToString(randomBytes(relayStateLength))
+		}
 		redirectURL, err := provider.Middleware.ServiceProvider.MakeRedirectAuthenticationRequest(relayState)
 		if err != nil {
 			slog.Error("Failed to create redirect URL", slog.String("error", err.Error()))

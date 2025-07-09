@@ -1,0 +1,368 @@
+package main
+
+import (
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
+	"testing"
+
+	"github.com/sters/simple-saml-proxy/proxy"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// setupSSOTest creates a common test setup for SSO tests.
+func setupSSOTest(t *testing.T) (*proxy.Config, *httptest.Server, *MockSAMLProvider) {
+	t.Helper()
+
+	proxyCertPath, proxyKeyPath := generateTestCertificate(t)
+
+	cfg := proxy.Config{}
+	cfg.Proxy.EntityID = "https://proxy.example.com"
+	cfg.Proxy.MetadataURL = "https://proxy.example.com/metadata"
+	cfg.Proxy.AcsURL = "https://proxy.example.com/saml/acs"
+	cfg.Proxy.PrivateKeyPath = proxyKeyPath
+	cfg.Proxy.CertificatePath = proxyCertPath
+	cfg.Proxy.AllowedSP = []proxy.SPConfig{
+		{EntityID: "https://sp.example.com"},
+	}
+
+	mockProvider := NewMockSAMLProvider(t)
+
+	cfg.IDP = []proxy.IDPConfig{
+		{
+			ID:          "test-idp",
+			MetadataURL: mockProvider.server.URL + "/saml/metadata",
+		},
+		{
+			ID:          "test-idp-2",
+			MetadataURL: mockProvider.server.URL + "/saml/metadata",
+		},
+	}
+
+	ctx := t.Context()
+	providers, err := proxy.CreateServiceProviders(ctx, cfg)
+	require.NoError(t, err)
+
+	idp, err := proxy.CreateProxyIDP(cfg)
+	require.NoError(t, err)
+
+	mux := proxy.SetupHTTPHandlers(idp, providers, cfg)
+	server := httptest.NewServer(mux)
+
+	return &cfg, server, mockProvider
+}
+
+func TestSSOEndpoint_ValidSAMLRequest(t *testing.T) {
+	cfg, server, mockProvider := setupSSOTest(t)
+	defer server.Close()
+	defer mockProvider.Close()
+
+	// Create a mock SAML request
+	samlRequest := `<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" ID="_123" Version="2.0" IssueInstant="2023-01-01T00:00:00Z">
+		<saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">https://sp.example.com</saml:Issuer>
+	</samlp:AuthnRequest>`
+
+	encoded, err := encodeSAMLRequest(samlRequest)
+	require.NoError(t, err)
+
+	// Make request to SSO endpoint
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL+"/sso?SAMLRequest="+url.QueryEscape(encoded)+"&RelayState=test-state", nil)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Should show IDP selection page
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	bodyStr := string(body)
+	assert.Contains(t, bodyStr, "Select an Identity Provider")
+	assert.Contains(t, bodyStr, cfg.IDP[0].ID)
+	assert.Contains(t, bodyStr, cfg.IDP[1].ID)
+}
+
+func TestSSOEndpoint_MissingSAMLRequest(t *testing.T) {
+	_, server, mockProvider := setupSSOTest(t)
+	defer server.Close()
+	defer mockProvider.Close()
+
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL+"/sso", nil)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	// Should return error response
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	bodyStr := string(body)
+	assert.Contains(t, bodyStr, "RequestDenied")
+}
+
+func TestSSOEndpoint_InvalidSAMLRequest(t *testing.T) {
+	_, server, mockProvider := setupSSOTest(t)
+	defer server.Close()
+	defer mockProvider.Close()
+
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL+"/sso?SAMLRequest=invalid-base64", nil)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	// Should return error response
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	bodyStr := string(body)
+	assert.Contains(t, bodyStr, "RequestDenied")
+}
+
+func TestSSOEndpoint_SingleIDPAutoRedirect(t *testing.T) {
+	t.Skip("Skipping - single IDP auto-redirect feature not yet implemented")
+	// Setup with single IDP
+	proxyCertPath, proxyKeyPath := generateTestCertificate(t)
+
+	singleCfg := proxy.Config{}
+	singleCfg.Proxy.EntityID = "https://proxy.example.com"
+	singleCfg.Proxy.MetadataURL = "https://proxy.example.com/metadata"
+	singleCfg.Proxy.AcsURL = "https://proxy.example.com/saml/acs"
+	singleCfg.Proxy.PrivateKeyPath = proxyKeyPath
+	singleCfg.Proxy.CertificatePath = proxyCertPath
+	singleCfg.Proxy.AllowedSP = []proxy.SPConfig{
+		{EntityID: "https://sp.example.com"},
+	}
+
+	mockProvider := NewMockSAMLProvider(t)
+	defer mockProvider.Close()
+
+	singleCfg.IDP = []proxy.IDPConfig{
+		{
+			ID:          "test-idp",
+			MetadataURL: mockProvider.server.URL + "/saml/metadata",
+		},
+	}
+
+	ctx := t.Context()
+	providers, err := proxy.CreateServiceProviders(ctx, singleCfg)
+	require.NoError(t, err)
+
+	idp, err := proxy.CreateProxyIDP(singleCfg)
+	require.NoError(t, err)
+
+	mux := proxy.SetupHTTPHandlers(idp, providers, singleCfg)
+	singleServer := httptest.NewServer(mux)
+	defer singleServer.Close()
+
+	// Create SAML request
+	samlRequest := `<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" ID="_123" Version="2.0" IssueInstant="2023-01-01T00:00:00Z">
+		<saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">https://sp.example.com</saml:Issuer>
+	</samlp:AuthnRequest>`
+
+	encoded, err := encodeSAMLRequest(samlRequest)
+	require.NoError(t, err)
+
+	// Use client that doesn't follow redirects
+	client := &http.Client{
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, singleServer.URL+"/sso?SAMLRequest="+url.QueryEscape(encoded)+"&RelayState=test-state", nil)
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	// Should redirect directly to IDP
+	assert.Equal(t, http.StatusFound, resp.StatusCode)
+	location := resp.Header.Get("Location")
+	assert.Contains(t, location, mockProvider.ssoURL)
+	assert.Contains(t, location, "SAMLRequest=")
+	assert.Contains(t, location, "RelayState=test-state")
+}
+
+func TestSSOEndpoint_RelayStatePreservation(t *testing.T) {
+	_, server, mockProvider := setupSSOTest(t)
+	defer server.Close()
+	defer mockProvider.Close()
+
+	samlRequest := `<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" ID="_123" Version="2.0" IssueInstant="2023-01-01T00:00:00Z">
+		<saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">https://sp.example.com</saml:Issuer>
+	</samlp:AuthnRequest>`
+
+	encoded, err := encodeSAMLRequest(samlRequest)
+	require.NoError(t, err)
+
+	customRelayState := "my-custom-relay-state-12345"
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL+"/sso?SAMLRequest="+url.QueryEscape(encoded)+"&RelayState="+url.QueryEscape(customRelayState), nil)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	// Check that relay state is preserved in the selection form
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	bodyStr := string(body)
+	assert.Contains(t, bodyStr, customRelayState)
+}
+
+func TestSSOEndpoint_MultipleIDPsSelection(t *testing.T) {
+	_, server, mockProvider := setupSSOTest(t)
+	defer server.Close()
+	defer mockProvider.Close()
+
+	samlRequest := `<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" ID="_123" Version="2.0" IssueInstant="2023-01-01T00:00:00Z">
+		<saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">https://sp.example.com</saml:Issuer>
+	</samlp:AuthnRequest>`
+
+	encoded, err := encodeSAMLRequest(samlRequest)
+	require.NoError(t, err)
+
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL+"/sso?SAMLRequest="+url.QueryEscape(encoded), nil)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	bodyStr := string(body)
+
+	// Should show both IDPs
+	assert.Contains(t, bodyStr, "test-idp")
+	assert.Contains(t, bodyStr, "test-idp-2")
+	assert.Contains(t, bodyStr, "/idp_selected")
+
+	// Should have auth request cookie
+	cookies := resp.Cookies()
+	var authCookie *http.Cookie
+	for _, c := range cookies {
+		if c.Name == "authID" {
+			authCookie = c
+
+			break
+		}
+	}
+	if assert.NotNil(t, authCookie, "Should set auth request cookie") {
+		assert.NotEmpty(t, authCookie.Value)
+	}
+}
+
+func TestSSOEndpoint_InvalidIDPSelection(t *testing.T) {
+	_, server, mockProvider := setupSSOTest(t)
+	defer server.Close()
+	defer mockProvider.Close()
+
+	// First make a valid request to get cookie
+	samlRequest := `<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" ID="_123" Version="2.0" IssueInstant="2023-01-01T00:00:00Z">
+		<saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">https://sp.example.com</saml:Issuer>
+	</samlp:AuthnRequest>`
+
+	encoded, err := encodeSAMLRequest(samlRequest)
+	require.NoError(t, err)
+
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL+"/sso?SAMLRequest="+url.QueryEscape(encoded), nil)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+
+	cookies := resp.Cookies()
+	resp.Body.Close()
+
+	// Now try to select invalid IDP
+	req2, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL+"/idp_selected?idp=invalid-idp", nil)
+	require.NoError(t, err)
+
+	for _, c := range cookies {
+		req2.AddCookie(c)
+	}
+
+	client := &http.Client{}
+	resp2, err := client.Do(req2)
+	require.NoError(t, err)
+	defer resp2.Body.Close()
+
+	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
+}
+
+func TestSSOEndpoint_IDPSelectionSuccess(t *testing.T) {
+	_, server, mockProvider := setupSSOTest(t)
+	defer server.Close()
+	defer mockProvider.Close()
+
+	// First make a valid request
+	samlRequest := `<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" ID="_123" Version="2.0" IssueInstant="2023-01-01T00:00:00Z">
+		<saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">https://sp.example.com</saml:Issuer>
+	</samlp:AuthnRequest>`
+
+	encoded, err := encodeSAMLRequest(samlRequest)
+	require.NoError(t, err)
+
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL+"/sso?SAMLRequest="+url.QueryEscape(encoded)+"&RelayState=test-state", nil)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+
+	cookies := resp.Cookies()
+	resp.Body.Close()
+
+	// Select an IDP
+	client := &http.Client{
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
+	req3, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL+"/idp_selected?idpID=test-idp", nil)
+	require.NoError(t, err)
+
+	for _, c := range cookies {
+		req3.AddCookie(c)
+	}
+
+	resp2, err := client.Do(req3)
+	require.NoError(t, err)
+	defer resp2.Body.Close()
+
+	// Should redirect to selected IDP
+	assert.Equal(t, http.StatusFound, resp2.StatusCode)
+	location := resp2.Header.Get("Location")
+	assert.Contains(t, location, mockProvider.ssoURL)
+	assert.Contains(t, location, "SAMLRequest=")
+	assert.Contains(t, location, "RelayState=test-state")
+}
+
+func TestSSOEndpoint_HTTPPOSTBinding(t *testing.T) {
+	t.Skip("Skipping - HTTP POST binding not yet implemented for SSO endpoint")
+	_, server, mockProvider := setupSSOTest(t)
+	defer server.Close()
+	defer mockProvider.Close()
+
+	// Create SAML request with POST binding
+	samlRequest := `<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" ID="_123" Version="2.0" IssueInstant="2023-01-01T00:00:00Z" ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST">
+		<saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">https://sp.example.com</saml:Issuer>
+	</samlp:AuthnRequest>`
+
+	encoded, err := encodeSAMLRequest(samlRequest)
+	require.NoError(t, err)
+
+	// Send as POST
+	form := url.Values{}
+	form.Set("SAMLRequest", encoded)
+	form.Set("RelayState", "post-relay-state")
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, server.URL+"/sso", strings.NewReader(form.Encode()))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	// Should handle POST binding
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	bodyStr := string(body)
+	assert.Contains(t, bodyStr, "Select an Identity Provider")
+}

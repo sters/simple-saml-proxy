@@ -308,3 +308,10 @@ func (s *Storage) getCertificateAndKey() (*key.CertificateAndKey, error) {
 		Key:         privateKey,
 	}, nil
 }
+
+// AddAuthRequestForTesting adds an auth request to storage for testing purposes.
+func (s *Storage) AddAuthRequestForTesting(authRequest *AuthRequest) {
+	s.authRequestsLock.Lock()
+	defer s.authRequestsLock.Unlock()
+	s.authRequests[authRequest.ID] = authRequest
+}

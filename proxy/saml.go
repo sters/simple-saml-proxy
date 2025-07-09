@@ -48,6 +48,11 @@ type IDP struct {
 	idpStorage *Storage
 }
 
+// GetStorage returns the IDP's storage for testing purposes.
+func (i *IDP) GetStorage() *Storage {
+	return i.idpStorage
+}
+
 // ServiceProvider represents a SAML Service Provider for a specific IDP.
 type ServiceProvider struct {
 	ID         string
