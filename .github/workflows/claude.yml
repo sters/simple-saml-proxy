@@ -68,8 +68,9 @@ jobs:
             mcp__github__list_branches,
             mcp__github__list_commits,
             mcp__github__list_code_scanning_alerts,
-            mcp__github__list_tags
-          
+            mcp__github__list_tags,
+            mcp__github__create_issue
+
           # Optional: Add custom instructions for Claude to customize its behavior for your project
           # custom_instructions: |
           #   Follow our coding standards
