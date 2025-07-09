@@ -149,11 +149,16 @@ func (s *Storage) GetEntityByID(_ context.Context, entityID string) (*servicepro
 			}
 			metadataBytes = b
 		} else {
-			metadataBytes = []byte("<EntityDescriptor xmlns='urn:oasis:names:tc:SAML:2.0:metadata' entityID='" +
-				entityID + "'></EntityDescriptor>")
+			// Create a minimal but valid metadata for SP without a metadata URL
+			metadataBytes = []byte(`<EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="` + entityID + `">
+				<SPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+					<AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="` + entityID + `/acs" index="0"/>
+				</SPSSODescriptor>
+			</EntityDescriptor>`)
 		}
 
-		parsedMetadata, err := xml.ParseMetadataXmlIntoStruct(metadataBytes)
+		// Validate the metadata can be parsed
+		_, err := xml.ParseMetadataXmlIntoStruct(metadataBytes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse metadata: %w", err)
 		}
@@ -169,7 +174,7 @@ func (s *Storage) GetEntityByID(_ context.Context, entityID string) (*servicepro
 		}
 
 		// Create a new service provider
-		sp, err := serviceprovider.NewServiceProvider(parsedMetadata.Id, spConfig, loginURL)
+		sp, err := serviceprovider.NewServiceProvider(entityID, spConfig, loginURL)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create service provider: %w", err)
 		}

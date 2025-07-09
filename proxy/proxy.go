@@ -107,12 +107,14 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, _ Config) http.Han
 
 			return
 		}
+		// Determine if we should use secure cookies based on the request scheme
+		isSecure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 		http.SetCookie(w, &http.Cookie{
 			Name:     cookieNameAuthRequestID,
 			Value:    authRequestID,
 			Path:     "/",
 			HttpOnly: true,
-			Secure:   true,
+			Secure:   isSecure,
 		})
 
 		data := struct {
@@ -182,12 +184,14 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, _ Config) http.Han
 
 			return
 		}
+		// Determine if we should use secure cookies based on the request scheme
+		isSecure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 		http.SetCookie(w, &http.Cookie{
 			Name:     cookieNameIDPID,
 			Value:    idpID,
 			Path:     "/",
 			HttpOnly: true,
-			Secure:   true,
+			Secure:   isSecure,
 		})
 
 		slog.Info("IDP found", slog.String("idp", idpID))
