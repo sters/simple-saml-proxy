@@ -74,29 +74,21 @@ func handlePing(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
-// SetupHTTPHandlers sets up the HTTP handlers for the SAML proxy.
-// This proxy acts as a SAML Identity Provider (IdP) proxy:
-// - To Service Providers (SPs), it appears as an IdP
-// - To Identity Providers (IdPs), it appears as an SP
-// It allows users to select which IdP they want to use for authentication.
-//
-//nolint:maintidx // Complex handler setup is necessary
-func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, _ Config) http.Handler {
-	// Create a router to handle different paths
-	mux := http.NewServeMux()
+// isSecureCookie determines if cookies should be secure based on the request.
+func isSecureCookie(r *http.Request) bool {
+	return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+}
 
-	mux.HandleFunc("/ping", handlePing)
-	mux.Handle("/metadata", idp.idp.HttpHandler())
-	mux.Handle("/sso", idp.idp.HttpHandler())
-	mux.Handle("/callback", idp.idp.HttpHandler())
-
-	idpSelectHandler := func(w http.ResponseWriter, r *http.Request) {
+// handleIDPSelect handles the IdP selection page.
+func handleIDPSelect(idp *IDP, providers *ServiceProviders) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		authRequestID := r.FormValue("id")
 		if authRequestID == "" {
 			http.Error(w, "Invalid request", http.StatusBadRequest)
 
 			return
 		}
+
 		_, err := idp.idpStorage.AuthRequestByID(r.Context(), authRequestID)
 		if err != nil {
 			slog.Error("Failed to get auth request",
@@ -107,14 +99,13 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, _ Config) http.Han
 
 			return
 		}
-		// Determine if we should use secure cookies based on the request scheme
-		isSecure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+
 		http.SetCookie(w, &http.Cookie{
 			Name:     cookieNameAuthRequestID,
 			Value:    authRequestID,
 			Path:     "/",
 			HttpOnly: true,
-			Secure:   isSecure,
+			Secure:   isSecureCookie(r),
 		})
 
 		data := struct {
@@ -125,7 +116,6 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, _ Config) http.Han
 			SelectURL: "/idp_selected",
 		}
 
-		// Parse the IdP selection template
 		tmpl, err := template.New("idpSelection").Parse(idpSelectionTemplate)
 		if err != nil {
 			slog.Error("Failed to parse IdP selection template", slog.String("error", err.Error()))
@@ -133,6 +123,7 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, _ Config) http.Han
 
 			return
 		}
+
 		err = tmpl.Execute(w, data)
 		if err != nil {
 			slog.Error("Failed to execute template", slog.String("error", err.Error()))
@@ -141,10 +132,11 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, _ Config) http.Han
 			return
 		}
 	}
+}
 
-	idpSelectedHandler := func(w http.ResponseWriter, r *http.Request) {
-		// NOTE: sso request is already authenticated by /sso endpoint.
-
+// handleIDPSelected handles the IdP selection result and redirects to the selected IdP.
+func handleIDPSelected(idp *IDP, providers *ServiceProviders) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		authRequestIDCookie, err := r.Cookie(cookieNameAuthRequestID)
 		if err != nil {
 			slog.Error("Failed to get auth request ID cookie", slog.String("error", err.Error()))
@@ -152,6 +144,7 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, _ Config) http.Han
 
 			return
 		}
+
 		authRequestID := authRequestIDCookie.Value
 		if authRequestID == "" {
 			slog.Error("Auth request ID cookie is empty")
@@ -159,6 +152,7 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, _ Config) http.Han
 
 			return
 		}
+
 		if _, err = idp.idpStorage.AuthRequestByID(r.Context(), authRequestID); err != nil {
 			slog.Error("Failed to get auth request",
 				slog.String("id", authRequestID),
@@ -170,13 +164,11 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, _ Config) http.Han
 		}
 
 		idpID := r.FormValue("idpID")
-
 		slog.Info("IdP selection",
 			slog.String("idp", idpID),
 			slog.Any("query", r.URL.Query()),
 		)
 
-		// Check if the IDP exists
 		provider, ok := providers.Providers[idpID]
 		if !ok {
 			slog.Info("Invalid IDP ID", slog.String("idp", idpID))
@@ -184,14 +176,13 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, _ Config) http.Han
 
 			return
 		}
-		// Determine if we should use secure cookies based on the request scheme
-		isSecure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+
 		http.SetCookie(w, &http.Cookie{
 			Name:     cookieNameIDPID,
 			Value:    idpID,
 			Path:     "/",
 			HttpOnly: true,
-			Secure:   isSecure,
+			Secure:   isSecureCookie(r),
 		})
 
 		slog.Info("IDP found", slog.String("idp", idpID))
@@ -210,8 +201,11 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, _ Config) http.Han
 
 		slog.Info("Redirecting to IdP", slog.String("url", redirectURL.String()))
 	}
+}
 
-	mux.HandleFunc("/saml/acs", func(w http.ResponseWriter, r *http.Request) {
+// handleSAMLACS handles the SAML assertion consumer service endpoint.
+func handleSAMLACS(idp *IDP, providers *ServiceProviders) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		slog.Info("Processing SAML response from actual IdP")
 
 		authRequestIDCookie, err := r.Cookie(cookieNameAuthRequestID)
@@ -221,6 +215,7 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, _ Config) http.Han
 
 			return
 		}
+
 		authRequestID := authRequestIDCookie.Value
 		if authRequestID == "" {
 			slog.Error("Auth request ID cookie is empty")
@@ -228,6 +223,7 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, _ Config) http.Han
 
 			return
 		}
+
 		authRequest, err := idp.idpStorage.AuthRequestByID(r.Context(), authRequestID)
 		if err != nil {
 			slog.Error("Failed to get auth request",
@@ -238,6 +234,7 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, _ Config) http.Han
 
 			return
 		}
+
 		if ar, ok := authRequest.(*AuthRequest); ok {
 			ar.IsDone = true // 自分でDone=trueにしないといけない
 		} else {
@@ -254,6 +251,7 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, _ Config) http.Han
 
 			return
 		}
+
 		idpID := idpIDCookie.Value
 		if idpID == "" {
 			slog.Error("IDP ID cookie is empty")
@@ -261,6 +259,7 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, _ Config) http.Han
 
 			return
 		}
+
 		provider, ok := providers.Providers[idpID]
 		if !ok {
 			slog.Error("Invalid IDP ID", slog.String("idp", idpID))
@@ -269,7 +268,6 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, _ Config) http.Han
 			return
 		}
 
-		// NOTE: SAMLKitはConditions.NotOnOrAfterがないらしく、XMLバリデーションに引っかかる
 		if err := r.ParseForm(); err != nil {
 			slog.Error("Failed to parse form", slog.String("error", err.Error()))
 			http.Error(w, "Invalid request", http.StatusBadRequest)
@@ -282,6 +280,7 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, _ Config) http.Han
 		for i, tr := range trackedRequests {
 			possibleRequestIDs[i] = tr.SAMLRequestID
 		}
+
 		assertion, err := provider.Middleware.ServiceProvider.ParseResponse(r, possibleRequestIDs)
 		if err != nil {
 			slog.Error("Failed to parse response", slog.String("error", err.Error()))
@@ -289,13 +288,13 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, _ Config) http.Han
 
 			return
 		}
+
 		slog.Info(
 			"Assertion",
 			slog.Any("subject", assertion.Subject),
 			slog.Any("attributes", assertion.AttributeStatements),
 		)
 
-		// nameID is required
 		if assertion.Subject == nil || assertion.Subject.NameID == nil {
 			slog.Error("Assertion does not contain NameID")
 			http.Error(w, "Invalid request", http.StatusBadRequest)
@@ -303,27 +302,45 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, _ Config) http.Han
 			return
 		}
 
-		// move to /callback to response original SP
 		callbackURL := idp.idp.AuthCallbackURL()(r.Context(), authRequestID)
 		http.Redirect(w, r, callbackURL, http.StatusFound)
-	})
+	}
+}
 
-	// Add handler for idp-initiated endpoint
-	mux.HandleFunc("/idp-initiated", func(w http.ResponseWriter, _ *http.Request) {
-		http.Error(w, "IdP-Initiated flow not yet implemented", http.StatusNotImplemented)
-	})
+// handleIDPInitiated handles the IdP-initiated flow endpoint.
+func handleIDPInitiated(w http.ResponseWriter, _ *http.Request) {
+	http.Error(w, "IdP-Initiated flow not yet implemented", http.StatusNotImplemented)
+}
 
-	// Create a middleware that logs all requests
+// SetupHTTPHandlers sets up the HTTP handlers for the SAML proxy.
+// This proxy acts as a SAML Identity Provider (IdP) proxy:
+// - To Service Providers (SPs), it appears as an IdP
+// - To Identity Providers (IdPs), it appears as an SP
+// It allows users to select which IdP they want to use for authentication.
+func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, _ Config) http.Handler {
+	mux := http.NewServeMux()
+
+	// Basic endpoints
+	mux.HandleFunc("/ping", handlePing)
+	mux.Handle("/metadata", idp.idp.HttpHandler())
+	mux.Handle("/sso", idp.idp.HttpHandler())
+	mux.Handle("/callback", idp.idp.HttpHandler())
+
+	// SAML proxy endpoints
+	mux.HandleFunc("/saml/acs", handleSAMLACS(idp, providers))
+	mux.HandleFunc("/idp-initiated", handleIDPInitiated)
+
+	// Create request handler with routing
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		slog.Info("Received request", slog.String("path", r.URL.Path))
 
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/idp_selected"):
-			idpSelectedHandler(w, r)
+			handleIDPSelected(idp, providers)(w, r)
 
 			return
 		case strings.HasPrefix(r.URL.Path, "/idp_select"):
-			idpSelectHandler(w, r)
+			handleIDPSelect(idp, providers)(w, r)
 
 			return
 		}
