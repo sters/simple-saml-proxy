@@ -39,7 +39,7 @@ type IDP struct {
 	// Using zitadel/saml
 	EntityID   string
 	idp        *provider.Provider
-	idpStorage *ProxyStorage
+	idpStorage *Storage
 }
 
 // ServiceProvider represents a SAML Service Provider for a specific IDP.
@@ -70,7 +70,7 @@ func (s *ServiceProviders) GetProvider(id string) *ServiceProvider {
 // CreateProxyIDP creates a SAML Identity Provider middleware from the configuration.
 func CreateProxyIDP(config Config) (*IDP, error) {
 	// Create a new storage
-	storage, err := NewProxyStorage(config)
+	storage, err := NewStorage(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage: %w", err)
 	}
@@ -112,7 +112,7 @@ func CreateProxyIDP(config Config) (*IDP, error) {
 	}
 
 	// Create issuer function
-	issuerFunc := func(insecure bool) (provider.IssuerFromRequest, error) {
+	issuerFunc := func(_ bool) (provider.IssuerFromRequest, error) {
 		return func(r *http.Request) string {
 			r.FormValue("SAMLRequest")
 
@@ -163,7 +163,7 @@ func CreateServiceProviders(ctx context.Context, config Config) (*ServiceProvide
 			if err != nil {
 				slog.Warn("Invalid IDP metadata URL", slog.String("url", idpConfig.MetadataURL))
 			} else {
-				ed, err = samlsp.FetchMetadata(context.Background(), http.DefaultClient, *idpMetadataURL)
+				ed, err = samlsp.FetchMetadata(ctx, http.DefaultClient, *idpMetadataURL)
 				if err != nil {
 					slog.Warn("Failed to fetch IDP metadata", slog.String("url", idpConfig.MetadataURL))
 				}
@@ -218,9 +218,14 @@ func CreateServiceProviders(ctx context.Context, config Config) (*ServiceProvide
 
 		slog.Info("Creating SAML SP for IDP", slog.Any("EntityDescriptor", ed))
 
+		privateKey, ok := keyPair.PrivateKey.(*rsa.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("private key is not RSA for IDP %s", idpConfig.ID)
+		}
+
 		sp, err := samlsp.New(samlsp.Options{
 			URL:               *rootURL,
-			Key:               keyPair.PrivateKey.(*rsa.PrivateKey),
+			Key:               privateKey,
 			Certificate:       keyPair.Leaf,
 			IDPMetadata:       ed,
 			AllowIDPInitiated: true,

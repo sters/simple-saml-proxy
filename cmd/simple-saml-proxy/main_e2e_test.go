@@ -785,7 +785,7 @@ func TestE2EFlow(t *testing.T) {
 	if resp.StatusCode == http.StatusOK {
 		body, err = io.ReadAll(resp.Body)
 		assert.NoError(t, err)
-		bodyStr = string(body)
+		_ = string(body)
 		// The success page might contain various information
 		// For simplicity, we won't make specific assertions about the content
 	}

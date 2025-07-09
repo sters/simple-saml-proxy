@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewProxyStorage(t *testing.T) {
+func TestNewStorage(t *testing.T) {
 	// Generate test certificate and key
 	certPath, keyPath := generateTestCertificate(t)
 
@@ -16,8 +16,8 @@ func TestNewProxyStorage(t *testing.T) {
 	config.Proxy.CertificatePath = certPath
 	config.Proxy.PrivateKeyPath = keyPath
 
-	// Test creating a new ProxyStorage
-	storage, err := NewProxyStorage(config)
+	// Test creating a new Storage
+	storage, err := NewStorage(config)
 	require.NoError(t, err)
 	assert.NotNil(t, storage)
 	assert.Equal(t, config, storage.config)
@@ -30,7 +30,7 @@ func TestNewProxyStorage(t *testing.T) {
 	invalidConfig := Config{}
 	invalidConfig.Proxy.CertificatePath = "/nonexistent/cert.pem"
 	invalidConfig.Proxy.PrivateKeyPath = "/nonexistent/key.pem"
-	_, err = NewProxyStorage(invalidConfig)
+	_, err = NewStorage(invalidConfig)
 	assert.Error(t, err)
 }
 
@@ -71,8 +71,8 @@ func TestGetCertificateAndKey(t *testing.T) {
 	config.Proxy.CertificatePath = certPath
 	config.Proxy.PrivateKeyPath = keyPath
 
-	// Create a new ProxyStorage
-	storage, err := NewProxyStorage(config)
+	// Create a new Storage
+	storage, err := NewStorage(config)
 	require.NoError(t, err)
 
 	// Test getCertificateAndKey

@@ -65,7 +65,7 @@ const (
 )
 
 // handlePing handles the /ping health check endpoint.
-func handlePing(w http.ResponseWriter, r *http.Request) {
+func handlePing(w http.ResponseWriter, _ *http.Request) {
 	// Health check endpoint
 	_, err := w.Write([]byte("pong"))
 	if err != nil {
@@ -78,7 +78,9 @@ func handlePing(w http.ResponseWriter, r *http.Request) {
 // - To Service Providers (SPs), it appears as an IdP
 // - To Identity Providers (IdPs), it appears as an SP
 // It allows users to select which IdP they want to use for authentication.
-func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) http.Handler {
+//
+//nolint:maintidx // Complex handler setup is necessary
+func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, _ Config) http.Handler {
 	// Create a router to handle different paths
 	mux := http.NewServeMux()
 
@@ -231,7 +233,14 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 
 			return
 		}
-		authRequest.(*AuthRequest).IsDone = true // 自分でDone=trueにしないといけない
+		if ar, ok := authRequest.(*AuthRequest); ok {
+			ar.IsDone = true // 自分でDone=trueにしないといけない
+		} else {
+			slog.Error("Failed to cast authRequest to *AuthRequest")
+			http.Error(w, "Invalid request", http.StatusInternalServerError)
+
+			return
+		}
 
 		idpIDCookie, err := r.Cookie(cookieNameIDPID)
 		if err != nil {
@@ -295,7 +304,7 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 	})
 
 	// Add handler for idp-initiated endpoint
-	mux.HandleFunc("/idp-initiated", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/idp-initiated", func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "IdP-Initiated flow not yet implemented", http.StatusNotImplemented)
 	})
 
