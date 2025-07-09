@@ -114,18 +114,18 @@ func (a *AuthRequest) Done() bool {
 
 // EntityStorage interface implementation
 
-func (s *ProxyStorage) GetCA(ctx context.Context) (*key.CertificateAndKey, error) {
+func (s *ProxyStorage) GetCA(_ context.Context) (*key.CertificateAndKey, error) {
 	// For simplicity, we'll use the same certificate for CA, metadata signing, and response signing
 	return s.getCertificateAndKey()
 }
 
-func (s *ProxyStorage) GetMetadataSigningKey(ctx context.Context) (*key.CertificateAndKey, error) {
+func (s *ProxyStorage) GetMetadataSigningKey(_ context.Context) (*key.CertificateAndKey, error) {
 	return s.getCertificateAndKey()
 }
 
 // IdentityProviderStorage interface implementation
 
-func (s *ProxyStorage) GetEntityByID(ctx context.Context, entityID string) (*serviceprovider.ServiceProvider, error) {
+func (s *ProxyStorage) GetEntityByID(_ context.Context, entityID string) (*serviceprovider.ServiceProvider, error) {
 	s.spCacheLock.RLock()
 	sp, ok := s.spCache[entityID]
 	s.spCacheLock.RUnlock()
@@ -154,7 +154,7 @@ func (s *ProxyStorage) GetEntityByID(ctx context.Context, entityID string) (*ser
 	return nil, fmt.Errorf("%w: %s", ErrEntityNotFound, entityID)
 }
 
-func (s *ProxyStorage) GetEntityIDByAppID(ctx context.Context, appID string) (string, error) {
+func (s *ProxyStorage) GetEntityIDByAppID(_ context.Context, appID string) (string, error) {
 	s.entityIDByAppIDLock.RLock()
 	entityID, ok := s.entityIDByAppID[appID]
 	s.entityIDByAppIDLock.RUnlock()
@@ -166,13 +166,13 @@ func (s *ProxyStorage) GetEntityIDByAppID(ctx context.Context, appID string) (st
 	return entityID, nil
 }
 
-func (s *ProxyStorage) GetResponseSigningKey(ctx context.Context) (*key.CertificateAndKey, error) {
+func (s *ProxyStorage) GetResponseSigningKey(_ context.Context) (*key.CertificateAndKey, error) {
 	return s.getCertificateAndKey()
 }
 
 // AuthStorage interface implementation
 
-func (s *ProxyStorage) CreateAuthRequest(ctx context.Context, authnRequest *samlp.AuthnRequestType, appID, bindingType, relayState, userID string) (models.AuthRequestInt, error) {
+func (s *ProxyStorage) CreateAuthRequest(_ context.Context, authnRequest *samlp.AuthnRequestType, appID, bindingType, relayState, userID string) (models.AuthRequestInt, error) {
 	id := uuid.New().String()
 
 	authRequest := &AuthRequest{
@@ -199,7 +199,7 @@ func (s *ProxyStorage) CreateAuthRequest(ctx context.Context, authnRequest *saml
 	return authRequest, nil
 }
 
-func (s *ProxyStorage) AuthRequestByID(ctx context.Context, id string) (models.AuthRequestInt, error) {
+func (s *ProxyStorage) AuthRequestByID(_ context.Context, id string) (models.AuthRequestInt, error) {
 	s.authRequestsLock.RLock()
 	authRequest, ok := s.authRequests[id]
 	s.authRequestsLock.RUnlock()
@@ -213,7 +213,7 @@ func (s *ProxyStorage) AuthRequestByID(ctx context.Context, id string) (models.A
 
 // UserStorage interface implementation
 
-func (s *ProxyStorage) SetUserinfoWithUserID(ctx context.Context, applicationID string, userinfo models.AttributeSetter, userID string, attributes []int) (err error) {
+func (s *ProxyStorage) SetUserinfoWithUserID(_ context.Context, applicationID string, userinfo models.AttributeSetter, userID string, attributes []int) (err error) {
 	// TODO: Set user attributes
 	userinfo.SetUserID(userID)
 	userinfo.SetUsername(userID)
@@ -225,7 +225,7 @@ func (s *ProxyStorage) SetUserinfoWithUserID(ctx context.Context, applicationID 
 	return nil
 }
 
-func (s *ProxyStorage) SetUserinfoWithLoginName(ctx context.Context, userinfo models.AttributeSetter, loginName string, attributes []int) (err error) {
+func (s *ProxyStorage) SetUserinfoWithLoginName(_ context.Context, userinfo models.AttributeSetter, loginName string, attributes []int) (err error) {
 	// TODO: Set user attributes
 	userinfo.SetUserID(loginName)
 	userinfo.SetUsername(loginName)
@@ -237,7 +237,7 @@ func (s *ProxyStorage) SetUserinfoWithLoginName(ctx context.Context, userinfo mo
 	return nil
 }
 
-func (s *ProxyStorage) Health(ctx context.Context) error {
+func (s *ProxyStorage) Health(_ context.Context) error {
 	return nil
 }
 

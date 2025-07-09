@@ -29,9 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	ErrNoLocationHeader = errors.New("no Location header in redirect response")
-)
+var ErrNoLocationHeader = errors.New("no Location header in redirect response")
 
 // generateTestCertificate generates a self-signed certificate and private key for testing.
 func generateTestCertificate(t *testing.T) (string, string) {
@@ -41,7 +39,7 @@ func generateTestCertificate(t *testing.T) (string, string) {
 
 	// Generate a private key
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Create a certificate template
 	template := x509.Certificate{
@@ -58,26 +56,26 @@ func generateTestCertificate(t *testing.T) (string, string) {
 
 	// Create a self-signed certificate
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Write the certificate to a file
 	certPath = filepath.Join(tempDir, "cert.pem")
 	certOut, err := os.Create(certPath)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer certOut.Close()
 
 	err = pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Write the private key to a file
 	keyPath = filepath.Join(tempDir, "key.pem")
 	keyOut, err := os.Create(keyPath)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer keyOut.Close()
 
 	privBytes := x509.MarshalPKCS1PrivateKey(privateKey)
 	err = pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: privBytes})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	return certPath, keyPath
 }
@@ -307,7 +305,12 @@ func (c *MockSAMLClient) InitiateLogin(proxyURL string) (*http.Response, error) 
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	return c.client.Do(req)
+	resp2, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to perform HTTP request: %w", err)
+	}
+
+	return resp2, nil
 }
 
 // FollowRedirect follows a redirect response.
@@ -322,7 +325,12 @@ func (c *MockSAMLClient) FollowRedirect(resp *http.Response) (*http.Response, er
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	return c.client.Do(req)
+	resp2, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to perform HTTP request: %w", err)
+	}
+
+	return resp2, nil
 }
 
 // TestMetadataEndpoint tests the /metadata endpoint of the SAML proxy.
@@ -363,7 +371,7 @@ func TestMetadataEndpoint(t *testing.T) {
 	}
 
 	// Create SAML service providers
-	providers, err := proxy.CreateServiceProviders(context.Background(), config)
+	providers, err := proxy.CreateServiceProviders(t.Context(), config)
 	require.NoError(t, err)
 
 	// Create proxy IDP
@@ -379,7 +387,7 @@ func TestMetadataEndpoint(t *testing.T) {
 	defer proxyServer.Close()
 
 	// Test the metadata endpoint
-	ctx := context.Background()
+	ctx := t.Context()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, proxyServer.URL+"/metadata", nil)
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
@@ -450,7 +458,7 @@ func TestSSOEndpoint(t *testing.T) {
 	}
 
 	// Create SAML service providers
-	providers, err := proxy.CreateServiceProviders(context.Background(), config)
+	providers, err := proxy.CreateServiceProviders(t.Context(), config)
 	require.NoError(t, err)
 
 	// Create proxy IDP
@@ -492,7 +500,7 @@ func TestSSOEndpoint(t *testing.T) {
 	ssoURL := proxyServer.URL + "/sso?SAMLRequest=" + url.QueryEscape(encoded) + "&RelayState=test-relay-state"
 
 	// Send a GET request to the SSO endpoint
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ssoURL, nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, ssoURL, nil)
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
@@ -553,7 +561,7 @@ func TestACSEndpoint(t *testing.T) {
 	}
 
 	// Create SAML service providers
-	providers, err := proxy.CreateServiceProviders(context.Background(), config)
+	providers, err := proxy.CreateServiceProviders(t.Context(), config)
 	require.NoError(t, err)
 
 	// Create proxy IDP
@@ -569,7 +577,7 @@ func TestACSEndpoint(t *testing.T) {
 	defer proxyServer.Close()
 
 	// Test 1: GET request to ACS endpoint (should fail with method not allowed)
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, proxyServer.URL+"/sso/acs", nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, proxyServer.URL+"/sso/acs", nil)
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
@@ -579,7 +587,7 @@ func TestACSEndpoint(t *testing.T) {
 	assert.GreaterOrEqual(t, resp.StatusCode, 400, "Expected error status code for GET request to ACS endpoint")
 
 	// Test 2: POST request to ACS endpoint without SAMLResponse (should fail with bad request)
-	req, err = http.NewRequestWithContext(context.Background(), http.MethodPost, proxyServer.URL+"/sso/acs", strings.NewReader(url.Values{}.Encode()))
+	req, err = http.NewRequestWithContext(t.Context(), http.MethodPost, proxyServer.URL+"/sso/acs", strings.NewReader(url.Values{}.Encode()))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err = http.DefaultClient.Do(req)
@@ -590,7 +598,7 @@ func TestACSEndpoint(t *testing.T) {
 	assert.GreaterOrEqual(t, resp.StatusCode, 400, "Expected error status code for POST without SAMLResponse")
 
 	// Test 3: Test the idp-initiated endpoint (should return not implemented)
-	req, err = http.NewRequestWithContext(context.Background(), http.MethodGet, proxyServer.URL+"/idp-initiated", nil)
+	req, err = http.NewRequestWithContext(t.Context(), http.MethodGet, proxyServer.URL+"/idp-initiated", nil)
 	require.NoError(t, err)
 	resp, err = http.DefaultClient.Do(req)
 	require.NoError(t, err)
@@ -650,7 +658,7 @@ func TestE2EFlow(t *testing.T) {
 	}
 
 	// Create SAML service providers
-	providers, err := proxy.CreateServiceProviders(context.Background(), config)
+	providers, err := proxy.CreateServiceProviders(t.Context(), config)
 	require.NoError(t, err)
 
 	// Create proxy IDP
@@ -741,7 +749,7 @@ func TestE2EFlow(t *testing.T) {
 
 	// Send the request to select the IdP
 	resp, err = client.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer resp.Body.Close()
 
 	// Verify the response is a redirect to the IdP
@@ -763,8 +771,8 @@ func TestE2EFlow(t *testing.T) {
 	form.Add("RelayState", "test-relay-state")
 
 	// Send the form to the proxy's ACS endpoint
-	req, err = http.NewRequestWithContext(context.Background(), http.MethodPost, proxyServer.URL+"/saml/acs", strings.NewReader(form.Encode()))
-	assert.NoError(t, err)
+	req, err = http.NewRequestWithContext(t.Context(), http.MethodPost, proxyServer.URL+"/saml/acs", strings.NewReader(form.Encode()))
+	require.NoError(t, err)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{
 		Name:  "authID",
@@ -777,7 +785,7 @@ func TestE2EFlow(t *testing.T) {
 
 	// Send the request
 	resp, err = client.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer resp.Body.Close()
 
 	// Verify the response is a redirect to the callback endpoint
@@ -787,8 +795,8 @@ func TestE2EFlow(t *testing.T) {
 	assert.Contains(t, location, "/callback", "Expected redirect to callback endpoint")
 
 	// Step 5: Follow the redirect to the callback endpoint
-	req, err = http.NewRequestWithContext(context.Background(), http.MethodGet, proxyServer.URL+location, nil)
-	assert.NoError(t, err)
+	req, err = http.NewRequestWithContext(t.Context(), http.MethodGet, proxyServer.URL+location, nil)
+	require.NoError(t, err)
 	req.AddCookie(&http.Cookie{
 		Name:  "authID",
 		Value: authRequestID,
@@ -796,7 +804,7 @@ func TestE2EFlow(t *testing.T) {
 
 	// Send the request
 	resp, err = client.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer resp.Body.Close()
 
 	// Verify the response is a redirect or a success page
@@ -814,7 +822,7 @@ func TestE2EFlow(t *testing.T) {
 	// If it's a success page, verify it contains the expected content
 	if resp.StatusCode == http.StatusOK {
 		body, err = io.ReadAll(resp.Body)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		_ = string(body) // bodyStr used to be assigned but never used
 		// The success page might contain various information
 		// For simplicity, we won't make specific assertions about the content

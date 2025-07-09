@@ -21,7 +21,8 @@ import (
 )
 
 var (
-	ErrDecodePEMBlock = errors.New("failed to decode PEM block containing certificate")
+	ErrDecodePEMBlock      = errors.New("failed to decode PEM block containing certificate")
+	ErrPrivateKeyNotRSAKey = errors.New("private key is not an RSA key")
 )
 
 // LoadCertificate loads and parses the SP certificate and private key.
@@ -117,7 +118,7 @@ func CreateProxyIDP(config Config) (*IDP, error) {
 	}
 
 	// Create issuer function
-	issuerFunc := func(insecure bool) (provider.IssuerFromRequest, error) {
+	issuerFunc := func(_ bool) (provider.IssuerFromRequest, error) {
 		return func(r *http.Request) string {
 			r.FormValue("SAMLRequest")
 
@@ -225,7 +226,7 @@ func CreateServiceProviders(ctx context.Context, config Config) (*ServiceProvide
 
 		privateKey, ok := keyPair.PrivateKey.(*rsa.PrivateKey)
 		if !ok {
-			return nil, fmt.Errorf("private key is not an RSA key for IDP %s", idpConfig.ID)
+			return nil, fmt.Errorf("IDP %s: %w", idpConfig.ID, ErrPrivateKeyNotRSAKey)
 		}
 
 		sp, err := samlsp.New(samlsp.Options{

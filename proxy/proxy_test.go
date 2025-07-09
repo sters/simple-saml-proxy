@@ -294,7 +294,9 @@ func TestStartServer(t *testing.T) {
 	resp.Body.Close()
 
 	// Test non-existent endpoint
-	resp, err = http.Get(testServer.URL + "/nonexistent")
+	req, err = http.NewRequestWithContext(t.Context(), http.MethodGet, testServer.URL+"/nonexistent", nil)
+	require.NoError(t, err)
+	resp, err = http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	resp.Body.Close()
