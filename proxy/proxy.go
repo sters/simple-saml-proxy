@@ -62,6 +62,7 @@ const idpSelectionTemplate = `
 const (
 	cookieNameAuthRequestID = "authID"
 	cookieNameIDPID         = "idpID"
+	relayStateLength        = 42
 )
 
 // handlePing handles the /ping health check endpoint.
@@ -189,7 +190,7 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 
 		slog.Info("IDP found", slog.String("idp", idpID))
 
-		relayState := base64.RawURLEncoding.EncodeToString(randomBytes(42))
+		relayState := base64.RawURLEncoding.EncodeToString(randomBytes(relayStateLength))
 		redirectURL, err := provider.Middleware.ServiceProvider.MakeRedirectAuthenticationRequest(relayState)
 		if err != nil {
 			slog.Error("Failed to create redirect URL", slog.String("error", err.Error()))
@@ -231,7 +232,9 @@ func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, config Config) htt
 
 			return
 		}
-		authRequest.(*AuthRequest).IsDone = true // 自分でDone=trueにしないといけない
+		if ar, ok := authRequest.(*AuthRequest); ok {
+			ar.IsDone = true // 自分でDone=trueにしないといけない
+		}
 
 		idpIDCookie, err := r.Cookie(cookieNameIDPID)
 		if err != nil {
@@ -369,7 +372,7 @@ func StartServer(config Config, handler http.Handler) error {
 func randomBytes(n int) []byte {
 	rv := make([]byte, n)
 	if _, err := io.ReadFull(rand.Reader, rv); err != nil {
-		panic(err)
+		return nil
 	}
 
 	return rv

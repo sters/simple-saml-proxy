@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -17,6 +18,10 @@ import (
 	"github.com/crewjam/saml"
 	"github.com/crewjam/saml/samlsp"
 	"github.com/zitadel/saml/pkg/provider"
+)
+
+var (
+	ErrDecodePEMBlock = errors.New("failed to decode PEM block containing certificate")
 )
 
 // LoadCertificate loads and parses the SP certificate and private key.
@@ -163,7 +168,7 @@ func CreateServiceProviders(ctx context.Context, config Config) (*ServiceProvide
 			if err != nil {
 				slog.Warn("Invalid IDP metadata URL", slog.String("url", idpConfig.MetadataURL))
 			} else {
-				ed, err = samlsp.FetchMetadata(context.Background(), http.DefaultClient, *idpMetadataURL)
+				ed, err = samlsp.FetchMetadata(ctx, http.DefaultClient, *idpMetadataURL)
 				if err != nil {
 					slog.Warn("Failed to fetch IDP metadata", slog.String("url", idpConfig.MetadataURL))
 				}
@@ -178,7 +183,7 @@ func CreateServiceProviders(ctx context.Context, config Config) (*ServiceProvide
 
 			idpCertBlock, _ := pem.Decode(idpCertPEM)
 			if idpCertBlock == nil {
-				return nil, fmt.Errorf("failed to decode PEM block containing certificate for IDP %s", idpConfig.ID)
+				return nil, fmt.Errorf("%w for IDP %s", ErrDecodePEMBlock, idpConfig.ID)
 			}
 
 			base64cert := base64.StdEncoding.EncodeToString(idpCertBlock.Bytes)
@@ -218,9 +223,14 @@ func CreateServiceProviders(ctx context.Context, config Config) (*ServiceProvide
 
 		slog.Info("Creating SAML SP for IDP", slog.Any("EntityDescriptor", ed))
 
+		privateKey, ok := keyPair.PrivateKey.(*rsa.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("private key is not an RSA key for IDP %s", idpConfig.ID)
+		}
+
 		sp, err := samlsp.New(samlsp.Options{
 			URL:               *rootURL,
-			Key:               keyPair.PrivateKey.(*rsa.PrivateKey),
+			Key:               privateKey,
 			Certificate:       keyPair.Leaf,
 			IDPMetadata:       ed,
 			AllowIDPInitiated: true,

@@ -271,7 +271,9 @@ func TestStartServer(t *testing.T) {
 
 	// Test the server endpoints
 	// Test ping endpoint
-	resp, err := http.Get(testServer.URL + "/ping")
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, testServer.URL+"/ping", nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body, err := io.ReadAll(resp.Body)
@@ -280,7 +282,9 @@ func TestStartServer(t *testing.T) {
 	resp.Body.Close()
 
 	// Test metadata endpoint
-	resp, err = http.Get(testServer.URL + "/metadata")
+	req, err = http.NewRequestWithContext(t.Context(), http.MethodGet, testServer.URL+"/metadata", nil)
+	require.NoError(t, err)
+	resp, err = http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, "application/xml", resp.Header.Get("Content-Type"))
