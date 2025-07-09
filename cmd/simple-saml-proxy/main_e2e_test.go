@@ -160,6 +160,7 @@ func NewMockSAMLProvider(t *testing.T) *MockSAMLProvider {
 			if err != nil {
 				provider.t.Errorf("Failed to decode SAML request: %v", err)
 				http.Error(w, "Invalid SAML request", http.StatusBadRequest)
+
 				return
 			}
 		}
@@ -177,6 +178,7 @@ func NewMockSAMLProvider(t *testing.T) *MockSAMLProvider {
 		if err != nil {
 			provider.t.Errorf("Failed to parse SAML request: %v", err)
 			http.Error(w, "Invalid SAML request", http.StatusBadRequest)
+
 			return
 		}
 
@@ -610,7 +612,7 @@ func disableSignatureValidation(providers *proxy.ServiceProviders) {
 		// removing signature method requirement
 		provider.Middleware.ServiceProvider.SignatureMethod = ""
 		provider.Middleware.ServiceProvider.AllowIDPInitiated = true
-		
+
 		// Make the provider accept any assertion without validation for testing
 		if provider.Middleware.ServiceProvider.IDPMetadata != nil {
 			provider.Middleware.ServiceProvider.IDPMetadata.IDPSSODescriptors[0].WantAuthnRequestsSigned = nil
@@ -619,6 +621,8 @@ func disableSignatureValidation(providers *proxy.ServiceProviders) {
 }
 
 // TestE2EFlow tests the complete end-to-end flow: Service -> Proxy -> SAML Provider -> Proxy -> Service.
+//
+//nolint:maintidx // This test is necessarily complex as it tests the complete E2E flow
 func TestE2EFlow(t *testing.T) {
 	// Generate test certificate and key
 	certPath, keyPath := generateTestCertificate(t)
@@ -676,7 +680,7 @@ func TestE2EFlow(t *testing.T) {
 	// Create SAML service providers
 	providers, err := proxy.CreateServiceProviders(t.Context(), config)
 	require.NoError(t, err)
-	
+
 	// Disable signature validation for testing
 	disableSignatureValidation(providers)
 
@@ -763,6 +767,7 @@ func TestE2EFlow(t *testing.T) {
 	for _, cookie := range resp.Cookies() {
 		if cookie.Name == "idpID" {
 			idpIDCookie = cookie
+
 			break
 		}
 	}
@@ -772,13 +777,15 @@ func TestE2EFlow(t *testing.T) {
 	// Step 4: Parse the redirect URL to get the SAML request sent to the IdP
 	idpURL, err := url.Parse(location)
 	require.NoError(t, err)
-	samlRequestToIdP := idpURL.Query().Get("SAMLRequest")
-	assert.NotEmpty(t, samlRequestToIdP, "Expected SAMLRequest in redirect to IdP")
+	samlRequestToIDP := idpURL.Query().Get("SAMLRequest")
+	assert.NotEmpty(t, samlRequestToIDP, "Expected SAMLRequest in redirect to IdP")
 
 	// Step 5: Simulate the IdP's response
 	// The mock IdP would normally authenticate the user and redirect back
 	// For testing, we'll simulate the SAML response directly
-	resp2, err := client.Get(location)
+	req2, err := http.NewRequestWithContext(t.Context(), http.MethodGet, location, nil)
+	require.NoError(t, err)
+	resp2, err := client.Do(req2)
 	require.NoError(t, err)
 	defer resp2.Body.Close()
 
@@ -792,7 +799,7 @@ func TestE2EFlow(t *testing.T) {
 	var acsURL string
 	var samlResponse string
 	var relayState string
-	
+
 	// Parse the HTML to extract form fields
 	if idx := strings.Index(bodyStr2, `action="`); idx != -1 {
 		start := idx + 8
@@ -823,7 +830,7 @@ func TestE2EFlow(t *testing.T) {
 	req3, err := http.NewRequestWithContext(t.Context(), http.MethodPost, acsURL, strings.NewReader(formData.Encode()))
 	require.NoError(t, err)
 	req3.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	
+
 	// Add the required cookies
 	req3.AddCookie(&http.Cookie{
 		Name:  "authID",
@@ -843,13 +850,14 @@ func TestE2EFlow(t *testing.T) {
 		body3, err := io.ReadAll(resp3.Body)
 		require.NoError(t, err)
 		t.Logf("ACS endpoint returned error: %s", string(body3))
-		
+
 		// For now, we'll skip the rest of the test as the SAML response parsing
 		// is failing due to signature validation or other issues
 		t.Skip("Skipping rest of test - SAML response parsing failed. This is a known issue with mock SAML responses.")
+
 		return
 	}
-	
+
 	assert.Equal(t, http.StatusFound, resp3.StatusCode, "Expected redirect to callback")
 	callbackLocation := resp3.Header.Get("Location")
 	assert.NotEmpty(t, callbackLocation, "Expected redirect to callback")
@@ -1008,6 +1016,7 @@ func TestE2EFlowErrorCases(t *testing.T) {
 		for _, cookie := range resp.Cookies() {
 			if cookie.Name == "authID" {
 				authRequestID = cookie.Value
+
 				break
 			}
 		}
@@ -1182,6 +1191,7 @@ func TestE2EFlowMultipleIdPs(t *testing.T) {
 	for _, cookie := range resp.Cookies() {
 		if cookie.Name == "authID" {
 			authRequestID = cookie.Value
+
 			break
 		}
 	}
@@ -1240,23 +1250,24 @@ func NewMockSAMLProviderWithErrors(t *testing.T) *MockSAMLProviderWithErrors {
 		case "/saml/sso":
 			if provider.shouldReturnError {
 				http.Error(w, provider.customErrorMessage, provider.errorStatusCode)
+
 				return
 			}
 
 			// Extract and parse SAML request as before
 			samlRequest := r.URL.Query().Get("SAMLRequest")
 			relayState := r.URL.Query().Get("RelayState")
-			
+
 			decoded, err := base64.StdEncoding.DecodeString(samlRequest)
 			if err != nil {
 				decoded, _ = base64.RawStdEncoding.DecodeString(samlRequest)
 			}
-			
+
 			inflated, err := io.ReadAll(flate.NewReader(bytes.NewReader(decoded)))
 			if err != nil {
 				inflated = decoded
 			}
-			
+
 			var authnRequest saml.AuthnRequest
 			_ = xml.Unmarshal(inflated, &authnRequest)
 
@@ -1264,7 +1275,7 @@ func NewMockSAMLProviderWithErrors(t *testing.T) *MockSAMLProviderWithErrors {
 				// Return an authentication failure response
 				failureResponse := provider.createFailureResponse(authnRequest.ID, authnRequest.AssertionConsumerServiceURL)
 				encoded := base64.StdEncoding.EncodeToString([]byte(failureResponse))
-				
+
 				w.Header().Set("Content-Type", "text/html")
 				html := `<html><body onload="document.forms[0].submit()">
 					<form method="post" action="` + authnRequest.AssertionConsumerServiceURL + `">
@@ -1276,7 +1287,7 @@ func NewMockSAMLProviderWithErrors(t *testing.T) *MockSAMLProviderWithErrors {
 				// Return success response
 				samlResponse := provider.createSAMLResponse(authnRequest.ID, authnRequest.AssertionConsumerServiceURL)
 				encoded := base64.StdEncoding.EncodeToString([]byte(samlResponse))
-				
+
 				w.Header().Set("Content-Type", "text/html")
 				html := `<html><body onload="document.forms[0].submit()">
 					<form method="post" action="` + authnRequest.AssertionConsumerServiceURL + `">
@@ -1309,7 +1320,7 @@ func (p *MockSAMLProviderWithErrors) SetShouldReturnError(shouldError bool, stat
 func (p *MockSAMLProviderWithErrors) createFailureResponse(requestID, acsURL string) string {
 	now := time.Now().UTC().Format(time.RFC3339)
 	randomID := strconv.FormatInt(time.Now().UnixNano(), 10)
-	
+
 	return fmt.Sprintf(`<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" ID="_response_%s" Version="2.0" IssueInstant="%s" Destination="%s" InResponseTo="%s"><saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">%s</saml:Issuer><samlp:Status><samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:AuthnFailed"/><samlp:StatusMessage>Authentication failed</samlp:StatusMessage></samlp:Status></samlp:Response>`,
 		randomID, now, acsURL, requestID, p.entityID)
 }
@@ -1391,6 +1402,7 @@ func TestE2EFlowWithAuthFailure(t *testing.T) {
 	for _, cookie := range resp.Cookies() {
 		if cookie.Name == "authID" {
 			authRequestID = cookie.Value
+
 			break
 		}
 	}
@@ -1399,21 +1411,23 @@ func TestE2EFlowWithAuthFailure(t *testing.T) {
 	req2, err := http.NewRequestWithContext(t.Context(), http.MethodGet, proxyServer.URL+"/idp_selected?idpID=mock", nil)
 	require.NoError(t, err)
 	req2.AddCookie(&http.Cookie{Name: "authID", Value: authRequestID})
-	
+
 	resp2, err := client.Do(req2)
 	require.NoError(t, err)
 	defer resp2.Body.Close()
 
 	// Step 3: Follow redirect to IdP
 	location := resp2.Header.Get("Location")
-	resp3, err := client.Get(location)
+	req3, err := http.NewRequestWithContext(t.Context(), http.MethodGet, location, nil)
+	require.NoError(t, err)
+	resp3, err := client.Do(req3)
 	require.NoError(t, err)
 	defer resp3.Body.Close()
 
 	// Parse the failure response form
 	body3, err := io.ReadAll(resp3.Body)
 	require.NoError(t, err)
-	
+
 	// Extract form data
 	var acsURL, samlResponse, relayState string
 	bodyStr3 := string(body3)
@@ -1463,13 +1477,15 @@ func TestMockProviderResponse(t *testing.T) {
 	// Test the createSAMLResponse method directly first
 	testResponse := mockProvider.createSAMLResponse("test-id", "https://example.com/acs")
 	t.Logf("Direct SAML Response:\n%s", testResponse)
-	
+
 	// Verify the response is valid XML
 	assert.Contains(t, testResponse, "<samlp:Response", "Expected Response element")
 	assert.Contains(t, testResponse, "InResponseTo=\"test-id\"", "Expected matching InResponseTo")
 }
 
 // TestProxyCore tests the core proxy functionality without full SAML validation.
+//
+//nolint:maintidx // Test requires multiple steps to verify proxy flow
 func TestProxyCore(t *testing.T) {
 	// Generate test certificate and key
 	certPath, keyPath := generateTestCertificate(t)
@@ -1522,8 +1538,17 @@ func TestProxyCore(t *testing.T) {
 	require.NoError(t, err)
 	handler = proxy.SetupHTTPHandlers(idp, providers, config)
 
+	// Create a client for testing
+	client := &http.Client{
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
 	// Test 1: Metadata endpoint
-	resp, err := http.Get(proxyServer.URL + "/metadata")
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, proxyServer.URL+"/metadata", nil)
+	require.NoError(t, err)
+	resp, err := client.Do(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -1534,47 +1559,66 @@ func TestProxyCore(t *testing.T) {
 	encoded, err := encodeSAMLRequest(samlRequest)
 	require.NoError(t, err)
 
-	resp2, err := http.Get(proxyServer.URL + "/sso?SAMLRequest=" + url.QueryEscape(encoded))
+	req2, err := http.NewRequestWithContext(t.Context(), http.MethodGet, proxyServer.URL+"/sso?SAMLRequest="+url.QueryEscape(encoded), nil)
+	require.NoError(t, err)
+	resp2, err := client.Do(req2)
 	require.NoError(t, err)
 	defer resp2.Body.Close()
-	
-	// Should show IdP selection page
-	assert.Equal(t, http.StatusOK, resp2.StatusCode)
-	body, err := io.ReadAll(resp2.Body)
+
+	// Should redirect to IdP selection page
+	assert.Equal(t, http.StatusSeeOther, resp2.StatusCode)
+
+	// Extract auth ID from redirect URL
+	location := resp2.Header.Get("Location")
+	assert.Contains(t, location, "/idp_select?id=")
+
+	// Parse auth ID from location
+	u, err := url.Parse(location)
+	require.NoError(t, err)
+	authID := u.Query().Get("id")
+	assert.NotEmpty(t, authID, "Expected auth ID in redirect URL")
+
+	// Follow redirect to IdP selection page
+	req2b, err := http.NewRequestWithContext(t.Context(), http.MethodGet, proxyServer.URL+location, nil)
+	require.NoError(t, err)
+	resp2b, err := client.Do(req2b)
+	require.NoError(t, err)
+	defer resp2b.Body.Close()
+
+	// Now should show IdP selection page
+	assert.Equal(t, http.StatusOK, resp2b.StatusCode)
+	body, err := io.ReadAll(resp2b.Body)
 	require.NoError(t, err)
 	assert.Contains(t, string(body), "Select an Identity Provider")
 	assert.Contains(t, string(body), "test-idp")
 
 	// Extract auth ID cookie
-	var authID string
-	for _, cookie := range resp2.Cookies() {
+	var cookieAuthID string
+	for _, cookie := range resp2b.Cookies() {
 		if cookie.Name == "authID" {
-			authID = cookie.Value
+			cookieAuthID = cookie.Value
+
 			break
 		}
 	}
-	assert.NotEmpty(t, authID, "Expected authID cookie")
+	assert.NotEmpty(t, cookieAuthID, "Expected authID cookie")
+	assert.Equal(t, authID, cookieAuthID, "Auth ID in cookie should match URL")
 
 	// Test 3: IdP selection
-	client := &http.Client{
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-	
+
 	req3, err := http.NewRequestWithContext(t.Context(), http.MethodGet, proxyServer.URL+"/idp_selected?idpID=test-idp", nil)
 	require.NoError(t, err)
-	req3.AddCookie(&http.Cookie{Name: "authID", Value: authID})
-	
+	req3.AddCookie(&http.Cookie{Name: "authID", Value: cookieAuthID})
+
 	resp3, err := client.Do(req3)
 	require.NoError(t, err)
 	defer resp3.Body.Close()
-	
+
 	// Should redirect to selected IdP
 	assert.Equal(t, http.StatusFound, resp3.StatusCode)
-	location := resp3.Header.Get("Location")
-	assert.Contains(t, location, mockProvider.ssoURL)
-	assert.Contains(t, location, "SAMLRequest=")
+	location3 := resp3.Header.Get("Location")
+	assert.Contains(t, location3, mockProvider.ssoURL)
+	assert.Contains(t, location3, "SAMLRequest=")
 
 	t.Log("Core proxy functionality verified:")
 	t.Log("✓ Metadata endpoint works")
@@ -1583,20 +1627,20 @@ func TestProxyCore(t *testing.T) {
 	t.Log("✓ Selected IdP redirect works")
 
 	// We already have the authRequestID from earlier
-	authRequestID := authID
+	authRequestID := cookieAuthID
 	require.NotEmpty(t, authRequestID, "Should have authID from earlier")
 
 	// Step 4: Parse the redirect URL to get the SAML request sent to the IdP
-	idpURL, err := url.Parse(location)
+	idpURL, err := url.Parse(location3)
 	require.NoError(t, err)
-	samlRequestToIdP := idpURL.Query().Get("SAMLRequest")
-	relayStateToIdP := idpURL.Query().Get("RelayState")
-	assert.NotEmpty(t, samlRequestToIdP, "Expected SAMLRequest in redirect to IdP")
-	assert.NotEmpty(t, relayStateToIdP, "Expected RelayState in redirect to IdP")
+	samlRequestToIDP := idpURL.Query().Get("SAMLRequest")
+	relayStateToIDP := idpURL.Query().Get("RelayState")
+	assert.NotEmpty(t, samlRequestToIDP, "Expected SAMLRequest in redirect to IdP")
+	assert.NotEmpty(t, relayStateToIDP, "Expected RelayState in redirect to IdP")
 
 	// Step 5: Follow the redirect to the mock IdP
 	// The mock IdP will authenticate and return a SAML response
-	req4, err := http.NewRequestWithContext(t.Context(), http.MethodGet, location, nil)
+	req4, err := http.NewRequestWithContext(t.Context(), http.MethodGet, location3, nil)
 	require.NoError(t, err)
 	resp4, err := client.Do(req4)
 	require.NoError(t, err)
@@ -1606,39 +1650,39 @@ func TestProxyCore(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp4.StatusCode)
 	body4, err := io.ReadAll(resp4.Body)
 	require.NoError(t, err)
-	
+
 	// Extract the SAML response and relay state from the form
 	bodyStr4 := string(body4)
 	assert.Contains(t, bodyStr4, "SAMLResponse")
 	assert.Contains(t, bodyStr4, "RelayState")
-	
+
 	// Extract form action URL
 	actionRegex := regexp.MustCompile(`action="([^"]+)"`)
 	actionMatches := actionRegex.FindStringSubmatch(bodyStr4)
 	require.Len(t, actionMatches, 2, "Failed to extract form action URL")
 	acsURL := actionMatches[1]
-	
+
 	// Extract SAMLResponse
 	samlResponseRegex := regexp.MustCompile(`name="SAMLResponse" value="([^"]+)"`)
 	samlResponseMatches := samlResponseRegex.FindStringSubmatch(bodyStr4)
 	require.Len(t, samlResponseMatches, 2, "Failed to extract SAMLResponse")
 	samlResponse := samlResponseMatches[1]
-	
+
 	// Extract RelayState
 	relayStateRegex := regexp.MustCompile(`name="RelayState" value="([^"]+)"`)
 	relayStateMatches := relayStateRegex.FindStringSubmatch(bodyStr4)
 	require.Len(t, relayStateMatches, 2, "Failed to extract RelayState")
-	relayStateFromIdP := relayStateMatches[1]
+	relayStateFromIDP := relayStateMatches[1]
 
 	// Step 6: Submit the SAML response to the proxy's ACS endpoint
 	form := url.Values{}
 	form.Add("SAMLResponse", samlResponse)
-	form.Add("RelayState", relayStateFromIdP)
-	
+	form.Add("RelayState", relayStateFromIDP)
+
 	req5, err := http.NewRequestWithContext(t.Context(), http.MethodPost, acsURL, strings.NewReader(form.Encode()))
 	require.NoError(t, err)
 	req5.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	
+
 	// Add the required cookies
 	req5.AddCookie(&http.Cookie{
 		Name:  "authID",
@@ -1648,11 +1692,11 @@ func TestProxyCore(t *testing.T) {
 		Name:  "idpID",
 		Value: "test-idp",
 	})
-	
+
 	resp5, err := client.Do(req5)
 	require.NoError(t, err)
 	defer resp5.Body.Close()
-	
+
 	// In test environment, SAML response validation will fail due to signature issues
 	// This is expected behavior without proper certificate setup
 	if resp5.StatusCode == http.StatusBadRequest {
@@ -1663,14 +1707,15 @@ func TestProxyCore(t *testing.T) {
 		t.Log("✓ IdP authentication simulation works")
 		t.Log("✓ Proxy ACS endpoint received and processed IdP response")
 		t.Log("✓ SAML parsing attempted (signature validation expected to fail)")
+
 		return
 	}
-	
+
 	// If signature validation is disabled or passes, verify the full flow
 	assert.Equal(t, http.StatusFound, resp5.StatusCode)
 	callbackLocation := resp5.Header.Get("Location")
 	assert.Contains(t, callbackLocation, "/callback", "Expected redirect to callback endpoint")
-	
+
 	// Step 7: Follow the redirect to the callback endpoint
 	callbackURL := proxyServer.URL + callbackLocation
 	req6, err := http.NewRequestWithContext(t.Context(), http.MethodGet, callbackURL, nil)
@@ -1679,21 +1724,21 @@ func TestProxyCore(t *testing.T) {
 		Name:  "authID",
 		Value: authRequestID,
 	})
-	
+
 	resp6, err := client.Do(req6)
 	require.NoError(t, err)
 	defer resp6.Body.Close()
-	
+
 	// The callback should return a form that posts back to the original SP
 	assert.Equal(t, http.StatusOK, resp6.StatusCode)
 	body6, err := io.ReadAll(resp6.Body)
 	require.NoError(t, err)
-	
+
 	// Verify the response contains a form posting to the original SP
 	bodyStr6 := string(body6)
 	assert.Contains(t, bodyStr6, "SAMLResponse", "Expected SAMLResponse in callback form")
 	assert.Contains(t, bodyStr6, "https://testsp.example.com/acs", "Expected form to post to original SP ACS URL")
-	
+
 	t.Log("Complete SAML flow verified:")
 	t.Log("✓ IdP authentication simulation works")
 	t.Log("✓ Proxy ACS endpoint processes IdP response")
@@ -1701,7 +1746,7 @@ func TestProxyCore(t *testing.T) {
 	t.Log("✓ RelayState is preserved throughout the flow")
 }
 
-// TestE2EFlowErrorHandling tests error scenarios in the SAML flow
+// TestE2EFlowErrorHandling tests error scenarios in the SAML flow.
 func TestE2EFlowErrorHandling(t *testing.T) {
 	// Generate test certificate and key
 	certPath, keyPath := generateTestCertificate(t)
@@ -1766,7 +1811,7 @@ func TestE2EFlowErrorHandling(t *testing.T) {
 
 	// Create a client that doesn't follow redirects
 	client := &http.Client{
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
 	}
@@ -1774,13 +1819,13 @@ func TestE2EFlowErrorHandling(t *testing.T) {
 	t.Run("Invalid SAML Request", func(t *testing.T) {
 		// Send an invalid SAML request
 		ssoURL := proxyServer.URL + "/sso?SAMLRequest=invalid-base64&RelayState=test"
-		
+
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, ssoURL, nil)
 		require.NoError(t, err)
 		resp, err := client.Do(req)
 		require.NoError(t, err)
 		defer resp.Body.Close()
-		
+
 		// The proxy returns 200 OK with an error page when SAML request is malformed
 		// This is reasonable behavior as it can't parse the request at all
 		assert.Equal(t, http.StatusOK, resp.StatusCode, "Expected 200 OK with error page for malformed SAML request")
@@ -1791,15 +1836,15 @@ func TestE2EFlowErrorHandling(t *testing.T) {
 		form := url.Values{}
 		form.Add("SAMLResponse", base64.StdEncoding.EncodeToString([]byte("<samlp:Response></samlp:Response>")))
 		form.Add("RelayState", "test")
-		
+
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, proxyServer.URL+"/saml/acs", strings.NewReader(form.Encode()))
 		require.NoError(t, err)
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-		
+
 		resp, err := client.Do(req)
 		require.NoError(t, err)
 		defer resp.Body.Close()
-		
+
 		// Should return an error
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "Expected bad request for missing auth cookie")
 	})
@@ -1807,10 +1852,10 @@ func TestE2EFlowErrorHandling(t *testing.T) {
 	t.Run("Invalid IdP Selection", func(t *testing.T) {
 		// Create a valid SAML request first
 		samlRequest := `<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="id-123456789" Version="2.0" IssueInstant="2023-01-01T12:00:00Z" AssertionConsumerServiceURL="https://testsp.example.com/acs" ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"><saml:Issuer>https://testsp.example.com</saml:Issuer><samlp:NameIDPolicy Format="urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified" AllowCreate="true"/></samlp:AuthnRequest>`
-		
+
 		encoded, err := encodeSAMLRequest(samlRequest)
 		require.NoError(t, err)
-		
+
 		// Step 1: Send SAML request to get auth cookie
 		ssoURL := proxyServer.URL + "/sso?SAMLRequest=" + url.QueryEscape(encoded) + "&RelayState=test"
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, ssoURL, nil)
@@ -1818,39 +1863,40 @@ func TestE2EFlowErrorHandling(t *testing.T) {
 		resp, err := client.Do(req)
 		require.NoError(t, err)
 		defer resp.Body.Close()
-		
+
 		// Should redirect to IdP selection page
 		assert.Equal(t, http.StatusSeeOther, resp.StatusCode, "Expected redirect to IdP selection")
 		location := resp.Header.Get("Location")
 		require.NotEmpty(t, location, "Expected Location header")
-		
+
 		// Follow the redirect to get the auth cookie
 		req2, err := http.NewRequestWithContext(t.Context(), http.MethodGet, proxyServer.URL+location, nil)
 		require.NoError(t, err)
 		resp2, err := client.Do(req2)
 		require.NoError(t, err)
 		defer resp2.Body.Close()
-		
+
 		// Extract auth cookie from the IdP selection page
 		var authCookie *http.Cookie
 		for _, cookie := range resp2.Cookies() {
 			if cookie.Name == "authID" {
 				authCookie = cookie
+
 				break
 			}
 		}
 		require.NotNil(t, authCookie, "Expected auth cookie")
-		
+
 		// Step 2: Try to select an invalid IdP
 		idpSelectedURL := proxyServer.URL + "/idp_selected?idpID=invalid-idp"
 		req3, err := http.NewRequestWithContext(t.Context(), http.MethodGet, idpSelectedURL, nil)
 		require.NoError(t, err)
 		req3.AddCookie(authCookie)
-		
+
 		resp3, err := client.Do(req3)
 		require.NoError(t, err)
 		defer resp3.Body.Close()
-		
+
 		// Should return an error
 		assert.Equal(t, http.StatusBadRequest, resp3.StatusCode, "Expected bad request for invalid IdP")
 	})
@@ -1858,17 +1904,17 @@ func TestE2EFlowErrorHandling(t *testing.T) {
 	t.Run("Unauthorized SP", func(t *testing.T) {
 		// Create a SAML request from an unauthorized SP
 		samlRequest := `<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="id-unauthorized" Version="2.0" IssueInstant="2023-01-01T12:00:00Z" AssertionConsumerServiceURL="https://unauthorized-sp.example.com/acs" ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"><saml:Issuer>https://unauthorized-sp.example.com</saml:Issuer><samlp:NameIDPolicy Format="urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified" AllowCreate="true"/></samlp:AuthnRequest>`
-		
+
 		encoded, err := encodeSAMLRequest(samlRequest)
 		require.NoError(t, err)
-		
+
 		ssoURL := proxyServer.URL + "/sso?SAMLRequest=" + url.QueryEscape(encoded) + "&RelayState=test"
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, ssoURL, nil)
 		require.NoError(t, err)
 		resp, err := client.Do(req)
 		require.NoError(t, err)
 		defer resp.Body.Close()
-		
+
 		// Should still work but when trying to get entity it might fail
 		// The current implementation might allow this, but it's good to test
 		assert.LessOrEqual(t, resp.StatusCode, 400, "Request should be processed or rejected appropriately")
@@ -1881,7 +1927,7 @@ func TestE2EFlowErrorHandling(t *testing.T) {
 	t.Log("✓ Unauthorized SP handling")
 }
 
-// TestSAMLResponseProcessing tests the SAML Response and Assertion processing
+// TestSAMLResponseProcessing tests the SAML Response and Assertion processing.
 func TestSAMLResponseProcessing(t *testing.T) {
 	// Generate test certificate and key
 	certPath, _ := generateTestCertificate(t)
@@ -1903,12 +1949,12 @@ func TestSAMLResponseProcessing(t *testing.T) {
 		requestID := "test-request-123"
 		acsURL := "https://testsp.example.com/acs"
 		samlResponse := mockProvider.createSAMLResponse(requestID, acsURL)
-		
+
 		// Decode and parse the response
 		var response saml.Response
 		err := xml.Unmarshal([]byte(samlResponse), &response)
 		require.NoError(t, err, "Should parse SAML Response")
-		
+
 		// Validate response structure
 		assert.Equal(t, requestID, response.InResponseTo, "InResponseTo should match request ID")
 		assert.Equal(t, acsURL, response.Destination, "Destination should match ACS URL")
@@ -1917,7 +1963,7 @@ func TestSAMLResponseProcessing(t *testing.T) {
 			assert.Equal(t, mockProvider.entityID, response.Issuer.Value, "Issuer should be the IdP entity ID")
 		}
 		assert.Equal(t, "urn:oasis:names:tc:SAML:2.0:status:Success", response.Status.StatusCode.Value, "Should have success status")
-		
+
 		// Validate assertion
 		assert.NotNil(t, response.Assertion, "Should have assertion")
 		assertion := response.Assertion
@@ -1926,7 +1972,7 @@ func TestSAMLResponseProcessing(t *testing.T) {
 			assert.NotEmpty(t, assertion.Issuer.Value, "Assertion should have issuer value")
 			assert.Equal(t, mockProvider.entityID, assertion.Issuer.Value, "Assertion issuer should be IdP entity ID")
 		}
-		
+
 		// Validate subject
 		if assertion != nil {
 			assert.NotNil(t, assertion.Subject, "Should have subject")
@@ -1934,16 +1980,16 @@ func TestSAMLResponseProcessing(t *testing.T) {
 				assert.NotNil(t, assertion.Subject.NameID, "Should have NameID")
 				assert.Equal(t, "testuser@example.com", assertion.Subject.NameID.Value, "Should have expected NameID value")
 			}
-			
+
 			// Validate conditions
 			assert.NotNil(t, assertion.Conditions, "Should have conditions")
 			if assertion.Conditions != nil && len(assertion.Conditions.AudienceRestrictions) > 0 {
 				assert.NotEmpty(t, assertion.Conditions.AudienceRestrictions, "Should have audience restrictions")
 			}
-			
+
 			// Validate authentication statement
 			assert.NotEmpty(t, assertion.AuthnStatements, "Should have authentication statements")
-			
+
 			// Validate attributes
 			assert.NotEmpty(t, assertion.AttributeStatements, "Should have attribute statements")
 			var emailFound, nameFound bool
@@ -1971,11 +2017,11 @@ func TestSAMLResponseProcessing(t *testing.T) {
 	t.Run("RelayState Preservation", func(t *testing.T) {
 		// Test that RelayState is preserved through the flow
 		originalRelayState := "test-relay-state-12345"
-		
+
 		// When the mock IdP receives a request with RelayState, it should preserve it
 		// This is already tested in the complete flow test, but we can verify it here
 		assert.NotEmpty(t, originalRelayState, "RelayState should not be empty")
-		
+
 		// In a real implementation, we would verify that:
 		// 1. SP sends RelayState to Proxy
 		// 2. Proxy sends RelayState to IdP
@@ -1987,22 +2033,22 @@ func TestSAMLResponseProcessing(t *testing.T) {
 	t.Run("Timestamp Validation", func(t *testing.T) {
 		// Create a SAML response
 		samlResponse := mockProvider.createSAMLResponse("test-123", "https://sp.example.com/acs")
-		
+
 		// Parse and check timestamps
 		var response saml.Response
 		err := xml.Unmarshal([]byte(samlResponse), &response)
 		require.NoError(t, err)
-		
+
 		// Check IssueInstant
 		issueTime := response.IssueInstant
 		assert.WithinDuration(t, time.Now().UTC(), issueTime, 5*time.Minute, "IssueInstant should be recent")
-		
+
 		// Check assertion timestamps
 		if response.Assertion != nil {
 			assertion := response.Assertion
 			assertionIssueTime := assertion.IssueInstant
 			assert.WithinDuration(t, time.Now().UTC(), assertionIssueTime, 5*time.Minute, "Assertion IssueInstant should be recent")
-		
+
 			// Check conditions timestamps
 			if assertion.Conditions != nil {
 				notBefore := assertion.Conditions.NotBefore
