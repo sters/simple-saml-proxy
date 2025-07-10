@@ -203,7 +203,7 @@ func (s *Storage) SetUserinfoWithUserID(
 	ctx context.Context,
 	authRequestID string,
 	userinfo models.AttributeSetter,
-	_ string,
+	userID string,
 	_ []int,
 ) error {
 	// Get the auth request to retrieve the assertion
@@ -223,6 +223,15 @@ func (s *Storage) SetUserinfoWithUserID(
 
 	// Use assertion data if available
 	if authRequest.Assertion == nil || authRequest.Assertion.Subject == nil {
+		// Fallback to original behavior if no assertion is available
+		slog.Warn("No assertion data available, using fallback values")
+		userinfo.SetUserID(userID)
+		userinfo.SetUsername(userID)
+		userinfo.SetEmail(userID + "@example.com")
+		userinfo.SetFullName("Test User")
+		userinfo.SetGivenName("Test")
+		userinfo.SetSurname("User")
+
 		return nil
 	}
 

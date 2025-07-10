@@ -16,7 +16,7 @@ func TestMockProviderResponse(t *testing.T) {
 	defer mockProvider.Close()
 
 	// Test the createSAMLResponse method directly first
-	testResponse := mockProvider.createSAMLResponse("test-id", "https://example.com/acs")
+	testResponse := mockProvider.createSAMLResponse("test-id", "https://example.com/acs", "https://proxy.example.com")
 	t.Logf("Direct SAML Response:\n%s", testResponse)
 
 	// Verify the response is valid XML
@@ -34,7 +34,7 @@ func TestProxyCore(t *testing.T) {
 	// Test SAML response generation
 	requestID := "test-request-123"
 	acsURL := "https://testsp.example.com/acs"
-	samlResponse := mockProvider.createSAMLResponse(requestID, acsURL)
+	samlResponse := mockProvider.createSAMLResponse(requestID, acsURL, "https://proxy.example.com")
 
 	// Parse and validate the response
 	var response saml.Response
@@ -107,7 +107,7 @@ func TestSAMLResponseProcessing_ValidSAMLResponse(t *testing.T) {
 	// Create a valid response
 	requestID := "test-request-123"
 	acsURL := "https://testsp.example.com/acs"
-	samlResponse := mockProvider.createSAMLResponse(requestID, acsURL)
+	samlResponse := mockProvider.createSAMLResponse(requestID, acsURL, "https://proxy.example.com")
 
 	// Decode and parse the response
 	var response saml.Response
@@ -134,7 +134,7 @@ func TestSAMLResponseProcessing_AssertionValidation(t *testing.T) {
 	mockProvider := NewMockSAMLProvider(t)
 	defer mockProvider.Close()
 
-	samlResponse := mockProvider.createSAMLResponse("test-123", "https://sp.example.com/acs")
+	samlResponse := mockProvider.createSAMLResponse("test-123", "https://sp.example.com/acs", "https://proxy.example.com")
 
 	var response saml.Response
 	err := xml.Unmarshal([]byte(samlResponse), &response)
@@ -168,7 +168,7 @@ func TestSAMLResponseProcessing_AssertionValidation(t *testing.T) {
 	// Validate audience restriction
 	require.NotEmpty(t, assertion.Conditions.AudienceRestrictions, "Should have audience restrictions")
 	require.NotEmpty(t, assertion.Conditions.AudienceRestrictions[0].Audience, "Should have audience")
-	assert.Equal(t, "https://sp.example.com", assertion.Conditions.AudienceRestrictions[0].Audience.Value)
+	assert.Equal(t, "https://proxy.example.com", assertion.Conditions.AudienceRestrictions[0].Audience.Value)
 
 	// Validate attributes
 	require.NotEmpty(t, assertion.AttributeStatements, "Should have attribute statements")
@@ -214,7 +214,7 @@ func TestSAMLResponseProcessing_TimestampValidation(t *testing.T) {
 	defer mockProvider.Close()
 
 	// Create a SAML response
-	samlResponse := mockProvider.createSAMLResponse("test-123", "https://sp.example.com/acs")
+	samlResponse := mockProvider.createSAMLResponse("test-123", "https://sp.example.com/acs", "https://proxy.example.com")
 
 	// Parse and check timestamps
 	var response saml.Response

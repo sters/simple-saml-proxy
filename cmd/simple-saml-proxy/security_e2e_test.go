@@ -250,7 +250,7 @@ func TestSecurityE2E_ReplayAttackPrevention(t *testing.T) {
 	defer mockProvider.server.Close()
 
 	// Create a valid SAML response
-	samlResp := mockProvider.createSAMLResponse("test-123", server.URL+"/saml/acs")
+	samlResp := mockProvider.createSAMLResponse("test-123", server.URL+"/saml/acs", "https://proxy.example.com")
 	encoded := base64.StdEncoding.EncodeToString([]byte(samlResp))
 
 	form := url.Values{}

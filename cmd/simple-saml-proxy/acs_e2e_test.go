@@ -74,7 +74,7 @@ func TestACSEndpoint_ValidSAMLResponse(t *testing.T) {
 	// The test will verify the signature validation doesn't fail
 
 	// Create a valid signed SAML response
-	signedResponse := mockProvider.createSAMLResponse("_proxy_request_123", server.URL+"/saml/acs")
+	signedResponse := mockProvider.createSAMLResponse("_proxy_request_123", server.URL+"/saml/acs", "https://proxy.example.com")
 	encoded := base64.StdEncoding.EncodeToString([]byte(signedResponse))
 
 	form := url.Values{}
@@ -217,7 +217,7 @@ func TestACSEndpoint_RelayStatePreservation(t *testing.T) {
 	})
 
 	// Create a valid SAML response
-	samlResponse := mockProvider.createSAMLResponse("test-123", server.URL+"/saml/acs")
+	samlResponse := mockProvider.createSAMLResponse("test-123", server.URL+"/saml/acs", "https://proxy.example.com")
 	encoded := base64.StdEncoding.EncodeToString([]byte(samlResponse))
 
 	customRelayState := "my-custom-relay-state-abc123"
@@ -264,7 +264,7 @@ func TestACSEndpoint_InvalidContentType(t *testing.T) {
 	})
 
 	// Create valid response data
-	samlResponse := mockProvider.createSAMLResponse("test-123", server.URL+"/saml/acs")
+	samlResponse := mockProvider.createSAMLResponse("test-123", server.URL+"/saml/acs", "https://proxy.example.com")
 	encoded := base64.StdEncoding.EncodeToString([]byte(samlResponse))
 
 	// Send with wrong content type
@@ -360,7 +360,7 @@ func TestACSEndpoint_SpecialCharactersInRelayState(t *testing.T) {
 		IsDone:        false,
 	})
 
-	samlResponse := mockProvider.createSAMLResponse("test-123", server.URL+"/saml/acs")
+	samlResponse := mockProvider.createSAMLResponse("test-123", server.URL+"/saml/acs", "https://proxy.example.com")
 	encoded := base64.StdEncoding.EncodeToString([]byte(samlResponse))
 
 	// RelayState with special characters

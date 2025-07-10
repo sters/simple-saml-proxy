@@ -220,7 +220,12 @@ func NewMockSAMLProvider(t *testing.T) *MockSAMLProvider {
 		relayState := r.URL.Query().Get("RelayState")
 
 		// Create a SAML response
-		samlResponse := provider.createSAMLResponse(authnRequest.ID, authnRequest.AssertionConsumerServiceURL)
+		// Use the proxy's entity ID as audience (in tests, it's usually http://localhost:8080)
+		audience := authnRequest.Issuer.Value
+		if audience == "" {
+			audience = "http://localhost:8080"
+		}
+		samlResponse := provider.createSAMLResponse(authnRequest.ID, authnRequest.AssertionConsumerServiceURL, audience)
 		provider.t.Logf("Generated SAML Response:\n%s", samlResponse)
 
 		// Encode the response
@@ -318,7 +323,7 @@ func (p *MockSAMLProvider) getAttributeValue(key, defaultValue string) string {
 }
 
 // createSAMLResponse creates a signed SAML response for the given request ID and ACS URL.
-func (p *MockSAMLProvider) createSAMLResponse(requestID, acsURL string) string {
+func (p *MockSAMLProvider) createSAMLResponse(requestID, acsURL, audience string) string {
 	now := time.Now().UTC()
 	notAfter := now.Add(time.Hour)
 	responseID := "_" + strconv.FormatInt(now.UnixNano(), 10)
@@ -353,7 +358,7 @@ func (p *MockSAMLProvider) createSAMLResponse(requestID, acsURL string) string {
 			NotOnOrAfter: notAfter,
 			AudienceRestrictions: []saml.AudienceRestriction{
 				{
-					Audience: saml.Audience{Value: "https://sp.example.com"},
+					Audience: saml.Audience{Value: audience},
 				},
 			},
 		},
@@ -611,7 +616,11 @@ func NewMockSAMLProviderWithErrors(t *testing.T) *MockSAMLProviderWithErrors {
 			_, _ = w.Write([]byte(html))
 		} else {
 			// Return success response
-			samlResponse := provider.createSAMLResponse(authnRequest.ID, authnRequest.AssertionConsumerServiceURL)
+			audience := authnRequest.Issuer.Value
+			if audience == "" {
+				audience = "http://localhost:8080"
+			}
+			samlResponse := provider.createSAMLResponse(authnRequest.ID, authnRequest.AssertionConsumerServiceURL, audience)
 			encoded := base64.StdEncoding.EncodeToString([]byte(samlResponse))
 
 			w.Header().Set("Content-Type", "text/html")
