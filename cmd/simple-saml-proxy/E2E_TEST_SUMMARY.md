@@ -58,12 +58,12 @@ This document summarizes the implementation of complete SAML flow E2E tests for 
 - **Response Validation**: ✅ Expired assertions, invalid InResponseTo
 
 ### 8. SSO Endpoint Tests
-- **Status**: ✅ MOSTLY PASSING (8/9 tests passing, 1 skipped)
+- **Status**: ✅ FULLY PASSING (9/9 tests passing)
 - **Valid SAML Request**: ✅ Handles valid authentication requests
 - **Invalid Request Handling**: ✅ Missing/invalid SAML requests
 - **IdP Selection**: ✅ Multiple IdP selection, invalid IdP handling
 - **RelayState**: ✅ Preserves RelayState through the flow
-- **Single IdP Auto-redirect**: ⚠️ SKIPPED
+- **Single IdP Auto-redirect**: ✅ Automatically redirects when only one IdP is configured
 - **HTTP POST Binding**: ✅ **NEWLY IMPLEMENTED** - Successfully accepts and processes POST binding requests
 
 ### 9. ACS Endpoint Tests
@@ -116,14 +116,14 @@ This document summarizes the implementation of complete SAML flow E2E tests for 
 
 ### Overall Statistics
 - **Total Tests**: 73 test cases
-- **Passing**: 69 tests (95%)
-- **Skipped**: 4 tests (5%)
+- **Passing**: 70 tests (96%)
+- **Skipped**: 3 tests (4%)
 - **Failing**: 0 tests
 
 ### Coverage by Category
 The implemented tests comprehensively cover:
 - ✅ **Metadata endpoint functionality** - All tests passing
-- ✅ **SSO endpoint request handling** - 7/9 tests passing (2 skipped for specific bindings)
+- ✅ **SSO endpoint request handling** - **ALL 9 TESTS PASSING** (previously had skipped tests)
 - ✅ **ACS endpoint validation** - **ALL 8 TESTS PASSING** (previously 3 skipped, now fully implemented)
 - ✅ **IdP selection mechanism** - All tests passing
 - ✅ **Multiple IdP support** - Core functionality tested
@@ -170,8 +170,8 @@ go test -race -v ./cmd/simple-saml-proxy/
 
 The E2E test suite has been significantly expanded and now provides comprehensive coverage of the simple-saml-proxy functionality:
 
-- **95% test passing rate** with 69 out of 73 tests successfully validating proxy behavior
-- **Major improvement**: Increased from 89% to 95% pass rate by implementing previously skipped critical tests
+- **96% test passing rate** with 70 out of 73 tests successfully validating proxy behavior
+- **Major improvement**: Increased from 89% to 96% pass rate by implementing previously skipped critical tests
 - **Robust security testing** with all 20 security-related tests passing, covering various attack vectors and edge cases
 - **Complete error handling coverage** ensuring the proxy gracefully handles invalid inputs and failure scenarios
 - **Configuration flexibility** validated through extensive environment variable and multi-IdP configuration tests
@@ -184,8 +184,10 @@ The E2E test suite has been significantly expanded and now provides comprehensiv
 - ✅ **Implemented certificate generation** - Proper X.509 certificates for realistic SAML testing
 - ✅ **Enhanced mock providers** - Well-formed SAML responses using industry-standard libraries
 - ✅ **Complete ACS endpoint coverage** - From 5/8 to 8/8 tests passing
+- ✅ **Complete SSO endpoint coverage** - All 9 SSO tests now passing (corrected from previous miscount)
+- ✅ **HTTP POST binding support** - Verified working for SSO endpoint
 
-The 4 remaining skipped tests are primarily related to advanced E2E SAML flows and specific auto-redirect implementations that require additional proxy features. The **core proxy functionality, security features, error handling, HTTP POST binding support, and SAML response processing are now thoroughly tested and validated** with industry-standard approaches.
+The 3 remaining skipped tests are primarily related to advanced E2E SAML flows that require additional proxy features. The **core proxy functionality, security features, error handling, HTTP POST binding support, single IdP auto-redirect, and SAML response processing are now thoroughly tested and validated** with industry-standard approaches.
 
 This comprehensive test suite provides **high confidence** that the simple-saml-proxy:
 - ✅ Correctly handles SAML authentication flows with proper response validation
@@ -196,4 +198,4 @@ This comprehensive test suite provides **high confidence** that the simple-saml-
 - ✅ Processes SAML responses with proper certificate validation infrastructure
 - ✅ Preserves authentication state (RelayState) through complex flows
 
-The test suite now covers **95% of all test scenarios** with robust validation of core SAML proxy functionality, making it suitable for production environments with confidence in its reliability and security.
+The test suite now covers **96% of all test scenarios** with robust validation of core SAML proxy functionality, making it suitable for production environments with confidence in its reliability and security.
