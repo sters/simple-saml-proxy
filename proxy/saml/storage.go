@@ -203,7 +203,7 @@ func (s *Storage) SetUserinfoWithUserID(
 	ctx context.Context,
 	authRequestID string,
 	userinfo models.AttributeSetter,
-	userID string,
+	_ string,
 	_ []int,
 ) error {
 	// Get the auth request to retrieve the assertion
@@ -222,50 +222,43 @@ func (s *Storage) SetUserinfoWithUserID(
 	}
 
 	// Use assertion data if available
-	if authRequest.Assertion != nil && authRequest.Assertion.Subject != nil {
-		// Set the NameID as UserID
-		if authRequest.Assertion.Subject.NameID != nil {
-			userinfo.SetUserID(authRequest.Assertion.Subject.NameID.Value)
-			userinfo.SetUsername(authRequest.Assertion.Subject.NameID.Value)
-		}
+	if authRequest.Assertion == nil || authRequest.Assertion.Subject == nil {
+		return nil
+	}
 
-		// Extract attributes from the assertion
-		for _, attrStatement := range authRequest.Assertion.AttributeStatements {
-			for _, attr := range attrStatement.Attributes {
-				switch attr.Name {
-				case "email", "Email", "mail":
-					if len(attr.Values) > 0 {
-						userinfo.SetEmail(attr.Values[0].Value)
-					}
-				case "name", "Name", "displayName", "DisplayName":
-					if len(attr.Values) > 0 {
-						userinfo.SetFullName(attr.Values[0].Value)
-					}
-				case "givenName", "GivenName", "firstName", "FirstName":
-					if len(attr.Values) > 0 {
-						userinfo.SetGivenName(attr.Values[0].Value)
-					}
-				case "surname", "Surname", "lastName", "LastName", "sn":
-					if len(attr.Values) > 0 {
-						userinfo.SetSurname(attr.Values[0].Value)
-					}
-				default:
-					// For other attributes, we could add custom attribute support here
-					slog.Debug("Unhandled attribute",
-						slog.String("name", attr.Name),
-						slog.Any("values", attr.Values))
+	// Set the NameID as UserID
+	if authRequest.Assertion.Subject.NameID != nil {
+		userinfo.SetUserID(authRequest.Assertion.Subject.NameID.Value)
+		userinfo.SetUsername(authRequest.Assertion.Subject.NameID.Value)
+	}
+
+	// Extract attributes from the assertion
+	for _, attrStatement := range authRequest.Assertion.AttributeStatements {
+		for _, attr := range attrStatement.Attributes {
+			switch attr.Name {
+			case "email", "Email", "mail":
+				if len(attr.Values) > 0 {
+					userinfo.SetEmail(attr.Values[0].Value)
 				}
+			case "name", "Name", "displayName", "DisplayName":
+				if len(attr.Values) > 0 {
+					userinfo.SetFullName(attr.Values[0].Value)
+				}
+			case "givenName", "GivenName", "firstName", "FirstName":
+				if len(attr.Values) > 0 {
+					userinfo.SetGivenName(attr.Values[0].Value)
+				}
+			case "surname", "Surname", "lastName", "LastName", "sn":
+				if len(attr.Values) > 0 {
+					userinfo.SetSurname(attr.Values[0].Value)
+				}
+			default:
+				// For other attributes, we could add custom attribute support here
+				slog.Debug("Unhandled attribute",
+					slog.String("name", attr.Name),
+					slog.Any("values", attr.Values))
 			}
 		}
-	} else {
-		// Fallback to original behavior if no assertion is available
-		slog.Warn("No assertion data available, using fallback values")
-		userinfo.SetUserID(userID)
-		userinfo.SetUsername(userID)
-		userinfo.SetEmail(userID + "@example.com")
-		userinfo.SetFullName("Test User")
-		userinfo.SetGivenName("Test")
-		userinfo.SetSurname("User")
 	}
 
 	return nil
@@ -293,37 +286,7 @@ func (s *Storage) SetUserinfoWithLoginName(
 	}
 	s.authRequestsLock.RUnlock()
 
-	if foundAuthRequest != nil && foundAuthRequest.Assertion != nil {
-		// Use the same logic as SetUserinfoWithUserID
-		if foundAuthRequest.Assertion.Subject != nil && foundAuthRequest.Assertion.Subject.NameID != nil {
-			userinfo.SetUserID(foundAuthRequest.Assertion.Subject.NameID.Value)
-			userinfo.SetUsername(foundAuthRequest.Assertion.Subject.NameID.Value)
-		}
-
-		// Extract attributes from the assertion
-		for _, attrStatement := range foundAuthRequest.Assertion.AttributeStatements {
-			for _, attr := range attrStatement.Attributes {
-				switch attr.Name {
-				case "email", "Email", "mail":
-					if len(attr.Values) > 0 {
-						userinfo.SetEmail(attr.Values[0].Value)
-					}
-				case "name", "Name", "displayName", "DisplayName":
-					if len(attr.Values) > 0 {
-						userinfo.SetFullName(attr.Values[0].Value)
-					}
-				case "givenName", "GivenName", "firstName", "FirstName":
-					if len(attr.Values) > 0 {
-						userinfo.SetGivenName(attr.Values[0].Value)
-					}
-				case "surname", "Surname", "lastName", "LastName", "sn":
-					if len(attr.Values) > 0 {
-						userinfo.SetSurname(attr.Values[0].Value)
-					}
-				}
-			}
-		}
-	} else {
+	if foundAuthRequest == nil || foundAuthRequest.Assertion == nil {
 		// Fallback to original behavior
 		slog.Warn("No assertion data available for login name, using fallback values", slog.String("loginName", loginName))
 		userinfo.SetUserID(loginName)
@@ -332,6 +295,38 @@ func (s *Storage) SetUserinfoWithLoginName(
 		userinfo.SetFullName("Test User")
 		userinfo.SetGivenName("Test")
 		userinfo.SetSurname("User")
+
+		return nil
+	}
+
+	// Use the same logic as SetUserinfoWithUserID
+	if foundAuthRequest.Assertion.Subject != nil && foundAuthRequest.Assertion.Subject.NameID != nil {
+		userinfo.SetUserID(foundAuthRequest.Assertion.Subject.NameID.Value)
+		userinfo.SetUsername(foundAuthRequest.Assertion.Subject.NameID.Value)
+	}
+
+	// Extract attributes from the assertion
+	for _, attrStatement := range foundAuthRequest.Assertion.AttributeStatements {
+		for _, attr := range attrStatement.Attributes {
+			switch attr.Name {
+			case "email", "Email", "mail":
+				if len(attr.Values) > 0 {
+					userinfo.SetEmail(attr.Values[0].Value)
+				}
+			case "name", "Name", "displayName", "DisplayName":
+				if len(attr.Values) > 0 {
+					userinfo.SetFullName(attr.Values[0].Value)
+				}
+			case "givenName", "GivenName", "firstName", "FirstName":
+				if len(attr.Values) > 0 {
+					userinfo.SetGivenName(attr.Values[0].Value)
+				}
+			case "surname", "Surname", "lastName", "LastName", "sn":
+				if len(attr.Values) > 0 {
+					userinfo.SetSurname(attr.Values[0].Value)
+				}
+			}
+		}
 	}
 
 	return nil
