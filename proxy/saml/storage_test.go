@@ -1,36 +1,37 @@
-package proxy
+package saml
 
 import (
 	"testing"
 
+	"github.com/sters/simple-saml-proxy/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewStorage(t *testing.T) {
 	// Generate test certificate and key
-	certPath, keyPath := generateTestCertificate(t)
+	certPath, keyPath := GenerateTestCertificate(t)
 
 	// Create a test config
-	config := Config{}
-	config.Proxy.CertificatePath = certPath
-	config.Proxy.PrivateKeyPath = keyPath
+	cfg := &config.Config{}
+	cfg.Proxy.CertificatePath = certPath
+	cfg.Proxy.PrivateKeyPath = keyPath
 
 	// Test creating a new Storage
-	storage, err := NewStorage(config)
+	storage, err := NewStorage(*cfg)
 	require.NoError(t, err)
 	assert.NotNil(t, storage)
-	assert.Equal(t, config, storage.config)
+	assert.Equal(t, *cfg, storage.config)
 	assert.NotNil(t, storage.cert)
 	assert.NotNil(t, storage.spCache)
 	assert.NotNil(t, storage.authRequests)
 	assert.NotNil(t, storage.entityIDByAppID)
 
 	// Test with invalid certificate path
-	invalidConfig := Config{}
+	invalidConfig := &config.Config{}
 	invalidConfig.Proxy.CertificatePath = "/nonexistent/cert.pem"
 	invalidConfig.Proxy.PrivateKeyPath = "/nonexistent/key.pem"
-	_, err = NewStorage(invalidConfig)
+	_, err = NewStorage(*invalidConfig)
 	assert.Error(t, err)
 }
 
@@ -64,15 +65,15 @@ func TestAuthRequest(t *testing.T) {
 
 func TestGetCertificateAndKey(t *testing.T) {
 	// Generate test certificate and key
-	certPath, keyPath := generateTestCertificate(t)
+	certPath, keyPath := GenerateTestCertificate(t)
 
 	// Create a test config
-	config := Config{}
-	config.Proxy.CertificatePath = certPath
-	config.Proxy.PrivateKeyPath = keyPath
+	cfg := &config.Config{}
+	cfg.Proxy.CertificatePath = certPath
+	cfg.Proxy.PrivateKeyPath = keyPath
 
 	// Create a new Storage
-	storage, err := NewStorage(config)
+	storage, err := NewStorage(*cfg)
 	require.NoError(t, err)
 
 	// Test getCertificateAndKey

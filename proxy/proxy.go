@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/sters/simple-saml-proxy/config"
+	"github.com/sters/simple-saml-proxy/proxy/saml"
 )
 
 // SetupHTTPHandlers sets up the HTTP handlers for the SAML proxy.
@@ -13,14 +16,14 @@ import (
 // - To Service Providers (SPs), it appears as an IdP
 // - To Identity Providers (IdPs), it appears as an SP
 // It allows users to select which IdP they want to use for authentication.
-func SetupHTTPHandlers(idp *IDP, providers *ServiceProviders, _ Config) http.Handler {
+func SetupHTTPHandlers(idp *saml.IDP, providers *saml.ServiceProviders, _ config.Config) http.Handler {
 	mux := http.NewServeMux()
 
 	// Basic endpoints
 	mux.HandleFunc("/ping", handlePing)
-	mux.Handle("/metadata", idp.idp.HttpHandler())
-	mux.Handle("/sso", idp.idp.HttpHandler())
-	mux.Handle("/callback", idp.idp.HttpHandler())
+	mux.Handle("/metadata", idp.IDP.HttpHandler())
+	mux.Handle("/sso", idp.IDP.HttpHandler())
+	mux.Handle("/callback", idp.IDP.HttpHandler())
 
 	// SAML proxy endpoints
 	mux.HandleFunc("/saml/acs", handleSAMLACS(idp, providers))
@@ -64,22 +67,22 @@ func isAllowedServiceURL(serviceURL string, allowedPrefixes []string) bool {
 }
 
 // StartServer starts the HTTP server with the given configuration and handler.
-func StartServer(config Config, handler http.Handler) error {
+func StartServer(cfg config.Config, handler http.Handler) error {
 	server := &http.Server{
-		Addr:              config.Server.ListenAddress,
+		Addr:              cfg.Server.ListenAddress,
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	slog.Info("Starting SAML IdP proxy", slog.String("address", config.Server.ListenAddress))
-	slog.Info("Metadata URL (for SPs)", slog.String("url", config.Proxy.MetadataURL))
-	slog.Info("SSO URL (for SPs)", slog.String("url", config.Proxy.EntityID+"/sso"))
-	slog.Info("ACS URL (for IdPs)", slog.String("url", config.Proxy.AcsURL))
-	slog.Info("IdP Selection URL", slog.String("url", config.Proxy.EntityID+"/idp_selected"))
+	slog.Info("Starting SAML IdP proxy", slog.String("address", cfg.Server.ListenAddress))
+	slog.Info("Metadata URL (for SPs)", slog.String("url", cfg.Proxy.MetadataURL))
+	slog.Info("SSO URL (for SPs)", slog.String("url", cfg.Proxy.EntityID+"/sso"))
+	slog.Info("ACS URL (for IdPs)", slog.String("url", cfg.Proxy.AcsURL))
+	slog.Info("IdP Selection URL", slog.String("url", cfg.Proxy.EntityID+"/idp_selected"))
 
 	// Log information about configured IDP
 	slog.Info("Configured IDP")
-	for _, idp := range config.IDP {
+	for _, idp := range cfg.IDP {
 		slog.Info("IDP details",
 			slog.String("id", idp.ID),
 		)

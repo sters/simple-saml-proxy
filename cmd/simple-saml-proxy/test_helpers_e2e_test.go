@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/crewjam/saml"
-	"github.com/sters/simple-saml-proxy/proxy"
 	"github.com/stretchr/testify/require"
 )
 
@@ -394,7 +393,7 @@ func (c *MockSAMLClient) FollowRedirect(resp *http.Response) (*http.Response, er
 }
 
 // disableSignatureValidation disables signature validation for testing.
-func disableSignatureValidation(_ *proxy.ServiceProviders) {
+func disableSignatureValidation(_ interface{}) {
 	// Note: The crewjam/saml library doesn't expose a simple way to disable signature validation
 	// This function is left as a placeholder for when such functionality is needed
 }

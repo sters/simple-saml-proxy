@@ -6,7 +6,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/sters/simple-saml-proxy/config"
 	"github.com/sters/simple-saml-proxy/proxy"
+	"github.com/sters/simple-saml-proxy/proxy/saml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,13 +18,13 @@ func TestMetadataEndpoint(t *testing.T) {
 	proxyCertPath, proxyKeyPath := generateTestCertificate(t)
 
 	// Create test configuration
-	cfg := proxy.Config{}
+	cfg := &config.Config{}
 	cfg.Proxy.EntityID = "https://proxy.example.com"
 	cfg.Proxy.MetadataURL = "https://proxy.example.com/metadata"
 	cfg.Proxy.AcsURL = "https://proxy.example.com/saml/acs"
 	cfg.Proxy.PrivateKeyPath = proxyKeyPath
 	cfg.Proxy.CertificatePath = proxyCertPath
-	cfg.Proxy.AllowedSP = []proxy.SPConfig{
+	cfg.Proxy.AllowedSP = []config.SPConfig{
 		{EntityID: "https://sp.example.com"},
 	}
 
@@ -30,7 +32,7 @@ func TestMetadataEndpoint(t *testing.T) {
 	mockProvider := NewMockSAMLProvider(t)
 	defer mockProvider.Close()
 
-	cfg.IDP = []proxy.IDPConfig{
+	cfg.IDP = []config.IDPConfig{
 		{
 			ID:          "test-idp",
 			MetadataURL: mockProvider.server.URL + "/saml/metadata",
@@ -39,13 +41,13 @@ func TestMetadataEndpoint(t *testing.T) {
 
 	// Create the proxy
 	ctx := t.Context()
-	providers, err := proxy.CreateServiceProviders(ctx, cfg)
+	providers, err := saml.CreateServiceProviders(ctx, *cfg)
 	require.NoError(t, err)
 
-	idp, err := proxy.CreateProxyIDP(cfg)
+	idp, err := saml.CreateProxyIDP(*cfg)
 	require.NoError(t, err)
 
-	mux := proxy.SetupHTTPHandlers(idp, providers, cfg)
+	mux := proxy.SetupHTTPHandlers(idp, providers, *cfg)
 
 	// Start test server
 	server := httptest.NewServer(mux)

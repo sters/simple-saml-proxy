@@ -1,4 +1,4 @@
-package proxy
+package saml
 
 import (
 	"crypto/tls"
@@ -8,13 +8,14 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/sters/simple-saml-proxy/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestLoadCertificate(t *testing.T) {
 	// Generate test certificate and key
-	certPath, keyPath := generateTestCertificate(t)
+	certPath, keyPath := GenerateTestCertificate(t)
 	defer os.RemoveAll(filepath.Dir(certPath)) // Clean up temp directory
 
 	// Test loading valid certificate
@@ -33,19 +34,19 @@ func TestLoadCertificate(t *testing.T) {
 
 func TestCreateProxyIDP(t *testing.T) {
 	// Generate test certificate and key
-	certPath, keyPath := generateTestCertificate(t)
+	certPath, keyPath := GenerateTestCertificate(t)
 	defer os.RemoveAll(filepath.Dir(certPath)) // Clean up temp directory
 
 	// Create a test config
-	config := Config{}
-	config.Proxy.EntityID = "http://test.example.com/metadata"
-	config.Proxy.AcsURL = "http://test.example.com/sso/acs"
-	config.Proxy.MetadataURL = "http://test.example.com/metadata"
-	config.Proxy.CertificatePath = certPath
-	config.Proxy.PrivateKeyPath = keyPath
+	cfg := &config.Config{}
+	cfg.Proxy.EntityID = "http://test.example.com/metadata"
+	cfg.Proxy.AcsURL = "http://test.example.com/sso/acs"
+	cfg.Proxy.MetadataURL = "http://test.example.com/metadata"
+	cfg.Proxy.CertificatePath = certPath
+	cfg.Proxy.PrivateKeyPath = keyPath
 
 	// Add a single IDP
-	config.IDP = []IDPConfig{
+	cfg.IDP = []config.IDPConfig{
 		{
 			ID:              "idp1",
 			EntityID:        "https://idp1.example.com/saml/metadata",
@@ -55,19 +56,19 @@ func TestCreateProxyIDP(t *testing.T) {
 	}
 
 	// Test creating proxy IDP
-	idp, err := CreateProxyIDP(config)
+	idp, err := CreateProxyIDP(*cfg)
 	require.NoError(t, err)
 	assert.NotNil(t, idp)
-	assert.Equal(t, config.Proxy.EntityID, idp.EntityID)
-	assert.NotNil(t, idp.idp)
-	assert.NotNil(t, idp.idpStorage)
+	assert.Equal(t, cfg.Proxy.EntityID, idp.EntityID)
+	assert.NotNil(t, idp.IDP)
+	assert.NotNil(t, idp.IDPStorage)
 
 	// Test with invalid certificate path
-	invalidConfig := Config{}
+	invalidConfig := &config.Config{}
 	invalidConfig.Proxy.EntityID = "http://test.example.com/metadata"
 	invalidConfig.Proxy.CertificatePath = "/nonexistent/cert.pem"
 	invalidConfig.Proxy.PrivateKeyPath = "/nonexistent/key.pem"
-	invalidConfig.IDP = []IDPConfig{
+	invalidConfig.IDP = []config.IDPConfig{
 		{
 			ID:              "idp1",
 			EntityID:        "https://idp1.example.com/saml/metadata",
@@ -76,7 +77,7 @@ func TestCreateProxyIDP(t *testing.T) {
 		},
 	}
 
-	_, err = CreateProxyIDP(invalidConfig)
+	_, err = CreateProxyIDP(*invalidConfig)
 	assert.Error(t, err)
 }
 
@@ -113,18 +114,18 @@ func TestServiceProvidersGetProvider(t *testing.T) {
 
 func TestCreateServiceProviders(t *testing.T) {
 	// Generate test certificate and key
-	certPath, keyPath := generateTestCertificate(t)
+	certPath, keyPath := GenerateTestCertificate(t)
 	defer os.RemoveAll(filepath.Dir(certPath)) // Clean up temp directory
 
 	t.Run("Single IDP", func(t *testing.T) {
 		// Create a test config with a single IDP
-		config := Config{}
-		config.Proxy.EntityID = "http://test.example.com/metadata"
-		config.Proxy.CertificatePath = certPath
-		config.Proxy.PrivateKeyPath = keyPath
+		cfg := &config.Config{}
+		cfg.Proxy.EntityID = "http://test.example.com/metadata"
+		cfg.Proxy.CertificatePath = certPath
+		cfg.Proxy.PrivateKeyPath = keyPath
 
 		// Add a single IDP
-		config.IDP = []IDPConfig{
+		cfg.IDP = []config.IDPConfig{
 			{
 				ID:              "idp1",
 				EntityID:        "https://idp1.example.com/saml/metadata",
@@ -134,7 +135,7 @@ func TestCreateServiceProviders(t *testing.T) {
 		}
 
 		// Test creating SAML service providers
-		providers, err := CreateServiceProviders(t.Context(), config)
+		providers, err := CreateServiceProviders(t.Context(), *cfg)
 		require.NoError(t, err)
 		assert.NotNil(t, providers)
 
@@ -155,13 +156,13 @@ func TestCreateServiceProviders(t *testing.T) {
 
 	t.Run("Multiple IDP", func(t *testing.T) {
 		// Create a test config with multiple IDP
-		config := Config{}
-		config.Proxy.EntityID = "http://test.example.com/metadata"
-		config.Proxy.CertificatePath = certPath
-		config.Proxy.PrivateKeyPath = keyPath
+		cfg := &config.Config{}
+		cfg.Proxy.EntityID = "http://test.example.com/metadata"
+		cfg.Proxy.CertificatePath = certPath
+		cfg.Proxy.PrivateKeyPath = keyPath
 
 		// Add multiple IDP
-		config.IDP = []IDPConfig{
+		cfg.IDP = []config.IDPConfig{
 			{
 				ID:              "idp1",
 				EntityID:        "https://idp1.example.com/saml/metadata",
@@ -177,7 +178,7 @@ func TestCreateServiceProviders(t *testing.T) {
 		}
 
 		// Test creating SAML service providers
-		providers, err := CreateServiceProviders(t.Context(), config)
+		providers, err := CreateServiceProviders(t.Context(), *cfg)
 		require.NoError(t, err)
 		assert.NotNil(t, providers)
 
@@ -239,13 +240,13 @@ m1rhMtZCwLf9bUG8OkZRnZEMIagLIPRpwVd6JvjYWp8=</X509Certificate>
 		defer server.Close()
 
 		// Create a test config with IDP using MetadataURL
-		config := Config{}
-		config.Proxy.EntityID = "http://test.example.com/metadata"
-		config.Proxy.CertificatePath = certPath
-		config.Proxy.PrivateKeyPath = keyPath
+		cfg := &config.Config{}
+		cfg.Proxy.EntityID = "http://test.example.com/metadata"
+		cfg.Proxy.CertificatePath = certPath
+		cfg.Proxy.PrivateKeyPath = keyPath
 
 		// Add IDP with MetadataURL
-		config.IDP = []IDPConfig{
+		cfg.IDP = []config.IDPConfig{
 			{
 				ID:          "metadata-idp",
 				MetadataURL: server.URL,
@@ -253,7 +254,7 @@ m1rhMtZCwLf9bUG8OkZRnZEMIagLIPRpwVd6JvjYWp8=</X509Certificate>
 		}
 
 		// Test creating SAML service providers
-		providers, err := CreateServiceProviders(t.Context(), config)
+		providers, err := CreateServiceProviders(t.Context(), *cfg)
 		require.NoError(t, err)
 		assert.NotNil(t, providers)
 
@@ -270,13 +271,13 @@ m1rhMtZCwLf9bUG8OkZRnZEMIagLIPRpwVd6JvjYWp8=</X509Certificate>
 
 	t.Run("Invalid Certificate Path", func(t *testing.T) {
 		// Create a test config with invalid certificate path
-		config := Config{}
-		config.Proxy.EntityID = "http://test.example.com/metadata"
-		config.Proxy.CertificatePath = "/nonexistent/cert.pem"
-		config.Proxy.PrivateKeyPath = "/nonexistent/key.pem"
+		cfg := &config.Config{}
+		cfg.Proxy.EntityID = "http://test.example.com/metadata"
+		cfg.Proxy.CertificatePath = "/nonexistent/cert.pem"
+		cfg.Proxy.PrivateKeyPath = "/nonexistent/key.pem"
 
 		// Add a single IDP
-		config.IDP = []IDPConfig{
+		cfg.IDP = []config.IDPConfig{
 			{
 				ID:              "idp1",
 				EntityID:        "https://idp1.example.com/saml/metadata",
@@ -286,7 +287,7 @@ m1rhMtZCwLf9bUG8OkZRnZEMIagLIPRpwVd6JvjYWp8=</X509Certificate>
 		}
 
 		// Test creating SAML service providers - should fail
-		_, err := CreateServiceProviders(t.Context(), config)
+		_, err := CreateServiceProviders(t.Context(), *cfg)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to load certificate and key")
 	})

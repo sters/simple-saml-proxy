@@ -1,57 +1,20 @@
-package proxy
+package saml
 
 import (
 	"context"
 	"crypto/rsa"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
-	"time"
 
 	"github.com/crewjam/saml"
 	"github.com/crewjam/saml/samlsp"
-	"github.com/zitadel/saml/pkg/provider"
+	"github.com/sters/simple-saml-proxy/config"
 )
-
-var (
-	ErrDecodePEMBlock      = errors.New("failed to decode PEM block containing certificate")
-	ErrPrivateKeyNotRSAKey = errors.New("private key is not an RSA key")
-)
-
-// LoadCertificate loads and parses the SP certificate and private key.
-func LoadCertificate(certPath, keyPath string) (tls.Certificate, error) {
-	keyPair, err := tls.LoadX509KeyPair(certPath, keyPath)
-	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("failed to load certificate and key: %w", err)
-	}
-
-	keyPair.Leaf, err = x509.ParseCertificate(keyPair.Certificate[0])
-	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("failed to load certificate and key: %w", err)
-	}
-
-	return keyPair, nil
-}
-
-// IDP represents the SAML Identity Provider configuration.
-type IDP struct {
-	// Using zitadel/saml
-	EntityID   string
-	idp        *provider.Provider
-	idpStorage *Storage
-}
-
-// GetStorage returns the IDP's storage for testing purposes.
-func (i *IDP) GetStorage() *Storage {
-	return i.idpStorage
-}
 
 // ServiceProvider represents a SAML Service Provider for a specific IDP.
 type ServiceProvider struct {
@@ -78,90 +41,19 @@ func (s *ServiceProviders) GetProvider(id string) *ServiceProvider {
 	return s.Default
 }
 
-// CreateProxyIDP creates a SAML Identity Provider middleware from the configuration.
-func CreateProxyIDP(config Config) (*IDP, error) {
-	// Create a new storage
-	storage, err := NewStorage(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create storage: %w", err)
-	}
-
-	slog.Info(
-		"Creating SAML IDP with zitadel/saml",
-		slog.String("entityID", config.Proxy.EntityID),
-	)
-
-	// Create metadata endpoint
-	metadataEndpoint := provider.NewEndpoint(provider.DefaultMetadataEndpoint)
-
-	// Create endpoints
-	ssoEndpoint := provider.NewEndpoint("/sso")
-	callbackEndpoint := provider.NewEndpoint("/callback")
-
-	// Create IDP config
-	idpConfig := &provider.IdentityProviderConfig{
-		MetadataIDPConfig: &provider.MetadataIDPConfig{
-			ValidUntil:    24 * time.Hour, // Metadata valid for 24 hours
-			CacheDuration: "PT24H",        // Cache for 24 hours
-		},
-		Endpoints: &provider.EndpointConfig{
-			SingleSignOn: &ssoEndpoint,
-			Callback:     &callbackEndpoint,
-		},
-		SignatureAlgorithm: "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
-	}
-
-	// Create provider config
-	providerConfig := &provider.Config{
-		Metadata:  &metadataEndpoint,
-		IDPConfig: idpConfig,
-		Organisation: &provider.Organisation{
-			Name:        "SAML Proxy",
-			DisplayName: "SAML Proxy",
-			URL:         config.Proxy.EntityID,
-		},
-	}
-
-	// Create issuer function
-	issuerFunc := func(_ bool) (provider.IssuerFromRequest, error) {
-		return func(r *http.Request) string {
-			r.FormValue("SAMLRequest")
-
-			return config.Proxy.EntityID
-		}, nil
-	}
-
-	// Create provider
-	p, err := provider.NewProvider(
-		storage,
-		issuerFunc,
-		providerConfig,
-		provider.WithAllowInsecure(), // Allow HTTP for development
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create provider: %w", err)
-	}
-
-	return &IDP{
-		EntityID:   config.Proxy.EntityID,
-		idp:        p,
-		idpStorage: storage,
-	}, nil
-}
-
 // CreateServiceProviders creates Service Providers for all configured IDP.
-func CreateServiceProviders(ctx context.Context, config Config) (*ServiceProviders, error) {
+func CreateServiceProviders(ctx context.Context, cfg config.Config) (*ServiceProviders, error) {
 	providers := &ServiceProviders{
 		Providers: make(map[string]*ServiceProvider),
 	}
 
-	keyPair, err := LoadCertificate(config.Proxy.CertificatePath, config.Proxy.PrivateKeyPath)
+	keyPair, err := LoadCertificate(cfg.Proxy.CertificatePath, cfg.Proxy.PrivateKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load certificate and key: %w", err)
 	}
 
-	for _, idpConfig := range config.IDP {
-		rootURL, err := url.Parse(config.Proxy.EntityID)
+	for _, idpConfig := range cfg.IDP {
+		rootURL, err := url.Parse(cfg.Proxy.EntityID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse IDP URL for IDP %s: %w", idpConfig.ID, err)
 		}

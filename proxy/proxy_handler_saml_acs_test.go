@@ -7,13 +7,15 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/sters/simple-saml-proxy/config"
+	"github.com/sters/simple-saml-proxy/proxy/saml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestHandleSAMLACS(t *testing.T) {
 	// Generate test certificate and key
-	certPath, keyPath := generateTestCertificate(t)
+	certPath, keyPath := saml.GenerateTestCertificate(t)
 	defer func() {
 		if certPath != "" {
 			err := os.RemoveAll(filepath.Dir(certPath))
@@ -24,13 +26,13 @@ func TestHandleSAMLACS(t *testing.T) {
 	}()
 
 	// Create a test config
-	config := Config{}
-	config.Proxy.EntityID = "http://test.example.com/metadata"
-	config.Proxy.CertificatePath = certPath
-	config.Proxy.PrivateKeyPath = keyPath
+	cfg := config.Config{}
+	cfg.Proxy.EntityID = "http://test.example.com/metadata"
+	cfg.Proxy.CertificatePath = certPath
+	cfg.Proxy.PrivateKeyPath = keyPath
 
 	// Add test IDP
-	config.IDP = []IDPConfig{
+	cfg.IDP = []config.IDPConfig{
 		{
 			ID:              "idp1",
 			EntityID:        "https://idp1.example.com/saml/metadata",
@@ -46,22 +48,20 @@ func TestHandleSAMLACS(t *testing.T) {
 	}
 
 	// Create SAML service providers
-	providers, err := CreateServiceProviders(t.Context(), config)
+	providers, err := saml.CreateServiceProviders(t.Context(), cfg)
 	require.NoError(t, err)
 
 	// Create SAML IDP
-	idp, err := CreateProxyIDP(config)
+	idp, err := saml.CreateProxyIDP(cfg)
 	require.NoError(t, err)
 
 	// Create a mock auth request
 	authRequestID := "test-auth-request-id"
-	idp.idpStorage.authRequestsLock.Lock()
-	idp.idpStorage.authRequests[authRequestID] = &AuthRequest{
+	idp.IDPStorage.AddAuthRequestForTesting(&saml.AuthRequest{
 		ID:            authRequestID,
 		ApplicationID: "test-app-id",
 		IsDone:        false,
-	}
-	idp.idpStorage.authRequestsLock.Unlock()
+	})
 
 	handler := handleSAMLACS(idp, providers)
 

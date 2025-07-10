@@ -11,7 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sters/simple-saml-proxy/config"
 	"github.com/sters/simple-saml-proxy/proxy"
+	"github.com/sters/simple-saml-proxy/proxy/saml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -49,11 +51,11 @@ func TestMultipleIdPConfiguration(t *testing.T) {
 	}
 
 	// Load config
-	config, err := proxy.LoadConfig()
+	cfg, err := config.LoadConfig()
 	require.NoError(t, err)
-	require.Len(t, config.IDP, 2, "Expected 2 IdPs to be configured")
-	assert.Equal(t, "IdP-1", config.IDP[0].ID)
-	assert.Equal(t, "IdP-2", config.IDP[1].ID)
+	require.Len(t, cfg.IDP, 2, "Expected 2 IdPs to be configured")
+	assert.Equal(t, "IdP-1", cfg.IDP[0].ID)
+	assert.Equal(t, "IdP-2", cfg.IDP[1].ID)
 
 	// Start the proxy
 	ctx, cancel := context.WithCancel(t.Context())
@@ -166,7 +168,7 @@ func TestInvalidConfiguration(t *testing.T) {
 			}
 
 			// Try to load config
-			_, err := proxy.LoadConfig()
+			_, err := config.LoadConfig()
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.expectError)
 		})
@@ -181,7 +183,7 @@ func TestEnvironmentVariableValidation(t *testing.T) {
 	testCases := []struct {
 		name     string
 		envVars  map[string]string
-		validate func(t *testing.T, config proxy.Config)
+		validate func(t *testing.T, cfg config.Config)
 	}{
 		{
 			name: "Default values applied",
@@ -191,13 +193,13 @@ func TestEnvironmentVariableValidation(t *testing.T) {
 				"IDP_0_ID":               "test-idp",
 				"IDP_0_METADATA_URL":     "http://idp.example.com",
 			},
-			validate: func(t *testing.T, config proxy.Config) {
+			validate: func(t *testing.T, cfg config.Config) {
 				t.Helper()
 				// Check defaults
-				assert.Equal(t, "http://localhost:8080", config.Proxy.EntityID)
-				assert.Equal(t, "http://localhost:8080/sso/acs", config.Proxy.AcsURL)
-				assert.Equal(t, "http://localhost:8080/metadata", config.Proxy.MetadataURL)
-				assert.Equal(t, ":8080", config.Server.ListenAddress)
+				assert.Equal(t, "http://localhost:8080", cfg.Proxy.EntityID)
+				assert.Equal(t, "http://localhost:8080/sso/acs", cfg.Proxy.AcsURL)
+				assert.Equal(t, "http://localhost:8080/metadata", cfg.Proxy.MetadataURL)
+				assert.Equal(t, ":8080", cfg.Server.ListenAddress)
 			},
 		},
 		{
@@ -212,12 +214,12 @@ func TestEnvironmentVariableValidation(t *testing.T) {
 				"IDP_0_METADATA_URL":     "http://idp.example.com",
 				"SERVER_LISTEN_ADDRESS":  ":9090",
 			},
-			validate: func(t *testing.T, config proxy.Config) {
+			validate: func(t *testing.T, cfg config.Config) {
 				t.Helper()
-				assert.Equal(t, "https://proxy.example.com", config.Proxy.EntityID)
-				assert.Equal(t, "https://proxy.example.com/acs", config.Proxy.AcsURL)
-				assert.Equal(t, "https://proxy.example.com/metadata", config.Proxy.MetadataURL)
-				assert.Equal(t, ":9090", config.Server.ListenAddress)
+				assert.Equal(t, "https://proxy.example.com", cfg.Proxy.EntityID)
+				assert.Equal(t, "https://proxy.example.com/acs", cfg.Proxy.AcsURL)
+				assert.Equal(t, "https://proxy.example.com/metadata", cfg.Proxy.MetadataURL)
+				assert.Equal(t, ":9090", cfg.Server.ListenAddress)
 			},
 		},
 		{
@@ -234,11 +236,11 @@ func TestEnvironmentVariableValidation(t *testing.T) {
 				"IDP_0_ID":                        "test-idp",
 				"IDP_0_METADATA_URL":              "http://idp.example.com",
 			},
-			validate: func(t *testing.T, config proxy.Config) {
+			validate: func(t *testing.T, cfg config.Config) {
 				t.Helper()
-				require.Len(t, config.Proxy.AllowedSP, 2)
-				assert.Equal(t, "https://sp1.example.com", config.Proxy.AllowedSP[0].EntityID)
-				assert.Equal(t, "https://sp2.example.com", config.Proxy.AllowedSP[1].EntityID)
+				require.Len(t, cfg.Proxy.AllowedSP, 2)
+				assert.Equal(t, "https://sp1.example.com", cfg.Proxy.AllowedSP[0].EntityID)
+				assert.Equal(t, "https://sp2.example.com", cfg.Proxy.AllowedSP[1].EntityID)
 			},
 		},
 	}
@@ -254,11 +256,11 @@ func TestEnvironmentVariableValidation(t *testing.T) {
 			}
 
 			// Load config
-			config, err := proxy.LoadConfig()
+			cfg, err := config.LoadConfig()
 			require.NoError(t, err)
 
 			// Validate
-			tc.validate(t, config)
+			tc.validate(t, cfg)
 		})
 	}
 }
@@ -523,36 +525,36 @@ func startTestProxy(ctx context.Context, t *testing.T) (*httptest.Server, error)
 	t.Helper()
 
 	// Load config
-	config, err := proxy.LoadConfig()
+	cfg, err := config.LoadConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
 	// Create service providers
-	providers, err := proxy.CreateServiceProviders(ctx, config)
+	providers, err := saml.CreateServiceProviders(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create service providers: %w", err)
 	}
 
 	// Create proxy IDP
-	idp, err := proxy.CreateProxyIDP(config)
+	idp, err := saml.CreateProxyIDP(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create proxy IDP: %w", err)
 	}
 
 	// Setup HTTP handlers
-	mux := proxy.SetupHTTPHandlers(idp, providers, config)
+	mux := proxy.SetupHTTPHandlers(idp, providers, cfg)
 
 	// Create test server
 	server := httptest.NewServer(mux)
 
 	// Update URLs to use test server address
-	config.Proxy.EntityID = server.URL
-	config.Proxy.AcsURL = server.URL + "/sso/acs"
-	config.Proxy.MetadataURL = server.URL + "/metadata"
+	cfg.Proxy.EntityID = server.URL
+	cfg.Proxy.AcsURL = server.URL + "/sso/acs"
+	cfg.Proxy.MetadataURL = server.URL + "/metadata"
 
 	// Recreate providers with updated config
-	providers, err = proxy.CreateServiceProviders(ctx, config)
+	providers, err = saml.CreateServiceProviders(ctx, cfg)
 	if err != nil {
 		server.Close()
 
@@ -560,7 +562,7 @@ func startTestProxy(ctx context.Context, t *testing.T) (*httptest.Server, error)
 	}
 
 	// Recreate proxy IDP
-	idp, err = proxy.CreateProxyIDP(config)
+	idp, err = saml.CreateProxyIDP(cfg)
 	if err != nil {
 		server.Close()
 
@@ -568,7 +570,7 @@ func startTestProxy(ctx context.Context, t *testing.T) (*httptest.Server, error)
 	}
 
 	// Update handler
-	mux = proxy.SetupHTTPHandlers(idp, providers, config)
+	mux = proxy.SetupHTTPHandlers(idp, providers, cfg)
 	server.Config.Handler = mux
 
 	return server, nil

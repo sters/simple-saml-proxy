@@ -8,30 +8,32 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sters/simple-saml-proxy/config"
 	"github.com/sters/simple-saml-proxy/proxy"
+	"github.com/sters/simple-saml-proxy/proxy/saml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // setupSSOTest creates a common test setup for SSO tests.
-func setupSSOTest(t *testing.T) (*proxy.Config, *httptest.Server, *MockSAMLProvider) {
+func setupSSOTest(t *testing.T) (*config.Config, *httptest.Server, *MockSAMLProvider) {
 	t.Helper()
 
 	proxyCertPath, proxyKeyPath := generateTestCertificate(t)
 
-	cfg := proxy.Config{}
+	cfg := &config.Config{}
 	cfg.Proxy.EntityID = "https://proxy.example.com"
 	cfg.Proxy.MetadataURL = "https://proxy.example.com/metadata"
 	cfg.Proxy.AcsURL = "https://proxy.example.com/saml/acs"
 	cfg.Proxy.PrivateKeyPath = proxyKeyPath
 	cfg.Proxy.CertificatePath = proxyCertPath
-	cfg.Proxy.AllowedSP = []proxy.SPConfig{
+	cfg.Proxy.AllowedSP = []config.SPConfig{
 		{EntityID: "https://sp.example.com"},
 	}
 
 	mockProvider := NewMockSAMLProvider(t)
 
-	cfg.IDP = []proxy.IDPConfig{
+	cfg.IDP = []config.IDPConfig{
 		{
 			ID:          "test-idp",
 			MetadataURL: mockProvider.server.URL + "/saml/metadata",
@@ -43,16 +45,16 @@ func setupSSOTest(t *testing.T) (*proxy.Config, *httptest.Server, *MockSAMLProvi
 	}
 
 	ctx := t.Context()
-	providers, err := proxy.CreateServiceProviders(ctx, cfg)
+	providers, err := saml.CreateServiceProviders(ctx, *cfg)
 	require.NoError(t, err)
 
-	idp, err := proxy.CreateProxyIDP(cfg)
+	idp, err := saml.CreateProxyIDP(*cfg)
 	require.NoError(t, err)
 
-	mux := proxy.SetupHTTPHandlers(idp, providers, cfg)
+	mux := proxy.SetupHTTPHandlers(idp, providers, *cfg)
 	server := httptest.NewServer(mux)
 
-	return &cfg, server, mockProvider
+	return cfg, server, mockProvider
 }
 
 func TestSSOEndpoint_ValidSAMLRequest(t *testing.T) {
@@ -126,20 +128,20 @@ func TestSSOEndpoint_SingleIDPAutoRedirect(t *testing.T) {
 	// Setup with single IDP
 	proxyCertPath, proxyKeyPath := generateTestCertificate(t)
 
-	singleCfg := proxy.Config{}
+	singleCfg := config.Config{}
 	singleCfg.Proxy.EntityID = "https://proxy.example.com"
 	singleCfg.Proxy.MetadataURL = "https://proxy.example.com/metadata"
 	singleCfg.Proxy.AcsURL = "https://proxy.example.com/saml/acs"
 	singleCfg.Proxy.PrivateKeyPath = proxyKeyPath
 	singleCfg.Proxy.CertificatePath = proxyCertPath
-	singleCfg.Proxy.AllowedSP = []proxy.SPConfig{
+	singleCfg.Proxy.AllowedSP = []config.SPConfig{
 		{EntityID: "https://sp.example.com"},
 	}
 
 	mockProvider := NewMockSAMLProvider(t)
 	defer mockProvider.Close()
 
-	singleCfg.IDP = []proxy.IDPConfig{
+	singleCfg.IDP = []config.IDPConfig{
 		{
 			ID:          "test-idp",
 			MetadataURL: mockProvider.server.URL + "/saml/metadata",
@@ -147,10 +149,10 @@ func TestSSOEndpoint_SingleIDPAutoRedirect(t *testing.T) {
 	}
 
 	ctx := t.Context()
-	providers, err := proxy.CreateServiceProviders(ctx, singleCfg)
+	providers, err := saml.CreateServiceProviders(ctx, singleCfg)
 	require.NoError(t, err)
 
-	idp, err := proxy.CreateProxyIDP(singleCfg)
+	idp, err := saml.CreateProxyIDP(singleCfg)
 	require.NoError(t, err)
 
 	mux := proxy.SetupHTTPHandlers(idp, providers, singleCfg)

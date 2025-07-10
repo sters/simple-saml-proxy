@@ -1,4 +1,4 @@
-package proxy
+package saml
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
+	"github.com/sters/simple-saml-proxy/config"
 	"github.com/zitadel/saml/pkg/provider/key"
 	"github.com/zitadel/saml/pkg/provider/models"
 	"github.com/zitadel/saml/pkg/provider/serviceprovider"
@@ -27,7 +28,7 @@ var (
 
 // Storage implements the zitadel/saml Storage interfaces.
 type Storage struct {
-	config Config
+	config config.Config
 	cert   tls.Certificate
 
 	// Cache for service providers
@@ -43,73 +44,19 @@ type Storage struct {
 }
 
 // NewStorage creates a new Storage.
-func NewStorage(config Config) (*Storage, error) {
-	cert, err := LoadCertificate(config.Proxy.CertificatePath, config.Proxy.PrivateKeyPath)
+func NewStorage(cfg config.Config) (*Storage, error) {
+	cert, err := LoadCertificate(cfg.Proxy.CertificatePath, cfg.Proxy.PrivateKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load certificate and key: %w", err)
 	}
 
 	return &Storage{
-		config:          config,
+		config:          cfg,
 		cert:            cert,
 		spCache:         make(map[string]*serviceprovider.ServiceProvider),
 		authRequests:    make(map[string]*AuthRequest),
 		entityIDByAppID: make(map[string]string),
 	}, nil
-}
-
-// AuthRequest implements the models.AuthRequestInt interface.
-type AuthRequest struct {
-	ID                       string
-	ApplicationID            string
-	RelayState               string
-	AccessConsumerServiceURL string
-	BindingType              string
-	AuthRequestID            string
-	Issuer                   string
-	Destination              string
-	UserID                   string
-	IsDone                   bool
-}
-
-func (a *AuthRequest) GetID() string {
-	return a.ID
-}
-
-func (a *AuthRequest) GetApplicationID() string {
-	return a.ApplicationID
-}
-
-func (a *AuthRequest) GetRelayState() string {
-	return a.RelayState
-}
-
-func (a *AuthRequest) GetAccessConsumerServiceURL() string {
-	return a.AccessConsumerServiceURL
-}
-
-func (a *AuthRequest) GetBindingType() string {
-	return a.BindingType
-}
-
-func (a *AuthRequest) GetAuthRequestID() string {
-	return a.AuthRequestID
-}
-
-func (a *AuthRequest) GetIssuer() string {
-	return a.Issuer
-}
-
-func (a *AuthRequest) GetDestination() string {
-	return a.Destination
-}
-
-func (a *AuthRequest) GetUserID() string {
-	return a.UserID
-}
-
-func (a *AuthRequest) Done() bool {
-	return a.IsDone
 }
 
 // EntityStorage interface implementation

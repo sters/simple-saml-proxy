@@ -4,10 +4,12 @@ import (
 	"encoding/base64"
 	"log/slog"
 	"net/http"
+
+	"github.com/sters/simple-saml-proxy/proxy/saml"
 )
 
 // handleIDPSelected handles the IdP selection result and redirects to the selected IdP.
-func handleIDPSelected(idp *IDP, providers *ServiceProviders) http.HandlerFunc {
+func handleIDPSelected(idp *saml.IDP, providers *saml.ServiceProviders) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authRequestIDCookie, err := r.Cookie(cookieNameAuthRequestID)
 		if err != nil {
@@ -25,7 +27,7 @@ func handleIDPSelected(idp *IDP, providers *ServiceProviders) http.HandlerFunc {
 			return
 		}
 
-		authRequest, err := idp.idpStorage.AuthRequestByID(r.Context(), authRequestID)
+		authRequest, err := idp.IDPStorage.AuthRequestByID(r.Context(), authRequestID)
 		if err != nil {
 			slog.Error("Failed to get auth request",
 				slog.String("id", authRequestID),
@@ -62,7 +64,7 @@ func handleIDPSelected(idp *IDP, providers *ServiceProviders) http.HandlerFunc {
 
 		// Use original relay state from auth request if available
 		var relayState string
-		if ar, ok := authRequest.(*AuthRequest); ok && ar.RelayState != "" {
+		if ar, ok := authRequest.(*saml.AuthRequest); ok && ar.RelayState != "" {
 			relayState = ar.RelayState
 		} else {
 			relayState = base64.RawURLEncoding.EncodeToString(randomBytes(relayStateLength))

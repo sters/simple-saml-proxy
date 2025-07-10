@@ -9,30 +9,32 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sters/simple-saml-proxy/config"
 	"github.com/sters/simple-saml-proxy/proxy"
+	"github.com/sters/simple-saml-proxy/proxy/saml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // setupACSTest creates a common test setup for ACS endpoint tests.
-func setupACSTest(t *testing.T) (*httptest.Server, *MockSAMLProvider, *proxy.IDP) {
+func setupACSTest(t *testing.T) (*httptest.Server, *MockSAMLProvider, *saml.IDP) {
 	t.Helper()
 
 	proxyCertPath, proxyKeyPath := generateTestCertificate(t)
 
-	cfg := proxy.Config{}
+	cfg := &config.Config{}
 	cfg.Proxy.EntityID = "https://proxy.example.com"
 	cfg.Proxy.MetadataURL = "https://proxy.example.com/metadata"
 	cfg.Proxy.AcsURL = "https://proxy.example.com/saml/acs"
 	cfg.Proxy.PrivateKeyPath = proxyKeyPath
 	cfg.Proxy.CertificatePath = proxyCertPath
-	cfg.Proxy.AllowedSP = []proxy.SPConfig{
+	cfg.Proxy.AllowedSP = []config.SPConfig{
 		{EntityID: "https://sp.example.com"},
 	}
 
 	mockProvider := NewMockSAMLProvider(t)
 
-	cfg.IDP = []proxy.IDPConfig{
+	cfg.IDP = []config.IDPConfig{
 		{
 			ID:          "test-idp",
 			MetadataURL: mockProvider.server.URL + "/saml/metadata",
@@ -40,13 +42,13 @@ func setupACSTest(t *testing.T) (*httptest.Server, *MockSAMLProvider, *proxy.IDP
 	}
 
 	ctx := t.Context()
-	providers, err := proxy.CreateServiceProviders(ctx, cfg)
+	providers, err := saml.CreateServiceProviders(ctx, *cfg)
 	require.NoError(t, err)
 
-	idp, err := proxy.CreateProxyIDP(cfg)
+	idp, err := saml.CreateProxyIDP(*cfg)
 	require.NoError(t, err)
 
-	mux := proxy.SetupHTTPHandlers(idp, providers, cfg)
+	mux := proxy.SetupHTTPHandlers(idp, providers, *cfg)
 	server := httptest.NewServer(mux)
 
 	return server, mockProvider, idp
@@ -75,7 +77,7 @@ func TestACSEndpoint_MissingSAMLResponse(t *testing.T) {
 	// Create auth request in storage
 	authRequestID := "test-auth-id"
 	storage := idp.GetStorage()
-	storage.AddAuthRequestForTesting(&proxy.AuthRequest{
+	storage.AddAuthRequestForTesting(&saml.AuthRequest{
 		ID:            authRequestID,
 		ApplicationID: "test-app-id",
 		IsDone:        false,
@@ -112,7 +114,7 @@ func TestACSEndpoint_InvalidSAMLResponse(t *testing.T) {
 	// Create auth request in storage
 	authRequestID := "test-auth-id"
 	storage := idp.GetStorage()
-	storage.AddAuthRequestForTesting(&proxy.AuthRequest{
+	storage.AddAuthRequestForTesting(&saml.AuthRequest{
 		ID:            authRequestID,
 		ApplicationID: "test-app-id",
 		IsDone:        false,
@@ -169,7 +171,7 @@ func TestACSEndpoint_RelayStatePreservation(t *testing.T) {
 	// Create auth request in storage
 	authRequestID := "test-auth-id"
 	storage := idp.GetStorage()
-	storage.AddAuthRequestForTesting(&proxy.AuthRequest{
+	storage.AddAuthRequestForTesting(&saml.AuthRequest{
 		ID:            authRequestID,
 		ApplicationID: "test-app-id",
 		RelayState:    "my-custom-relay-state-abc123",
@@ -218,7 +220,7 @@ func TestACSEndpoint_InvalidContentType(t *testing.T) {
 	// Create auth request in storage
 	authRequestID := "test-auth-id"
 	storage := idp.GetStorage()
-	storage.AddAuthRequestForTesting(&proxy.AuthRequest{
+	storage.AddAuthRequestForTesting(&saml.AuthRequest{
 		ID:            authRequestID,
 		ApplicationID: "test-app-id",
 		IsDone:        false,
@@ -261,7 +263,7 @@ func TestACSEndpoint_LargeSAMLResponse(t *testing.T) {
 	// Create auth request in storage
 	authRequestID := "test-auth-id"
 	storage := idp.GetStorage()
-	storage.AddAuthRequestForTesting(&proxy.AuthRequest{
+	storage.AddAuthRequestForTesting(&saml.AuthRequest{
 		ID:            authRequestID,
 		ApplicationID: "test-app-id",
 		IsDone:        false,
@@ -316,7 +318,7 @@ func TestACSEndpoint_SpecialCharactersInRelayState(t *testing.T) {
 	// Create auth request in storage
 	authRequestID := "test-auth-id"
 	storage := idp.GetStorage()
-	storage.AddAuthRequestForTesting(&proxy.AuthRequest{
+	storage.AddAuthRequestForTesting(&saml.AuthRequest{
 		ID:            authRequestID,
 		ApplicationID: "test-app-id",
 		IsDone:        false,

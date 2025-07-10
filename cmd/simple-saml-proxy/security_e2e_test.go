@@ -20,9 +20,11 @@ import (
 	"time"
 
 	"github.com/beevik/etree"
-	"github.com/crewjam/saml"
+	crewjamsaml "github.com/crewjam/saml"
 	"github.com/google/uuid"
+	"github.com/sters/simple-saml-proxy/config"
 	"github.com/sters/simple-saml-proxy/proxy"
+	"github.com/sters/simple-saml-proxy/proxy/saml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -35,16 +37,16 @@ func setupSecurityTest(t *testing.T) (*httptest.Server, *MockSAMLProvider) {
 
 	mockProvider := NewMockSAMLProvider(t)
 
-	cfg := proxy.Config{}
+	cfg := &config.Config{}
 	cfg.Proxy.EntityID = "https://proxy.example.com"
 	cfg.Proxy.MetadataURL = "https://proxy.example.com/metadata"
 	cfg.Proxy.AcsURL = "https://proxy.example.com/saml/acs"
 	cfg.Proxy.PrivateKeyPath = proxyKeyPath
 	cfg.Proxy.CertificatePath = proxyCertPath
-	cfg.Proxy.AllowedSP = []proxy.SPConfig{
+	cfg.Proxy.AllowedSP = []config.SPConfig{
 		{EntityID: "https://sp.example.com"},
 	}
-	cfg.IDP = []proxy.IDPConfig{
+	cfg.IDP = []config.IDPConfig{
 		{
 			ID:          "test-idp",
 			MetadataURL: mockProvider.server.URL + "/saml/metadata",
@@ -52,13 +54,13 @@ func setupSecurityTest(t *testing.T) (*httptest.Server, *MockSAMLProvider) {
 	}
 
 	ctx := t.Context()
-	providers, err := proxy.CreateServiceProviders(ctx, cfg)
+	providers, err := saml.CreateServiceProviders(ctx, *cfg)
 	require.NoError(t, err)
 
-	idp, err := proxy.CreateProxyIDP(cfg)
+	idp, err := saml.CreateProxyIDP(*cfg)
 	require.NoError(t, err)
 
-	mux := proxy.SetupHTTPHandlers(idp, providers, cfg)
+	mux := proxy.SetupHTTPHandlers(idp, providers, *cfg)
 	server := httptest.NewServer(mux)
 
 	return server, mockProvider
@@ -69,15 +71,15 @@ func TestSecurityE2E_TamperedSAMLRequest(t *testing.T) {
 	defer server.Close()
 	defer mockProvider.server.Close()
 	// Create a valid SAML request
-	authnReq := saml.AuthnRequest{
+	authnReq := crewjamsaml.AuthnRequest{
 		ID:           "_" + uuid.New().String(),
 		IssueInstant: time.Now().UTC(),
 		Version:      "2.0",
-		Issuer: &saml.Issuer{
+		Issuer: &crewjamsaml.Issuer{
 			Value: "https://sp.example.com",
 		},
 		AssertionConsumerServiceURL: "https://sp.example.com/acs",
-		ProtocolBinding:             saml.HTTPPostBinding,
+		ProtocolBinding:             crewjamsaml.HTTPPostBinding,
 	}
 
 	doc := etree.NewDocument()
@@ -104,15 +106,15 @@ func TestSecurityE2E_UnauthorizedSPRequest(t *testing.T) {
 	defer mockProvider.server.Close()
 
 	// Create request from unauthorized SP
-	authnReq := saml.AuthnRequest{
+	authnReq := crewjamsaml.AuthnRequest{
 		ID:           "_" + uuid.New().String(),
 		IssueInstant: time.Now().UTC(),
 		Version:      "2.0",
-		Issuer: &saml.Issuer{
+		Issuer: &crewjamsaml.Issuer{
 			Value: "https://unauthorized-sp.example.com", // Not in AllowedSPs
 		},
 		AssertionConsumerServiceURL: "https://unauthorized-sp.example.com/acs",
-		ProtocolBinding:             saml.HTTPPostBinding,
+		ProtocolBinding:             crewjamsaml.HTTPPostBinding,
 	}
 
 	doc := etree.NewDocument()
@@ -138,11 +140,11 @@ func TestSecurityE2E_InvalidRelayState(t *testing.T) {
 	defer mockProvider.server.Close()
 
 	// Test with excessively long RelayState (security risk)
-	authnReq := saml.AuthnRequest{
+	authnReq := crewjamsaml.AuthnRequest{
 		ID:           "_" + uuid.New().String(),
 		IssueInstant: time.Now().UTC(),
 		Version:      "2.0",
-		Issuer: &saml.Issuer{
+		Issuer: &crewjamsaml.Issuer{
 			Value: "https://sp.example.com",
 		},
 		AssertionConsumerServiceURL: "https://sp.example.com/acs",
@@ -190,32 +192,32 @@ func TestSecurityE2E_ExpiredAssertion(t *testing.T) {
 	defer mockProvider.server.Close()
 
 	// Create an expired SAML response
-	response := &saml.Response{
+	response := &crewjamsaml.Response{
 		ID:           "_" + uuid.New().String(),
 		IssueInstant: time.Now().UTC().Add(-2 * time.Hour), // Old response
 		Version:      "2.0",
-		Issuer: &saml.Issuer{
+		Issuer: &crewjamsaml.Issuer{
 			Value: mockProvider.entityID,
 		},
-		Status: saml.Status{
-			StatusCode: saml.StatusCode{
-				Value: saml.StatusSuccess,
+		Status: crewjamsaml.Status{
+			StatusCode: crewjamsaml.StatusCode{
+				Value: crewjamsaml.StatusSuccess,
 			},
 		},
-		Assertion: &saml.Assertion{
+		Assertion: &crewjamsaml.Assertion{
 			ID:           "_" + uuid.New().String(),
 			IssueInstant: time.Now().UTC().Add(-2 * time.Hour),
 			Version:      "2.0",
-			Issuer: saml.Issuer{
+			Issuer: crewjamsaml.Issuer{
 				Value: mockProvider.entityID,
 			},
-			Subject: &saml.Subject{
-				NameID: &saml.NameID{
+			Subject: &crewjamsaml.Subject{
+				NameID: &crewjamsaml.NameID{
 					Format: "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent",
 					Value:  "testuser",
 				},
 			},
-			Conditions: &saml.Conditions{
+			Conditions: &crewjamsaml.Conditions{
 				NotBefore:    time.Now().UTC().Add(-3 * time.Hour),
 				NotOnOrAfter: time.Now().UTC().Add(-1 * time.Hour), // Already expired
 			},
@@ -280,17 +282,17 @@ func TestSecurityE2E_InvalidInResponseTo(t *testing.T) {
 	defer mockProvider.server.Close()
 
 	// Create response with wrong InResponseTo
-	response := &saml.Response{
+	response := &crewjamsaml.Response{
 		ID:           "_" + uuid.New().String(),
 		InResponseTo: "wrong-request-id", // Does not match any stored request
 		IssueInstant: time.Now().UTC(),
 		Version:      "2.0",
-		Issuer: &saml.Issuer{
+		Issuer: &crewjamsaml.Issuer{
 			Value: mockProvider.entityID,
 		},
-		Status: saml.Status{
-			StatusCode: saml.StatusCode{
-				Value: saml.StatusSuccess,
+		Status: crewjamsaml.Status{
+			StatusCode: crewjamsaml.StatusCode{
+				Value: crewjamsaml.StatusSuccess,
 			},
 		},
 	}
@@ -320,15 +322,15 @@ func TestSecurityE2E_InvalidSAMLRequestSignature(t *testing.T) {
 	defer mockProvider.server.Close()
 
 	// Create a properly formed SAML request
-	authnReq := saml.AuthnRequest{
+	authnReq := crewjamsaml.AuthnRequest{
 		ID:           "_" + uuid.New().String(),
 		IssueInstant: time.Now().UTC(),
 		Version:      "2.0",
-		Issuer: &saml.Issuer{
+		Issuer: &crewjamsaml.Issuer{
 			Value: "https://sp.example.com",
 		},
 		AssertionConsumerServiceURL: "https://sp.example.com/acs",
-		ProtocolBinding:             saml.HTTPPostBinding,
+		ProtocolBinding:             crewjamsaml.HTTPPostBinding,
 	}
 
 	doc := etree.NewDocument()
@@ -382,46 +384,46 @@ func TestSecurityE2E_TamperedSAMLResponse(t *testing.T) {
 	defer mockProvider.server.Close()
 
 	// First, initiate a valid SAML flow to get a proper context
-	authnReq := saml.AuthnRequest{
+	authnReq := crewjamsaml.AuthnRequest{
 		ID:           "_" + uuid.New().String(),
 		IssueInstant: time.Now().UTC(),
 		Version:      "2.0",
-		Issuer: &saml.Issuer{
+		Issuer: &crewjamsaml.Issuer{
 			Value: "https://sp.example.com",
 		},
 		AssertionConsumerServiceURL: "https://sp.example.com/acs",
 	}
 
 	// Create a valid SAML response
-	response := &saml.Response{
+	response := &crewjamsaml.Response{
 		ID:           "_" + uuid.New().String(),
 		InResponseTo: authnReq.ID,
 		IssueInstant: time.Now().UTC(),
 		Version:      "2.0",
-		Issuer: &saml.Issuer{
+		Issuer: &crewjamsaml.Issuer{
 			Value: mockProvider.entityID,
 		},
-		Status: saml.Status{
-			StatusCode: saml.StatusCode{
-				Value: saml.StatusSuccess,
+		Status: crewjamsaml.Status{
+			StatusCode: crewjamsaml.StatusCode{
+				Value: crewjamsaml.StatusSuccess,
 			},
 		},
-		Assertion: &saml.Assertion{
+		Assertion: &crewjamsaml.Assertion{
 			ID:           "_" + uuid.New().String(),
 			IssueInstant: time.Now().UTC(),
 			Version:      "2.0",
-			Issuer: saml.Issuer{
+			Issuer: crewjamsaml.Issuer{
 				Value: mockProvider.entityID,
 			},
-			Subject: &saml.Subject{
-				NameID: &saml.NameID{
+			Subject: &crewjamsaml.Subject{
+				NameID: &crewjamsaml.NameID{
 					Format: "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent",
 					Value:  "testuser",
 				},
-				SubjectConfirmations: []saml.SubjectConfirmation{
+				SubjectConfirmations: []crewjamsaml.SubjectConfirmation{
 					{
 						Method: "urn:oasis:names:tc:SAML:2.0:cm:bearer",
-						SubjectConfirmationData: &saml.SubjectConfirmationData{
+						SubjectConfirmationData: &crewjamsaml.SubjectConfirmationData{
 							InResponseTo: authnReq.ID,
 							Recipient:    server.URL + "/saml/acs",
 							NotOnOrAfter: time.Now().UTC().Add(5 * time.Minute),
@@ -429,16 +431,16 @@ func TestSecurityE2E_TamperedSAMLResponse(t *testing.T) {
 					},
 				},
 			},
-			Conditions: &saml.Conditions{
+			Conditions: &crewjamsaml.Conditions{
 				NotBefore:    time.Now().UTC().Add(-1 * time.Minute),
 				NotOnOrAfter: time.Now().UTC().Add(5 * time.Minute),
 			},
-			AttributeStatements: []saml.AttributeStatement{
+			AttributeStatements: []crewjamsaml.AttributeStatement{
 				{
-					Attributes: []saml.Attribute{
+					Attributes: []crewjamsaml.Attribute{
 						{
 							Name: "email",
-							Values: []saml.AttributeValue{
+							Values: []crewjamsaml.AttributeValue{
 								{Value: "test@example.com"},
 							},
 						},
@@ -479,27 +481,27 @@ func TestSecurityE2E_InvalidSAMLResponseSignature(t *testing.T) {
 	defer mockProvider.server.Close()
 
 	// Create a SAML response with invalid signature
-	response := &saml.Response{
+	response := &crewjamsaml.Response{
 		ID:           "_" + uuid.New().String(),
 		IssueInstant: time.Now().UTC(),
 		Version:      "2.0",
-		Issuer: &saml.Issuer{
+		Issuer: &crewjamsaml.Issuer{
 			Value: mockProvider.entityID,
 		},
-		Status: saml.Status{
-			StatusCode: saml.StatusCode{
-				Value: saml.StatusSuccess,
+		Status: crewjamsaml.Status{
+			StatusCode: crewjamsaml.StatusCode{
+				Value: crewjamsaml.StatusSuccess,
 			},
 		},
-		Assertion: &saml.Assertion{
+		Assertion: &crewjamsaml.Assertion{
 			ID:           "_" + uuid.New().String(),
 			IssueInstant: time.Now().UTC(),
 			Version:      "2.0",
-			Issuer: saml.Issuer{
+			Issuer: crewjamsaml.Issuer{
 				Value: mockProvider.entityID,
 			},
-			Subject: &saml.Subject{
-				NameID: &saml.NameID{
+			Subject: &crewjamsaml.Subject{
+				NameID: &crewjamsaml.NameID{
 					Format: "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent",
 					Value:  "testuser",
 				},
@@ -557,7 +559,7 @@ INVALID_CERTIFICATE_CONTENT_THAT_IS_NOT_VALID_BASE64
 	require.NoError(t, os.WriteFile(invalidCertPath, []byte(invalidCertContent), 0o644))
 
 	// Try to create proxy with invalid certificate
-	cfg := proxy.Config{}
+	cfg := config.Config{}
 	cfg.Proxy.EntityID = "https://proxy.example.com"
 	cfg.Proxy.MetadataURL = "https://proxy.example.com/metadata"
 	cfg.Proxy.AcsURL = "https://proxy.example.com/saml/acs"
@@ -565,7 +567,7 @@ INVALID_CERTIFICATE_CONTENT_THAT_IS_NOT_VALID_BASE64
 	cfg.Proxy.CertificatePath = invalidCertPath // Invalid certificate
 
 	// This should fail during proxy creation
-	_, err := proxy.CreateProxyIDP(cfg)
+	_, err := saml.CreateProxyIDP(cfg)
 	require.Error(t, err, "Should fail with invalid certificate")
 
 	// Test with valid proxy cert but invalid IdP cert
@@ -594,7 +596,7 @@ INVALID_CERTIFICATE_CONTENT_THAT_IS_NOT_VALID_BASE64
 	}))
 	defer mockServer.Close()
 
-	cfg.IDP = []proxy.IDPConfig{
+	cfg.IDP = []config.IDPConfig{
 		{
 			ID:          "invalid-idp",
 			MetadataURL: mockServer.URL + "/saml/metadata",
@@ -603,7 +605,7 @@ INVALID_CERTIFICATE_CONTENT_THAT_IS_NOT_VALID_BASE64
 
 	// Try to create service providers with invalid IdP metadata
 	ctx := t.Context()
-	_, err = proxy.CreateServiceProviders(ctx, cfg)
+	_, err = saml.CreateServiceProviders(ctx, cfg)
 	// This might fail or succeed depending on validation
 	t.Logf("CreateServiceProviders with invalid cert result: %v", err)
 }
@@ -639,7 +641,7 @@ func TestSecurityE2E_ExpiredCertificate(t *testing.T) {
 	require.NoError(t, os.WriteFile(expiredKeyPath, keyPEM, 0o644))
 
 	// Test proxy with expired certificate
-	cfg := proxy.Config{}
+	cfg := config.Config{}
 	cfg.Proxy.EntityID = "https://proxy.example.com"
 	cfg.Proxy.MetadataURL = "https://proxy.example.com/metadata"
 	cfg.Proxy.AcsURL = "https://proxy.example.com/saml/acs"
@@ -647,7 +649,7 @@ func TestSecurityE2E_ExpiredCertificate(t *testing.T) {
 	cfg.Proxy.CertificatePath = expiredCertPath
 
 	// Try to create proxy IDP with expired cert
-	_, err := proxy.CreateProxyIDP(cfg)
+	_, err := saml.CreateProxyIDP(cfg)
 	// The library might or might not validate cert expiration during creation
 	t.Logf("CreateProxyIDP with expired cert result: %v", err)
 
@@ -684,7 +686,7 @@ func TestSecurityE2E_ExpiredCertificate(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	cfg.IDP = []proxy.IDPConfig{
+	cfg.IDP = []config.IDPConfig{
 		{
 			ID:          "expired-idp",
 			MetadataURL: mockServer.URL + "/saml/metadata",
@@ -693,7 +695,7 @@ func TestSecurityE2E_ExpiredCertificate(t *testing.T) {
 
 	// Try to create service providers with expired IdP cert
 	ctx := t.Context()
-	_, err = proxy.CreateServiceProviders(ctx, cfg)
+	_, err = saml.CreateServiceProviders(ctx, cfg)
 	t.Logf("CreateServiceProviders with expired IdP cert result: %v", err)
 }
 
@@ -734,11 +736,11 @@ func TestSecurityE2E_XSSAttackPrevention(t *testing.T) {
 	xssPayload := `<script>alert('XSS')</script>`
 
 	// Create valid request
-	authnReq := saml.AuthnRequest{
+	authnReq := crewjamsaml.AuthnRequest{
 		ID:           "_" + uuid.New().String(),
 		IssueInstant: time.Now().UTC(),
 		Version:      "2.0",
-		Issuer: &saml.Issuer{
+		Issuer: &crewjamsaml.Issuer{
 			Value: "https://sp.example.com",
 		},
 	}
@@ -829,7 +831,7 @@ func TestSecurityE2E_CertificateChainValidation(t *testing.T) {
 	require.NoError(t, os.WriteFile(chainKeyPath, keyPEM, 0o644))
 
 	// Test proxy with certificate chain
-	cfg := proxy.Config{}
+	cfg := config.Config{}
 	cfg.Proxy.EntityID = "https://proxy.example.com"
 	cfg.Proxy.MetadataURL = "https://proxy.example.com/metadata"
 	cfg.Proxy.AcsURL = "https://proxy.example.com/saml/acs"
@@ -837,7 +839,7 @@ func TestSecurityE2E_CertificateChainValidation(t *testing.T) {
 	cfg.Proxy.CertificatePath = chainCertPath
 
 	// Create proxy IDP with certificate chain
-	_, err := proxy.CreateProxyIDP(cfg)
+	_, err := saml.CreateProxyIDP(cfg)
 	t.Logf("CreateProxyIDP with certificate chain result: %v", err)
 }
 
@@ -869,27 +871,27 @@ func TestSecurityE2E_SAMLSignatureWrappingAttack(t *testing.T) {
 	defer mockProvider.server.Close()
 
 	// Create a valid SAML response
-	response := &saml.Response{
+	response := &crewjamsaml.Response{
 		ID:           "_" + uuid.New().String(),
 		IssueInstant: time.Now().UTC(),
 		Version:      "2.0",
-		Issuer: &saml.Issuer{
+		Issuer: &crewjamsaml.Issuer{
 			Value: mockProvider.entityID,
 		},
-		Status: saml.Status{
-			StatusCode: saml.StatusCode{
-				Value: saml.StatusSuccess,
+		Status: crewjamsaml.Status{
+			StatusCode: crewjamsaml.StatusCode{
+				Value: crewjamsaml.StatusSuccess,
 			},
 		},
-		Assertion: &saml.Assertion{
+		Assertion: &crewjamsaml.Assertion{
 			ID:           "_" + uuid.New().String(),
 			IssueInstant: time.Now().UTC(),
 			Version:      "2.0",
-			Issuer: saml.Issuer{
+			Issuer: crewjamsaml.Issuer{
 				Value: mockProvider.entityID,
 			},
-			Subject: &saml.Subject{
-				NameID: &saml.NameID{
+			Subject: &crewjamsaml.Subject{
+				NameID: &crewjamsaml.NameID{
 					Format: "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent",
 					Value:  "legitimateuser",
 				},

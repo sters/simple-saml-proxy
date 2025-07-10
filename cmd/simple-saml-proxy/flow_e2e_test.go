@@ -10,8 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/crewjam/saml"
+	crewjamsaml "github.com/crewjam/saml"
+	"github.com/sters/simple-saml-proxy/config"
 	"github.com/sters/simple-saml-proxy/proxy"
+	"github.com/sters/simple-saml-proxy/proxy/saml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,16 +26,16 @@ func TestE2EFlow(t *testing.T) {
 	proxyCertPath, proxyKeyPath := generateTestCertificate(t)
 
 	// Create proxy configuration
-	proxyConfig := proxy.Config{}
+	proxyConfig := &config.Config{}
 	proxyConfig.Proxy.EntityID = "https://proxy.example.com"
 	proxyConfig.Proxy.MetadataURL = "https://proxy.example.com/metadata"
 	proxyConfig.Proxy.AcsURL = "https://proxy.example.com/saml/acs"
 	proxyConfig.Proxy.PrivateKeyPath = proxyKeyPath
 	proxyConfig.Proxy.CertificatePath = proxyCertPath
-	proxyConfig.Proxy.AllowedSP = []proxy.SPConfig{
+	proxyConfig.Proxy.AllowedSP = []config.SPConfig{
 		{EntityID: "https://sp.example.com"},
 	}
-	proxyConfig.Proxy.AllowedSP = []proxy.SPConfig{
+	proxyConfig.Proxy.AllowedSP = []config.SPConfig{
 		{EntityID: "https://sp.example.com"},
 	}
 
@@ -41,7 +43,7 @@ func TestE2EFlow(t *testing.T) {
 	mockIdp := NewMockSAMLProvider(t)
 	defer mockIdp.Close()
 
-	proxyConfig.IDP = []proxy.IDPConfig{
+	proxyConfig.IDP = []config.IDPConfig{
 		{
 			ID:          "mock-idp",
 			MetadataURL: mockIdp.server.URL + "/saml/metadata",
@@ -50,16 +52,16 @@ func TestE2EFlow(t *testing.T) {
 
 	// Create and start proxy server
 	ctx := t.Context()
-	providers, err := proxy.CreateServiceProviders(ctx, proxyConfig)
+	providers, err := saml.CreateServiceProviders(ctx, *proxyConfig)
 	require.NoError(t, err)
 
 	// Disable signature validation for testing
 	disableSignatureValidation(providers)
 
-	idp, err := proxy.CreateProxyIDP(proxyConfig)
+	idp, err := saml.CreateProxyIDP(*proxyConfig)
 	require.NoError(t, err)
 
-	mux := proxy.SetupHTTPHandlers(idp, providers, proxyConfig)
+	mux := proxy.SetupHTTPHandlers(idp, providers, *proxyConfig)
 	proxyServer := httptest.NewServer(mux)
 	defer proxyServer.Close()
 
@@ -186,13 +188,13 @@ func TestE2EFlowMultipleIdPs(t *testing.T) {
 	// Setup
 	proxyCertPath, proxyKeyPath := generateTestCertificate(t)
 
-	proxyConfig := proxy.Config{}
+	proxyConfig := &config.Config{}
 	proxyConfig.Proxy.EntityID = "https://proxy.example.com"
 	proxyConfig.Proxy.MetadataURL = "https://proxy.example.com/metadata"
 	proxyConfig.Proxy.AcsURL = "https://proxy.example.com/saml/acs"
 	proxyConfig.Proxy.PrivateKeyPath = proxyKeyPath
 	proxyConfig.Proxy.CertificatePath = proxyCertPath
-	proxyConfig.Proxy.AllowedSP = []proxy.SPConfig{
+	proxyConfig.Proxy.AllowedSP = []config.SPConfig{
 		{EntityID: "https://sp.example.com"},
 	}
 
@@ -203,7 +205,7 @@ func TestE2EFlowMultipleIdPs(t *testing.T) {
 	mockIdp2 := NewMockSAMLProvider(t)
 	defer mockIdp2.Close()
 
-	proxyConfig.IDP = []proxy.IDPConfig{
+	proxyConfig.IDP = []config.IDPConfig{
 		{
 			ID:          "idp-1",
 			MetadataURL: mockIdp1.server.URL + "/saml/metadata",
@@ -216,15 +218,15 @@ func TestE2EFlowMultipleIdPs(t *testing.T) {
 
 	// Create proxy server
 	ctx := t.Context()
-	providers, err := proxy.CreateServiceProviders(ctx, proxyConfig)
+	providers, err := saml.CreateServiceProviders(ctx, *proxyConfig)
 	require.NoError(t, err)
 
 	disableSignatureValidation(providers)
 
-	idp, err := proxy.CreateProxyIDP(proxyConfig)
+	idp, err := saml.CreateProxyIDP(*proxyConfig)
 	require.NoError(t, err)
 
-	mux := proxy.SetupHTTPHandlers(idp, providers, proxyConfig)
+	mux := proxy.SetupHTTPHandlers(idp, providers, *proxyConfig)
 	proxyServer := httptest.NewServer(mux)
 	defer proxyServer.Close()
 
@@ -315,13 +317,13 @@ func TestE2EFlowWithAuthFailure(t *testing.T) {
 	// Setup
 	proxyCertPath, proxyKeyPath := generateTestCertificate(t)
 
-	proxyConfig := proxy.Config{}
+	proxyConfig := &config.Config{}
 	proxyConfig.Proxy.EntityID = "https://proxy.example.com"
 	proxyConfig.Proxy.MetadataURL = "https://proxy.example.com/metadata"
 	proxyConfig.Proxy.AcsURL = "https://proxy.example.com/saml/acs"
 	proxyConfig.Proxy.PrivateKeyPath = proxyKeyPath
 	proxyConfig.Proxy.CertificatePath = proxyCertPath
-	proxyConfig.Proxy.AllowedSP = []proxy.SPConfig{
+	proxyConfig.Proxy.AllowedSP = []config.SPConfig{
 		{EntityID: "https://sp.example.com"},
 	}
 
@@ -331,7 +333,7 @@ func TestE2EFlowWithAuthFailure(t *testing.T) {
 
 	mockIdp.SetShouldFailAuth(true)
 
-	proxyConfig.IDP = []proxy.IDPConfig{
+	proxyConfig.IDP = []config.IDPConfig{
 		{
 			ID:          "failing-idp",
 			MetadataURL: mockIdp.server.URL + "/saml/metadata",
@@ -340,15 +342,15 @@ func TestE2EFlowWithAuthFailure(t *testing.T) {
 
 	// Create proxy server
 	ctx := t.Context()
-	providers, err := proxy.CreateServiceProviders(ctx, proxyConfig)
+	providers, err := saml.CreateServiceProviders(ctx, *proxyConfig)
 	require.NoError(t, err)
 
 	disableSignatureValidation(providers)
 
-	idp, err := proxy.CreateProxyIDP(proxyConfig)
+	idp, err := saml.CreateProxyIDP(*proxyConfig)
 	require.NoError(t, err)
 
-	mux := proxy.SetupHTTPHandlers(idp, providers, proxyConfig)
+	mux := proxy.SetupHTTPHandlers(idp, providers, *proxyConfig)
 	proxyServer := httptest.NewServer(mux)
 	defer proxyServer.Close()
 
@@ -400,7 +402,7 @@ func TestE2EFlowWithAuthFailure(t *testing.T) {
 	decoded, err := base64.StdEncoding.DecodeString(samlResponse)
 	require.NoError(t, err)
 
-	var failureResp saml.Response
+	var failureResp crewjamsaml.Response
 	err = xml.Unmarshal(decoded, &failureResp)
 	require.NoError(t, err)
 
@@ -412,24 +414,24 @@ func TestE2EFlowWithAuthFailure(t *testing.T) {
 }
 
 // setupFlowErrorTest creates a common test setup for flow error tests.
-func setupFlowErrorTest(t *testing.T) (*proxy.Config, *httptest.Server, *MockSAMLProvider) {
+func setupFlowErrorTest(t *testing.T) (*config.Config, *httptest.Server, *MockSAMLProvider) {
 	t.Helper()
 
 	proxyCertPath, proxyKeyPath := generateTestCertificate(t)
 
-	proxyConfig := proxy.Config{}
+	proxyConfig := config.Config{}
 	proxyConfig.Proxy.EntityID = "https://proxy.example.com"
 	proxyConfig.Proxy.MetadataURL = "https://proxy.example.com/metadata"
 	proxyConfig.Proxy.AcsURL = "https://proxy.example.com/saml/acs"
 	proxyConfig.Proxy.PrivateKeyPath = proxyKeyPath
 	proxyConfig.Proxy.CertificatePath = proxyCertPath
-	proxyConfig.Proxy.AllowedSP = []proxy.SPConfig{
+	proxyConfig.Proxy.AllowedSP = []config.SPConfig{
 		{EntityID: "https://sp.example.com"},
 	}
 
 	mockIdp := NewMockSAMLProvider(t)
 
-	proxyConfig.IDP = []proxy.IDPConfig{
+	proxyConfig.IDP = []config.IDPConfig{
 		{
 			ID:          "test-idp",
 			MetadataURL: mockIdp.server.URL + "/saml/metadata",
@@ -437,10 +439,10 @@ func setupFlowErrorTest(t *testing.T) (*proxy.Config, *httptest.Server, *MockSAM
 	}
 
 	ctx := t.Context()
-	providers, err := proxy.CreateServiceProviders(ctx, proxyConfig)
+	providers, err := saml.CreateServiceProviders(ctx, proxyConfig)
 	require.NoError(t, err)
 
-	idp, err := proxy.CreateProxyIDP(proxyConfig)
+	idp, err := saml.CreateProxyIDP(proxyConfig)
 	require.NoError(t, err)
 
 	mux := proxy.SetupHTTPHandlers(idp, providers, proxyConfig)
@@ -503,7 +505,7 @@ func TestE2EFlowErrorCases_UnauthorizedSP(t *testing.T) {
 	defer mockIdp.Close()
 
 	// Add allowed SP configuration
-	proxyConfig.Proxy.AllowedSP = []proxy.SPConfig{
+	proxyConfig.Proxy.AllowedSP = []config.SPConfig{
 		{
 			EntityID: "https://allowed-sp.example.com",
 		},
@@ -512,10 +514,10 @@ func TestE2EFlowErrorCases_UnauthorizedSP(t *testing.T) {
 	ctx := t.Context()
 
 	// Recreate proxy with AllowedSP
-	providers, err := proxy.CreateServiceProviders(ctx, *proxyConfig)
+	providers, err := saml.CreateServiceProviders(ctx, *proxyConfig)
 	require.NoError(t, err)
 
-	idp, err := proxy.CreateProxyIDP(*proxyConfig)
+	idp, err := saml.CreateProxyIDP(*proxyConfig)
 	require.NoError(t, err)
 
 	mux := proxy.SetupHTTPHandlers(idp, providers, *proxyConfig)
@@ -537,24 +539,24 @@ func TestE2EFlowErrorCases_UnauthorizedSP(t *testing.T) {
 }
 
 // setupErrorHandlingTest creates a common test setup for error handling tests.
-func setupErrorHandlingTest(t *testing.T) (*proxy.Config, *httptest.Server, *MockSAMLProvider) {
+func setupErrorHandlingTest(t *testing.T) (*config.Config, *httptest.Server, *MockSAMLProvider) {
 	t.Helper()
 
 	proxyCertPath, proxyKeyPath := generateTestCertificate(t)
 
-	cfg := proxy.Config{}
+	cfg := config.Config{}
 	cfg.Proxy.EntityID = "https://proxy.example.com"
 	cfg.Proxy.MetadataURL = "https://proxy.example.com/metadata"
 	cfg.Proxy.AcsURL = "https://proxy.example.com/saml/acs"
 	cfg.Proxy.PrivateKeyPath = proxyKeyPath
 	cfg.Proxy.CertificatePath = proxyCertPath
-	cfg.Proxy.AllowedSP = []proxy.SPConfig{
+	cfg.Proxy.AllowedSP = []config.SPConfig{
 		{EntityID: "https://sp.example.com"},
 	}
 
 	mockIdp := NewMockSAMLProvider(t)
 
-	cfg.IDP = []proxy.IDPConfig{
+	cfg.IDP = []config.IDPConfig{
 		{
 			ID:          "test-idp",
 			MetadataURL: mockIdp.server.URL + "/saml/metadata",
@@ -562,10 +564,10 @@ func setupErrorHandlingTest(t *testing.T) (*proxy.Config, *httptest.Server, *Moc
 	}
 
 	ctx := t.Context()
-	providers, err := proxy.CreateServiceProviders(ctx, cfg)
+	providers, err := saml.CreateServiceProviders(ctx, cfg)
 	require.NoError(t, err)
 
-	idp, err := proxy.CreateProxyIDP(cfg)
+	idp, err := saml.CreateProxyIDP(cfg)
 	require.NoError(t, err)
 
 	mux := proxy.SetupHTTPHandlers(idp, providers, cfg)
@@ -640,15 +642,15 @@ func TestE2EFlowErrorHandling_UnauthorizedSP(t *testing.T) {
 	defer mockIdp.Close()
 
 	// Configure allowed SPs
-	cfg.Proxy.AllowedSP = []proxy.SPConfig{
+	cfg.Proxy.AllowedSP = []config.SPConfig{
 		{EntityID: "https://allowed-sp.example.com"},
 	}
 
 	ctx := t.Context()
 
 	// Recreate proxy with restrictions
-	providers, _ := proxy.CreateServiceProviders(ctx, *cfg)
-	idp, _ := proxy.CreateProxyIDP(*cfg)
+	providers, _ := saml.CreateServiceProviders(ctx, *cfg)
+	idp, _ := saml.CreateProxyIDP(*cfg)
 	mux := proxy.SetupHTTPHandlers(idp, providers, *cfg)
 	restrictedServer := httptest.NewServer(mux)
 	defer restrictedServer.Close()

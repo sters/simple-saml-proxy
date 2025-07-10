@@ -4,6 +4,8 @@ import (
 	"html/template"
 	"log/slog"
 	"net/http"
+
+	"github.com/sters/simple-saml-proxy/proxy/saml"
 )
 
 // idpSelectionTemplate is the HTML template for the IdP selection page.
@@ -56,7 +58,7 @@ const idpSelectionTemplate = `
 `
 
 // handleIDPSelect handles the IdP selection page.
-func handleIDPSelect(idp *IDP, providers *ServiceProviders) http.HandlerFunc {
+func handleIDPSelect(idp *saml.IDP, providers *saml.ServiceProviders) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authRequestID := r.FormValue("id")
 		if authRequestID == "" {
@@ -65,7 +67,7 @@ func handleIDPSelect(idp *IDP, providers *ServiceProviders) http.HandlerFunc {
 			return
 		}
 
-		authRequest, err := idp.idpStorage.AuthRequestByID(r.Context(), authRequestID)
+		authRequest, err := idp.IDPStorage.AuthRequestByID(r.Context(), authRequestID)
 		if err != nil {
 			slog.Error("Failed to get auth request",
 				slog.String("id", authRequestID),
@@ -85,12 +87,12 @@ func handleIDPSelect(idp *IDP, providers *ServiceProviders) http.HandlerFunc {
 		})
 
 		relayState := ""
-		if ar, ok := authRequest.(*AuthRequest); ok {
+		if ar, ok := authRequest.(*saml.AuthRequest); ok {
 			relayState = ar.RelayState
 		}
 
 		data := struct {
-			Providers  map[string]*ServiceProvider
+			Providers  map[string]*saml.ServiceProvider
 			SelectURL  string
 			RelayState string
 		}{

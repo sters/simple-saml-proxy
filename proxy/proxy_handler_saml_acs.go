@@ -3,10 +3,12 @@ package proxy
 import (
 	"log/slog"
 	"net/http"
+
+	"github.com/sters/simple-saml-proxy/proxy/saml"
 )
 
 // handleSAMLACS handles the SAML assertion consumer service endpoint.
-func handleSAMLACS(idp *IDP, providers *ServiceProviders) http.HandlerFunc {
+func handleSAMLACS(idp *saml.IDP, providers *saml.ServiceProviders) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		slog.Info("Processing SAML response from actual IdP")
 
@@ -26,7 +28,7 @@ func handleSAMLACS(idp *IDP, providers *ServiceProviders) http.HandlerFunc {
 			return
 		}
 
-		authRequest, err := idp.idpStorage.AuthRequestByID(r.Context(), authRequestID)
+		authRequest, err := idp.IDPStorage.AuthRequestByID(r.Context(), authRequestID)
 		if err != nil {
 			slog.Error("Failed to get auth request",
 				slog.String("id", authRequestID),
@@ -37,7 +39,7 @@ func handleSAMLACS(idp *IDP, providers *ServiceProviders) http.HandlerFunc {
 			return
 		}
 
-		if ar, ok := authRequest.(*AuthRequest); ok {
+		if ar, ok := authRequest.(*saml.AuthRequest); ok {
 			ar.IsDone = true // 自分でDone=trueにしないといけない
 		} else {
 			slog.Error("Failed to cast authRequest to *AuthRequest")
@@ -104,7 +106,7 @@ func handleSAMLACS(idp *IDP, providers *ServiceProviders) http.HandlerFunc {
 			return
 		}
 
-		callbackURL := idp.idp.AuthCallbackURL()(r.Context(), authRequestID)
+		callbackURL := idp.IDP.AuthCallbackURL()(r.Context(), authRequestID)
 		http.Redirect(w, r, callbackURL, http.StatusFound)
 	}
 }
