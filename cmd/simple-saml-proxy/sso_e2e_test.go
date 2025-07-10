@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -369,18 +370,17 @@ func TestSSOEndpoint_IDPSelectionSuccess(t *testing.T) {
 }
 
 func TestSSOEndpoint_HTTPPOSTBinding(t *testing.T) {
-	t.Skip("Skipping - HTTP POST binding not yet implemented for SSO endpoint")
-	_, server, mockProvider := setupSSOTest(t)
+	cfg, server, mockProvider := setupSSOTest(t)
 	defer server.Close()
 	defer mockProvider.Close()
 
-	// Create SAML request with POST binding
-	samlRequest := `<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" ID="_123" Version="2.0" IssueInstant="2023-01-01T00:00:00Z" ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST">
+	// Create SAML request for POST binding
+	samlRequest := `<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" ID="_123" Version="2.0" IssueInstant="2023-01-01T00:00:00Z">
 		<saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">https://sp.example.com</saml:Issuer>
 	</samlp:AuthnRequest>`
 
-	encoded, err := encodeSAMLRequest(samlRequest)
-	require.NoError(t, err)
+	// Base64 encode without deflating (POST binding doesn't use deflate)
+	encoded := base64.StdEncoding.EncodeToString([]byte(samlRequest))
 
 	// Send as POST
 	form := url.Values{}
@@ -394,10 +394,29 @@ func TestSSOEndpoint_HTTPPOSTBinding(t *testing.T) {
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
-	// Should handle POST binding
+	// Should handle POST binding and show IDP selection page
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	bodyStr := string(body)
+	
+	// Verify response contains IDP selection page
 	assert.Contains(t, bodyStr, "Select an Identity Provider")
+	assert.Contains(t, bodyStr, cfg.IDP[0].ID)
+	assert.Contains(t, bodyStr, cfg.IDP[1].ID)
+	
+	// Verify RelayState is preserved
+	assert.Contains(t, bodyStr, "post-relay-state")
+	
+	// Verify auth request cookie is set
+	cookies := resp.Cookies()
+	var authCookie *http.Cookie
+	for _, c := range cookies {
+		if c.Name == "authID" {
+			authCookie = c
+			break
+		}
+	}
+	assert.NotNil(t, authCookie, "Should set auth request cookie")
+	assert.NotEmpty(t, authCookie.Value)
 }
