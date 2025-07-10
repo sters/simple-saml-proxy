@@ -1,7 +1,7 @@
 # simple-saml-proxy
 
 [![go](https://github.com/sters/simple-saml-proxy/workflows/Go/badge.svg)](https://github.com/sters/simple-saml-proxy/actions?query=workflow%3AGo)
-[![codecov](https://codecov.io/gh/sters/simple-saml-proxy/branch/main/graph/badge.svg)](https://codecov.io/gh/sters/simple-saml-proxy)
+[![coverage](docs/coverage.svg)](https://github.com/sters/go-project-boilerplate)
 [![go-report](https://goreportcard.com/badge/github.com/sters/simple-saml-proxy)](https://goreportcard.com/report/github.com/sters/simple-saml-proxy)
 
 ## Install
