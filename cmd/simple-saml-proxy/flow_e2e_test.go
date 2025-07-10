@@ -185,7 +185,7 @@ func TestE2EFlow(t *testing.T) {
 
 func TestE2EFlowMultipleIdPs(t *testing.T) {
 	t.Skip("Skipping - SAML signature validation in crewjam/saml library prevents full E2E testing")
-	
+
 	// This test verifies the complete flow with multiple IdPs:
 	// 1. SP initiates login -> redirected to proxy SSO endpoint
 	// 2. Proxy shows IdP selection page with multiple IdPs
@@ -196,7 +196,7 @@ func TestE2EFlowMultipleIdPs(t *testing.T) {
 	//
 	// The test successfully completes steps 1-5 but fails at step 6 due to
 	// SAML response signature validation that cannot be disabled in tests.
-	
+
 	// Setup
 	proxyCertPath, proxyKeyPath := generateTestCertificate(t)
 
@@ -260,6 +260,7 @@ func TestE2EFlowMultipleIdPs(t *testing.T) {
 		t.Logf("Cookie from resp1: %s = %s", cookie.Name, cookie.Value)
 		if cookie.Name == "authID" {
 			authID = cookie.Value
+
 			break
 		}
 	}
@@ -285,6 +286,7 @@ func TestE2EFlowMultipleIdPs(t *testing.T) {
 		t.Logf("Cookie from resp2: %s = %s", cookie.Name, cookie.Value)
 		if cookie.Name == "authID" {
 			authID = cookie.Value
+
 			break
 		}
 	}
@@ -310,13 +312,14 @@ func TestE2EFlowMultipleIdPs(t *testing.T) {
 	assert.Equal(t, http.StatusFound, resp3.StatusCode)
 	location := resp3.Header.Get("Location")
 	assert.Contains(t, location, mockIdp1.server.URL)
-	
+
 	// Get the idpID cookie that was set
 	var idpID string
 	for _, cookie := range resp3.Cookies() {
 		t.Logf("Cookie from resp3: %s = %s", cookie.Name, cookie.Value)
 		if cookie.Name == "idpID" {
 			idpID = cookie.Value
+
 			break
 		}
 	}
@@ -352,10 +355,10 @@ func TestE2EFlowMultipleIdPs(t *testing.T) {
 
 	// Add the authID cookie that we got from idp_select page
 	req5.AddCookie(&http.Cookie{Name: "authID", Value: authID})
-	
+
 	// Add the idpID cookie that we got from idp_selected
 	req5.AddCookie(&http.Cookie{Name: "idpID", Value: idpID})
-	
+
 	// Also add any other cookies from the IDP selection response
 	for _, cookie := range resp3.Cookies() {
 		if cookie.Name != "idpID" { // Skip idpID as we already added it

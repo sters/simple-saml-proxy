@@ -533,6 +533,9 @@ func NewMockSAMLProviderWithErrors(t *testing.T) *MockSAMLProviderWithErrors {
 		errorMessage:     "Internal Server Error",
 	}
 
+	// Close the base provider's server since we'll create a new one
+	baseProvider.server.Close()
+
 	// Create a test server for the mock IDP
 	mux := http.NewServeMux()
 
@@ -592,8 +595,20 @@ func NewMockSAMLProviderWithErrors(t *testing.T) *MockSAMLProviderWithErrors {
 	provider.server = httptest.NewServer(mux)
 	provider.ssoURL = provider.server.URL + "/saml/sso"
 
-	// Metadata is already set by base provider
-	// Response template is no longer needed as we use the signing method
+	// Update metadata with the new server URL
+	provider.metadata = []byte(`<?xml version="1.0"?>
+<EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="` + provider.entityID + `">
+  <IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <KeyDescriptor use="signing">
+      <KeyInfo xmlns="http://www.w3.org/2000/09/xmldsig#">
+        <X509Data>
+          <X509Certificate>` + provider.certificatePEM + `</X509Certificate>
+        </X509Data>
+      </KeyInfo>
+    </KeyDescriptor>
+    <SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="` + provider.ssoURL + `"/>
+  </IDPSSODescriptor>
+</EntityDescriptor>`)
 
 	return provider
 }

@@ -399,21 +399,22 @@ func TestSSOEndpoint_HTTPPOSTBinding(t *testing.T) {
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	bodyStr := string(body)
-	
+
 	// Verify response contains IDP selection page
 	assert.Contains(t, bodyStr, "Select an Identity Provider")
 	assert.Contains(t, bodyStr, cfg.IDP[0].ID)
 	assert.Contains(t, bodyStr, cfg.IDP[1].ID)
-	
+
 	// Verify RelayState is preserved
 	assert.Contains(t, bodyStr, "post-relay-state")
-	
+
 	// Verify auth request cookie is set
 	cookies := resp.Cookies()
 	var authCookie *http.Cookie
 	for _, c := range cookies {
 		if c.Name == "authID" {
 			authCookie = c
+
 			break
 		}
 	}
