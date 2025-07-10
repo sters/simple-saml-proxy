@@ -22,7 +22,7 @@ func SetupHTTPHandlers(idp *saml.IDP, providers *saml.ServiceProviders, _ config
 	// Basic endpoints
 	mux.HandleFunc("/ping", handlePing)
 	mux.Handle("/metadata", idp.IDP.HttpHandler())
-	mux.Handle("/sso", idp.IDP.HttpHandler())
+	mux.Handle("/sso", handleSSO(idp))
 	mux.Handle("/callback", idp.IDP.HttpHandler())
 
 	// SAML proxy endpoints

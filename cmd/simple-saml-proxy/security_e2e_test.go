@@ -128,9 +128,9 @@ func TestSecurityE2E_UnauthorizedSPRequest(t *testing.T) {
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
-	// Should reject unauthorized SP or show error - current implementation shows decode error
+	// Should reject unauthorized SP
 	body, _ := io.ReadAll(resp.Body)
-	// TODO: Proxy should check AllowedSP and reject unauthorized SPs
+	// The proxy now checks AllowedSP and rejects unauthorized SPs
 	assert.Contains(t, string(body), "RequestDenied", "Should handle unauthorized SP")
 }
 
