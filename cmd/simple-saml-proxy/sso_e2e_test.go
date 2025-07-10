@@ -124,7 +124,6 @@ func TestSSOEndpoint_InvalidSAMLRequest(t *testing.T) {
 }
 
 func TestSSOEndpoint_SingleIDPAutoRedirect(t *testing.T) {
-	t.Skip("Skipping - single IDP auto-redirect feature not yet implemented")
 	// Setup with single IDP
 	proxyCertPath, proxyKeyPath := generateTestCertificate(t)
 
@@ -177,14 +176,48 @@ func TestSSOEndpoint_SingleIDPAutoRedirect(t *testing.T) {
 	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, singleServer.URL+"/sso?SAMLRequest="+url.QueryEscape(encoded)+"&RelayState=test-state", nil)
 	resp, err := client.Do(req)
 	require.NoError(t, err)
-	defer resp.Body.Close()
 
-	// Should redirect directly to IDP
-	assert.Equal(t, http.StatusFound, resp.StatusCode)
+	// Should redirect to idp_select first
+	assert.Equal(t, http.StatusSeeOther, resp.StatusCode)
 	location := resp.Header.Get("Location")
-	assert.Contains(t, location, mockProvider.ssoURL)
-	assert.Contains(t, location, "SAMLRequest=")
-	assert.Contains(t, location, "RelayState=test-state")
+	assert.Contains(t, location, "/idp_select?id=")
+
+	// Get cookies from first response
+	cookies := resp.Cookies()
+	resp.Body.Close()
+
+	// Follow the redirect to idp_select
+	req2, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, singleServer.URL+location, nil)
+	for _, c := range cookies {
+		req2.AddCookie(c)
+	}
+	resp2, err := client.Do(req2)
+	require.NoError(t, err)
+
+	// Should auto-redirect to idp_selected
+	assert.Equal(t, http.StatusFound, resp2.StatusCode)
+	location2 := resp2.Header.Get("Location")
+	assert.Contains(t, location2, "/idp_selected?idpID=test-idp")
+
+	// Get new cookies
+	cookies = append(cookies, resp2.Cookies()...)
+	resp2.Body.Close()
+
+	// Follow the redirect to idp_selected
+	req3, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, singleServer.URL+location2, nil)
+	for _, c := range cookies {
+		req3.AddCookie(c)
+	}
+	resp3, err := client.Do(req3)
+	require.NoError(t, err)
+	defer resp3.Body.Close()
+
+	// Should now redirect to the actual IDP
+	assert.Equal(t, http.StatusFound, resp3.StatusCode)
+	location3 := resp3.Header.Get("Location")
+	assert.Contains(t, location3, mockProvider.ssoURL)
+	assert.Contains(t, location3, "SAMLRequest=")
+	assert.Contains(t, location3, "RelayState=test-state")
 }
 
 func TestSSOEndpoint_RelayStatePreservation(t *testing.T) {

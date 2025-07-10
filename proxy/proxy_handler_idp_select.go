@@ -86,6 +86,34 @@ func handleIDPSelect(idp *saml.IDP, providers *saml.ServiceProviders) http.Handl
 			Secure:   isSecureCookie(r),
 		})
 
+		// If there's only one IdP configured, auto-redirect to it
+		if len(providers.Providers) == 1 {
+			// Get the single IdP ID
+			var singleIDPID string
+			for id := range providers.Providers {
+				singleIDPID = id
+
+				break
+			}
+			// Set the IdP cookie
+			http.SetCookie(w, &http.Cookie{
+				Name:     cookieNameIDPID,
+				Value:    singleIDPID,
+				Path:     "/",
+				HttpOnly: true,
+				Secure:   isSecureCookie(r),
+			})
+
+			// Redirect to the IdP selected handler
+			redirectURL := "/idp_selected?idpID=" + singleIDPID
+			if ar, ok := authRequest.(*saml.AuthRequest); ok && ar.RelayState != "" {
+				redirectURL += "&RelayState=" + ar.RelayState
+			}
+			http.Redirect(w, r, redirectURL, http.StatusFound)
+
+			return
+		}
+
 		relayState := ""
 		if ar, ok := authRequest.(*saml.AuthRequest); ok {
 			relayState = ar.RelayState
