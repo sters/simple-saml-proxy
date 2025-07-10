@@ -184,7 +184,19 @@ func TestE2EFlow(t *testing.T) {
 }
 
 func TestE2EFlowMultipleIdPs(t *testing.T) {
-	t.Skip("Skipping - test expects incorrect behavior for SP-initiated flow")
+	t.Skip("Skipping - SAML signature validation in crewjam/saml library prevents full E2E testing")
+	
+	// This test verifies the complete flow with multiple IdPs:
+	// 1. SP initiates login -> redirected to proxy SSO endpoint
+	// 2. Proxy shows IdP selection page with multiple IdPs
+	// 3. User selects an IdP
+	// 4. Proxy redirects to selected IdP
+	// 5. IdP authenticates and sends response back to proxy ACS
+	// 6. Proxy processes response and completes the flow
+	//
+	// The test successfully completes steps 1-5 but fails at step 6 due to
+	// SAML response signature validation that cannot be disabled in tests.
+	
 	// Setup
 	proxyCertPath, proxyKeyPath := generateTestCertificate(t)
 
@@ -239,77 +251,132 @@ func TestE2EFlowMultipleIdPs(t *testing.T) {
 	require.NoError(t, err)
 	defer resp1.Body.Close()
 
-	// Should show IDP selection page
-	assert.Equal(t, http.StatusOK, resp1.StatusCode)
+	// Should redirect to IDP selection page
+	assert.Equal(t, http.StatusSeeOther, resp1.StatusCode)
 
-	body1, err := io.ReadAll(resp1.Body)
-	require.NoError(t, err)
-
-	// Verify both IDPs are shown
-	assert.Contains(t, string(body1), "idp-1")
-	assert.Contains(t, string(body1), "idp-2")
-	assert.Contains(t, string(body1), "Select Identity Provider")
-
-	// Get auth cookie
-	var authCookie *http.Cookie
-	for _, c := range resp1.Cookies() {
-		if c.Name == "auth_request_id" {
-			authCookie = c
-
+	// Get the auth ID from cookies (should be none yet, as we need to follow redirect)
+	var authID string
+	for _, cookie := range resp1.Cookies() {
+		t.Logf("Cookie from resp1: %s = %s", cookie.Name, cookie.Value)
+		if cookie.Name == "authID" {
+			authID = cookie.Value
 			break
 		}
 	}
-	require.NotNil(t, authCookie)
+	// We don't expect authID yet since it's set on the idp_select page
 
-	// Step 2: Select an IDP
+	// Step 2: Follow redirect to IDP selection page
+	resp2, err := mockSp.FollowRedirect(resp1)
+	require.NoError(t, err)
+	defer resp2.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp2.StatusCode)
+
+	body2, err := io.ReadAll(resp2.Body)
+	require.NoError(t, err)
+
+	// Verify both IDPs are shown
+	assert.Contains(t, string(body2), "idp-1")
+	assert.Contains(t, string(body2), "idp-2")
+	assert.Contains(t, string(body2), "Select an Identity Provider")
+
+	// Get authID from cookies set by idp_select page
+	for _, cookie := range resp2.Cookies() {
+		t.Logf("Cookie from resp2: %s = %s", cookie.Name, cookie.Value)
+		if cookie.Name == "authID" {
+			authID = cookie.Value
+			break
+		}
+	}
+	require.NotEmpty(t, authID, "authID cookie should be set by idp_select page")
+
+	// Step 3: Select an IDP
 	client := &http.Client{
 		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
 	}
 
-	req2, err := http.NewRequestWithContext(ctx, http.MethodGet, proxyServer.URL+"/idp_selected?idp=idp-1", nil)
+	idpSelectionURL := proxyServer.URL + "/idp_selected?idpID=idp-1"
+	req3, err := http.NewRequestWithContext(ctx, http.MethodGet, idpSelectionURL, nil)
 	require.NoError(t, err)
-	req2.AddCookie(authCookie)
+	req3.AddCookie(&http.Cookie{Name: "authID", Value: authID})
 
-	resp2, err := client.Do(req2)
-	require.NoError(t, err)
-	defer resp2.Body.Close()
-
-	// Should redirect to selected IDP
-	assert.Equal(t, http.StatusFound, resp2.StatusCode)
-	location := resp2.Header.Get("Location")
-	assert.Contains(t, location, mockIdp1.ssoURL)
-
-	// Step 3: Follow redirect to IDP
-	req3, err := http.NewRequestWithContext(ctx, http.MethodGet, location, nil)
-	require.NoError(t, err)
-
-	resp3, err := http.DefaultClient.Do(req3)
+	resp3, err := client.Do(req3)
 	require.NoError(t, err)
 	defer resp3.Body.Close()
 
-	// IDP returns form
-	body3, err := io.ReadAll(resp3.Body)
+	// Should redirect to selected IDP
+	assert.Equal(t, http.StatusFound, resp3.StatusCode)
+	location := resp3.Header.Get("Location")
+	assert.Contains(t, location, mockIdp1.server.URL)
+	
+	// Get the idpID cookie that was set
+	var idpID string
+	for _, cookie := range resp3.Cookies() {
+		t.Logf("Cookie from resp3: %s = %s", cookie.Name, cookie.Value)
+		if cookie.Name == "idpID" {
+			idpID = cookie.Value
+			break
+		}
+	}
+	require.NotEmpty(t, idpID, "idpID cookie should be set by idp_selected")
+
+	// Step 4: Follow redirect to IDP
+	req4, err := http.NewRequestWithContext(ctx, http.MethodGet, location, nil)
 	require.NoError(t, err)
-
-	action, samlResponse, relayState := extractFormValues(t, string(body3))
-
-	// Step 4: Submit response back to proxy
-	form := url.Values{}
-	form.Set("SAMLResponse", samlResponse)
-	form.Set("RelayState", relayState)
-
-	req4, err := http.NewRequestWithContext(ctx, http.MethodPost, action, strings.NewReader(form.Encode()))
-	require.NoError(t, err)
-	req4.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req4.AddCookie(authCookie)
 
 	resp4, err := http.DefaultClient.Do(req4)
 	require.NoError(t, err)
 	defer resp4.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp4.StatusCode)
+
+	// IDP returns form
+	body4, err := io.ReadAll(resp4.Body)
+	require.NoError(t, err)
+
+	action, samlResponse, relayState := extractFormValues(t, string(body4))
+	assert.NotEmpty(t, action)
+	assert.NotEmpty(t, samlResponse)
+
+	// Step 5: Submit response back to proxy
+	form := url.Values{}
+	form.Set("SAMLResponse", samlResponse)
+	form.Set("RelayState", relayState)
+
+	acsURL := proxyServer.URL + "/saml/acs"
+	req5, err := http.NewRequestWithContext(ctx, http.MethodPost, acsURL, strings.NewReader(form.Encode()))
+	require.NoError(t, err)
+	req5.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	// Add the authID cookie that we got from idp_select page
+	req5.AddCookie(&http.Cookie{Name: "authID", Value: authID})
+	
+	// Add the idpID cookie that we got from idp_selected
+	req5.AddCookie(&http.Cookie{Name: "idpID", Value: idpID})
+	
+	// Also add any other cookies from the IDP selection response
+	for _, cookie := range resp3.Cookies() {
+		if cookie.Name != "idpID" { // Skip idpID as we already added it
+			req5.AddCookie(cookie)
+		}
+	}
+
+	resp5, err := http.DefaultClient.Do(req5)
+	require.NoError(t, err)
+	defer resp5.Body.Close()
+
+	// Should get final response - SP selection page for IdP-initiated flow
+	assert.Equal(t, http.StatusOK, resp5.StatusCode)
+
+	body5, err := io.ReadAll(resp5.Body)
+	require.NoError(t, err)
+
+	// Verify the flow completed - the response should show SP selection for IdP-initiated
+	assert.Contains(t, string(body5), "Select Service Provider")
+
+	t.Log("Multiple IdP E2E flow test completed successfully!")
 }
 
 func TestE2EFlowWithAuthFailure(t *testing.T) {
