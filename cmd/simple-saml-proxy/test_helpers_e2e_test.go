@@ -120,6 +120,8 @@ type MockSAMLProvider struct {
 	privateKey       *rsa.PrivateKey
 	certificate      *x509.Certificate
 	certificatePEM   string
+	// Custom user attributes for testing
+	userAttributes map[string]string
 }
 
 // NewMockSAMLProvider creates a new mock SAML provider.
@@ -299,6 +301,22 @@ func NewMockSAMLProvider(t *testing.T) *MockSAMLProvider {
 	return provider
 }
 
+// SetUserAttributes sets custom user attributes for the mock provider.
+func (p *MockSAMLProvider) SetUserAttributes(attrs map[string]string) {
+	p.userAttributes = attrs
+}
+
+// getAttributeValue gets an attribute value with fallback to default.
+func (p *MockSAMLProvider) getAttributeValue(key, defaultValue string) string {
+	if p.userAttributes != nil {
+		if val, ok := p.userAttributes[key]; ok {
+			return val
+		}
+	}
+
+	return defaultValue
+}
+
 // createSAMLResponse creates a signed SAML response for the given request ID and ACS URL.
 func (p *MockSAMLProvider) createSAMLResponse(requestID, acsURL string) string {
 	now := time.Now().UTC()
@@ -317,7 +335,7 @@ func (p *MockSAMLProvider) createSAMLResponse(requestID, acsURL string) string {
 		Subject: &saml.Subject{
 			NameID: &saml.NameID{
 				Format: "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent",
-				Value:  "testuser@example.com",
+				Value:  p.getAttributeValue("nameID", "testuser@example.com"),
 			},
 			SubjectConfirmations: []saml.SubjectConfirmation{
 				{
@@ -346,14 +364,28 @@ func (p *MockSAMLProvider) createSAMLResponse(requestID, acsURL string) string {
 						Name:       "email",
 						NameFormat: "urn:oasis:names:tc:SAML:2.0:attrname-format:basic",
 						Values: []saml.AttributeValue{
-							{Value: "testuser@example.com"},
+							{Value: p.getAttributeValue("email", "testuser@example.com")},
 						},
 					},
 					{
 						Name:       "name",
 						NameFormat: "urn:oasis:names:tc:SAML:2.0:attrname-format:basic",
 						Values: []saml.AttributeValue{
-							{Value: "Test User"},
+							{Value: p.getAttributeValue("name", "Test User")},
+						},
+					},
+					{
+						Name:       "givenName",
+						NameFormat: "urn:oasis:names:tc:SAML:2.0:attrname-format:basic",
+						Values: []saml.AttributeValue{
+							{Value: p.getAttributeValue("givenName", "Test")},
+						},
+					},
+					{
+						Name:       "surname",
+						NameFormat: "urn:oasis:names:tc:SAML:2.0:attrname-format:basic",
+						Values: []saml.AttributeValue{
+							{Value: p.getAttributeValue("surname", "User")},
 						},
 					},
 				},

@@ -1,5 +1,7 @@
 package saml
 
+import "github.com/crewjam/saml"
+
 // AuthRequest implements the models.AuthRequestInt interface.
 type AuthRequest struct {
 	ID                       string
@@ -12,6 +14,8 @@ type AuthRequest struct {
 	Destination              string
 	UserID                   string
 	IsDone                   bool
+	// Assertion data from the actual IdP
+	Assertion *saml.Assertion
 }
 
 func (a *AuthRequest) GetID() string {

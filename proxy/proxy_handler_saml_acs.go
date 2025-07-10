@@ -106,6 +106,13 @@ func handleSAMLACS(idp *saml.IDP, providers *saml.ServiceProviders) http.Handler
 			return
 		}
 
+		// Store the assertion in the auth request
+		if ar, ok := authRequest.(*saml.AuthRequest); ok {
+			ar.Assertion = assertion
+			// Update the UserID with the actual NameID from the assertion
+			ar.UserID = assertion.Subject.NameID.Value
+		}
+
 		callbackURL := idp.IDP.AuthCallbackURL()(r.Context(), authRequestID)
 		http.Redirect(w, r, callbackURL, http.StatusFound)
 	}

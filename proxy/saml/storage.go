@@ -20,10 +20,11 @@ import (
 )
 
 var (
-	ErrPrivateKeyIsNil     = errors.New("private key is nil")
-	ErrPrivateKeyNotRSA    = errors.New("private key is not an RSA key")
-	ErrEntityNotFound      = errors.New("entity not found")
-	ErrAuthRequestNotFound = errors.New("auth request not found")
+	ErrPrivateKeyIsNil        = errors.New("private key is nil")
+	ErrPrivateKeyNotRSA       = errors.New("private key is not an RSA key")
+	ErrEntityNotFound         = errors.New("entity not found")
+	ErrAuthRequestNotFound    = errors.New("auth request not found")
+	ErrInvalidAuthRequestType = errors.New("invalid auth request type")
 )
 
 // Storage implements the zitadel/saml Storage interfaces.
@@ -199,19 +200,73 @@ func (s *Storage) AuthRequestByID(_ context.Context, id string) (models.AuthRequ
 // UserStorage interface implementation
 
 func (s *Storage) SetUserinfoWithUserID(
-	_ context.Context,
-	_ string,
+	ctx context.Context,
+	authRequestID string,
 	userinfo models.AttributeSetter,
 	userID string,
 	_ []int,
 ) error {
-	// TODO: Set user attributes
-	userinfo.SetUserID(userID)
-	userinfo.SetUsername(userID)
-	userinfo.SetEmail(userID + "@example.com")
-	userinfo.SetFullName("Test User")
-	userinfo.SetGivenName("Test")
-	userinfo.SetSurname("User")
+	// Get the auth request to retrieve the assertion
+	authRequestInt, err := s.AuthRequestByID(ctx, authRequestID)
+	if err != nil {
+		slog.Error("Failed to get auth request", slog.String("error", err.Error()))
+
+		return err
+	}
+
+	authRequest, ok := authRequestInt.(*AuthRequest)
+	if !ok {
+		slog.Error("Failed to cast auth request")
+
+		return ErrInvalidAuthRequestType
+	}
+
+	// Use assertion data if available
+	if authRequest.Assertion != nil && authRequest.Assertion.Subject != nil {
+		// Set the NameID as UserID
+		if authRequest.Assertion.Subject.NameID != nil {
+			userinfo.SetUserID(authRequest.Assertion.Subject.NameID.Value)
+			userinfo.SetUsername(authRequest.Assertion.Subject.NameID.Value)
+		}
+
+		// Extract attributes from the assertion
+		for _, attrStatement := range authRequest.Assertion.AttributeStatements {
+			for _, attr := range attrStatement.Attributes {
+				switch attr.Name {
+				case "email", "Email", "mail":
+					if len(attr.Values) > 0 {
+						userinfo.SetEmail(attr.Values[0].Value)
+					}
+				case "name", "Name", "displayName", "DisplayName":
+					if len(attr.Values) > 0 {
+						userinfo.SetFullName(attr.Values[0].Value)
+					}
+				case "givenName", "GivenName", "firstName", "FirstName":
+					if len(attr.Values) > 0 {
+						userinfo.SetGivenName(attr.Values[0].Value)
+					}
+				case "surname", "Surname", "lastName", "LastName", "sn":
+					if len(attr.Values) > 0 {
+						userinfo.SetSurname(attr.Values[0].Value)
+					}
+				default:
+					// For other attributes, we could add custom attribute support here
+					slog.Debug("Unhandled attribute",
+						slog.String("name", attr.Name),
+						slog.Any("values", attr.Values))
+				}
+			}
+		}
+	} else {
+		// Fallback to original behavior if no assertion is available
+		slog.Warn("No assertion data available, using fallback values")
+		userinfo.SetUserID(userID)
+		userinfo.SetUsername(userID)
+		userinfo.SetEmail(userID + "@example.com")
+		userinfo.SetFullName("Test User")
+		userinfo.SetGivenName("Test")
+		userinfo.SetSurname("User")
+	}
 
 	return nil
 }
@@ -222,13 +277,62 @@ func (s *Storage) SetUserinfoWithLoginName(
 	loginName string,
 	_ []int,
 ) error {
-	// TODO: Set user attributes
-	userinfo.SetUserID(loginName)
-	userinfo.SetUsername(loginName)
-	userinfo.SetEmail(loginName + "@example.com")
-	userinfo.SetFullName("Test User")
-	userinfo.SetGivenName("Test")
-	userinfo.SetSurname("User")
+	// For login name, we don't have access to the auth request ID,
+	// so we need to find the auth request by user ID
+	// This is a limitation of the current design
+
+	// Try to find an auth request with matching UserID
+	s.authRequestsLock.RLock()
+	var foundAuthRequest *AuthRequest
+	for _, ar := range s.authRequests {
+		if ar.UserID == loginName && ar.Assertion != nil {
+			foundAuthRequest = ar
+
+			break
+		}
+	}
+	s.authRequestsLock.RUnlock()
+
+	if foundAuthRequest != nil && foundAuthRequest.Assertion != nil {
+		// Use the same logic as SetUserinfoWithUserID
+		if foundAuthRequest.Assertion.Subject != nil && foundAuthRequest.Assertion.Subject.NameID != nil {
+			userinfo.SetUserID(foundAuthRequest.Assertion.Subject.NameID.Value)
+			userinfo.SetUsername(foundAuthRequest.Assertion.Subject.NameID.Value)
+		}
+
+		// Extract attributes from the assertion
+		for _, attrStatement := range foundAuthRequest.Assertion.AttributeStatements {
+			for _, attr := range attrStatement.Attributes {
+				switch attr.Name {
+				case "email", "Email", "mail":
+					if len(attr.Values) > 0 {
+						userinfo.SetEmail(attr.Values[0].Value)
+					}
+				case "name", "Name", "displayName", "DisplayName":
+					if len(attr.Values) > 0 {
+						userinfo.SetFullName(attr.Values[0].Value)
+					}
+				case "givenName", "GivenName", "firstName", "FirstName":
+					if len(attr.Values) > 0 {
+						userinfo.SetGivenName(attr.Values[0].Value)
+					}
+				case "surname", "Surname", "lastName", "LastName", "sn":
+					if len(attr.Values) > 0 {
+						userinfo.SetSurname(attr.Values[0].Value)
+					}
+				}
+			}
+		}
+	} else {
+		// Fallback to original behavior
+		slog.Warn("No assertion data available for login name, using fallback values", slog.String("loginName", loginName))
+		userinfo.SetUserID(loginName)
+		userinfo.SetUsername(loginName)
+		userinfo.SetEmail(loginName + "@example.com")
+		userinfo.SetFullName("Test User")
+		userinfo.SetGivenName("Test")
+		userinfo.SetSurname("User")
+	}
 
 	return nil
 }
