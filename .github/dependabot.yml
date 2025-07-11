@@ -5,10 +5,6 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
-  - package-ecosystem: "gomod"
-    directory: "/tools"
-    schedule:
-      interval: "monthly"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
