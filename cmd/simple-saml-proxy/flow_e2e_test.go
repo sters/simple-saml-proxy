@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/xml"
 	"io"
@@ -18,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+//nolint:cyclop,gocognit,funlen // Complex e2e test that verifies entire SAML flow
 func TestE2EFlow(t *testing.T) {
 	t.Log("Starting E2E flow test...")
 
@@ -90,7 +92,7 @@ func TestE2EFlow(t *testing.T) {
 	if resp2.StatusCode == http.StatusFound {
 		// Single IDP - auto-redirected to idp_selected
 		t.Log("Single IDP detected - auto-redirected to idp_selected")
-		
+
 		// Get cookies from the idp_select page
 		for _, cookie := range resp2.Cookies() {
 			t.Logf("Cookie from resp2: %s = %s", cookie.Name, cookie.Value)
@@ -98,12 +100,13 @@ func TestE2EFlow(t *testing.T) {
 				authID = cookie.Value
 			}
 		}
-		
+
 		// Follow the redirect to idp_selected which will then redirect to IDP
 		resp3, err = mockSp.FollowRedirect(resp2)
 		require.NoError(t, err)
+		defer resp3.Body.Close()
 		assert.Equal(t, http.StatusFound, resp3.StatusCode)
-		
+
 		// Get additional cookies from idp_selected
 		for _, cookie := range resp3.Cookies() {
 			t.Logf("Cookie from resp3: %s = %s", cookie.Name, cookie.Value)
@@ -112,12 +115,12 @@ func TestE2EFlow(t *testing.T) {
 			}
 		}
 		t.Logf("Final authID: %s", authID)
-		
+
 		resp4 = resp3
 	} else {
 		// Multiple IDP - selection page shown
 		assert.Equal(t, http.StatusOK, resp2.StatusCode)
-		
+
 		// Should show IDP selection page
 		body2, err := io.ReadAll(resp2.Body)
 		require.NoError(t, err)
@@ -127,6 +130,7 @@ func TestE2EFlow(t *testing.T) {
 		for _, cookie := range resp2.Cookies() {
 			if cookie.Name == "authID" {
 				authID = cookie.Value
+
 				break
 			}
 		}
@@ -194,7 +198,7 @@ func TestE2EFlow(t *testing.T) {
 	if authID != "" {
 		req5.AddCookie(&http.Cookie{Name: "authID", Value: authID})
 	}
-	
+
 	// Copy cookies from IDP selection response (or from resp2 if single IDP)
 	if resp3 != nil {
 		for _, cookie := range resp3.Cookies() {
@@ -206,7 +210,7 @@ func TestE2EFlow(t *testing.T) {
 			req5.AddCookie(cookie)
 		}
 	}
-	
+
 	// Also add cookies from initial response
 	for _, cookie := range resp1.Cookies() {
 		req5.AddCookie(cookie)
@@ -225,74 +229,18 @@ func TestE2EFlow(t *testing.T) {
 	// Note: The proxy uses crewjam/saml which enforces signature validation
 	// In a test environment with mock providers, this will fail
 	// We verify the flow up to this point and document the limitation
-	if resp5.StatusCode == http.StatusBadRequest {
-		body, _ := io.ReadAll(resp5.Body)
-		t.Log("Expected failure: SAML response signature validation failed in test environment")
-		t.Logf("Error response: %s", string(body))
-		
-		// Even though we can't complete the full flow due to signature validation,
-		// we can verify that:
-		// 1. The proxy received the SAML response
-		// 2. The cookies were properly set and passed
-		// 3. The flow proceeded through all the expected steps
-		t.Log("Test verified successful flow through steps 1-5 of the SAML authentication process")
-	} else {
-		// If signature validation is somehow disabled or working, complete the flow
-		assert.Equal(t, http.StatusFound, resp5.StatusCode)
-		callbackLocation := resp5.Header.Get("Location")
-		t.Logf("Redirected to: %s", callbackLocation)
-
-		// Step 6: Follow redirect to callback
-		t.Log("Step 6: Following redirect to callback...")
-		req6, err := http.NewRequestWithContext(ctx, http.MethodGet, proxyServer.URL+callbackLocation, nil)
-		require.NoError(t, err)
-		
-		// Copy cookies
-		for _, cookie := range resp5.Cookies() {
-			req6.AddCookie(cookie)
-		}
-		if resp3 != nil {
-			for _, cookie := range resp3.Cookies() {
-				req6.AddCookie(cookie)
-			}
-		} else {
-			for _, cookie := range resp2.Cookies() {
-				req6.AddCookie(cookie)
-			}
-		}
-
-		resp6, err := http.DefaultClient.Do(req6)
-		require.NoError(t, err)
-		defer resp6.Body.Close()
-
-		// The callback should complete the SP-initiated flow
-		body6, err := io.ReadAll(resp6.Body)
-		require.NoError(t, err)
-		t.Logf("Callback response status: %d", resp6.StatusCode)
-
-		// Check the response
-		if resp6.StatusCode == http.StatusOK && strings.Contains(string(body6), "Select Service Provider") {
-			t.Log("WARNING: Proxy is showing SP selection page for SP-initiated flow.")
-			t.Log("The proxy should complete the original SP request instead.")
-		} else if resp6.StatusCode >= 300 && resp6.StatusCode < 400 {
-			location := resp6.Header.Get("Location")
-			t.Logf("Callback redirected to: %s", location)
-			if strings.Contains(location, "sp.example.com") {
-				t.Log("SUCCESS: Proxy correctly redirected back to the original SP")
-			}
-		}
-	}
+	handleSAMLResponseValidation(ctx, t, resp5, proxyServer, resp2, resp3)
 
 	// Step 7: Verify we can get the auth request details
 	authRequest, err := idp.IDPStorage.AuthRequestByID(ctx, authID)
 	require.NoError(t, err)
 	require.NotNil(t, authRequest)
-	
+
 	ar, ok := authRequest.(*saml.AuthRequest)
 	require.True(t, ok)
 	assert.Equal(t, "https://sp.example.com", ar.Issuer)
 	assert.NotEmpty(t, ar.AccessConsumerServiceURL)
-	
+
 	t.Log("E2E flow test completed!")
 }
 
@@ -554,7 +502,7 @@ func TestE2EFlowWithAuthFailure(t *testing.T) {
 	var cookies []*http.Cookie
 	cookies = append(cookies, resp1.Cookies()...)
 	cookies = append(cookies, resp2.Cookies()...)
-	
+
 	// Single IDP should auto-redirect
 	if resp2.StatusCode == http.StatusFound {
 		// Follow to idp_selected
@@ -562,16 +510,16 @@ func TestE2EFlowWithAuthFailure(t *testing.T) {
 		require.NoError(t, err)
 		defer resp3.Body.Close()
 		cookies = append(cookies, resp3.Cookies()...)
-		
+
 		// Should redirect to IDP
 		assert.Equal(t, http.StatusFound, resp3.StatusCode)
-		
+
 		// Follow to IDP
 		resp4, err := mockSp.FollowRedirect(resp3)
 		require.NoError(t, err)
 		defer resp4.Body.Close()
 		cookies = append(cookies, resp4.Cookies()...)
-		
+
 		resp2 = resp4
 	}
 
@@ -627,7 +575,7 @@ func TestE2EFlowWithAuthFailure(t *testing.T) {
 		// If for some reason signature validation is bypassed, check the response
 		assert.Equal(t, http.StatusBadRequest, resp3Final.StatusCode)
 	}
-	
+
 	t.Log("Successfully tested authentication failure handling")
 }
 
@@ -888,4 +836,68 @@ func TestE2EFlowErrorHandling_UnauthorizedSP(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	// Note: Current implementation might not enforce this
 	t.Logf("Unauthorized SP response: %s", string(body))
+}
+
+func handleSAMLResponseValidation(ctx context.Context, t *testing.T, resp5 *http.Response, proxyServer *httptest.Server, resp2, resp3 *http.Response) {
+	t.Helper()
+
+	if resp5.StatusCode == http.StatusBadRequest {
+		body, _ := io.ReadAll(resp5.Body)
+		t.Log("Expected failure: SAML response signature validation failed in test environment")
+		t.Logf("Error response: %s", string(body))
+
+		// Even though we can't complete the full flow due to signature validation,
+		// we can verify that:
+		// 1. The proxy received the SAML response
+		// 2. The cookies were properly set and passed
+		// 3. The flow proceeded through all the expected steps
+		t.Log("Test verified successful flow through steps 1-5 of the SAML authentication process")
+
+		return
+	}
+
+	// If signature validation is somehow disabled or working, complete the flow
+	assert.Equal(t, http.StatusFound, resp5.StatusCode)
+	callbackLocation := resp5.Header.Get("Location")
+	t.Logf("Redirected to: %s", callbackLocation)
+
+	// Step 6: Follow redirect to callback
+	t.Log("Step 6: Following redirect to callback...")
+	req6, err := http.NewRequestWithContext(ctx, http.MethodGet, proxyServer.URL+callbackLocation, nil)
+	require.NoError(t, err)
+
+	// Copy cookies
+	for _, cookie := range resp5.Cookies() {
+		req6.AddCookie(cookie)
+	}
+	if resp3 != nil {
+		for _, cookie := range resp3.Cookies() {
+			req6.AddCookie(cookie)
+		}
+	} else {
+		for _, cookie := range resp2.Cookies() {
+			req6.AddCookie(cookie)
+		}
+	}
+
+	resp6, err := http.DefaultClient.Do(req6)
+	require.NoError(t, err)
+	defer resp6.Body.Close()
+
+	// The callback should complete the SP-initiated flow
+	body6, err := io.ReadAll(resp6.Body)
+	require.NoError(t, err)
+	t.Logf("Callback response status: %d", resp6.StatusCode)
+
+	// Check the response
+	if resp6.StatusCode == http.StatusOK && strings.Contains(string(body6), "Select Service Provider") {
+		t.Log("WARNING: Proxy is showing SP selection page for SP-initiated flow.")
+		t.Log("The proxy should complete the original SP request instead.")
+	} else if resp6.StatusCode >= 300 && resp6.StatusCode < 400 {
+		location := resp6.Header.Get("Location")
+		t.Logf("Callback redirected to: %s", location)
+		if strings.Contains(location, "sp.example.com") {
+			t.Log("SUCCESS: Proxy correctly redirected back to the original SP")
+		}
+	}
 }
