@@ -66,9 +66,12 @@ func CreateServiceProviders(ctx context.Context, cfg config.Config) (*ServicePro
 			if err != nil {
 				slog.Warn("Invalid IDP metadata URL", slog.String("url", idpConfig.MetadataURL))
 			} else {
-				ed, err = samlsp.FetchMetadata(ctx, http.DefaultClient, *idpMetadataURL)
+				ed, err = FetchMetadataWithRetry(ctx, http.DefaultClient, *idpMetadataURL, cfg)
 				if err != nil {
-					slog.Warn("Failed to fetch IDP metadata", slog.String("url", idpConfig.MetadataURL))
+					slog.Error("Failed to fetch IDP metadata after retries", 
+						slog.String("url", idpConfig.MetadataURL),
+						slog.Any("error", err))
+					return nil, fmt.Errorf("failed to fetch metadata for IDP %s: %w", idpConfig.ID, err)
 				}
 			}
 		}

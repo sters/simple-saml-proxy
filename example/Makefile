@@ -20,7 +20,7 @@ certs:
 # Start services
 up: certs
 	@echo "Starting services..."
-	docker compose up -d --build --force-recreate --remove-orphans
+	docker compose up --build --force-recreate --remove-orphans
 	@echo ""
 	@echo "Services are running:"
 	@echo "  - Service Provider: http://localhost:8001/simplesaml/"

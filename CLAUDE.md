@@ -80,6 +80,9 @@ Configuration is loaded from environment variables:
 - `PROXY_PRIVATE_KEY_PATH`: Path to private key
 - `PROXY_CERTIFICATE_PATH`: Path to certificate
 - `IDP_0_ID`, `IDP_1_ID`, etc.: IdP configurations
+- `METADATA_MAX_RETRIES`: Max retry attempts for metadata fetching (default: 5)
+- `METADATA_INITIAL_DELAY`: Initial retry delay (default: 1s)
+- `METADATA_MAX_DELAY`: Maximum retry delay (default: 30s)
 
 ## Testing Approach
 

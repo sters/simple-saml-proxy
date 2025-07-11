@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/caarlos0/env/v11"
 )
@@ -41,6 +42,12 @@ type Config struct {
 	Server struct {
 		ListenAddress string `env:"LISTEN_ADDRESS" envDefault:":8080"`
 	} `envPrefix:"SERVER_"`
+
+	Metadata struct {
+		MaxRetries   int           `env:"MAX_RETRIES"    envDefault:"5"`
+		InitialDelay time.Duration `env:"INITIAL_DELAY"  envDefault:"1s"`
+		MaxDelay     time.Duration `env:"MAX_DELAY"      envDefault:"30s"`
+	} `envPrefix:"METADATA_"`
 }
 
 // LoadConfig loads configuration from environment variables.

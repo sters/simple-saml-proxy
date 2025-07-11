@@ -73,7 +73,7 @@ func (s *Storage) GetMetadataSigningKey(_ context.Context) (*key.CertificateAndK
 
 // IdentityProviderStorage interface implementation
 
-func (s *Storage) GetEntityByID(_ context.Context, entityID string) (*serviceprovider.ServiceProvider, error) {
+func (s *Storage) GetEntityByID(ctx context.Context, entityID string) (*serviceprovider.ServiceProvider, error) {
 	s.spCacheLock.RLock()
 	sp, ok := s.spCache[entityID]
 	s.spCacheLock.RUnlock()
@@ -91,7 +91,7 @@ func (s *Storage) GetEntityByID(_ context.Context, entityID string) (*servicepro
 		// Create a service provider config for requester info
 		var metadataBytes []byte
 		if allowedSP.MetadataURL != "" {
-			b, err := xml.ReadMetadataFromURL(http.DefaultClient, allowedSP.MetadataURL)
+			b, err := ReadMetadataFromURLWithRetry(ctx, http.DefaultClient, allowedSP.MetadataURL, s.config)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read metadata from URL: %w", err)
 			}
