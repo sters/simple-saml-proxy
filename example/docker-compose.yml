@@ -37,8 +37,6 @@ services:
         condition: service_healthy
       test-sp:
         condition: service_started
-    networks:
-      - saml-network
 
   # Test Identity Provider (SimpleSAMLphp)
   test-idp:
@@ -58,8 +56,6 @@ services:
       - ./docker/idp/saml20-idp-hosted.php:/var/www/simplesamlphp/metadata/saml20-idp-hosted.php:ro
       - ./docker/idp/saml20-sp-hosted.php:/var/www/simplesamlphp/metadata/saml20-sp-hosted.php:ro
       - ./docker/certs:/certs:ro
-    networks:
-      - saml-network
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/simplesaml/"]
       interval: 5s
@@ -69,7 +65,9 @@ services:
 
   # Test Service Provider (SimpleSAMLphp)
   test-sp:
-    image: kenchan0130/simplesamlphp:1.19.9
+    build:
+      context: ./docker/sp
+      dockerfile: Dockerfile
     container_name: test-sp
     ports:
       - "8001:8001"
@@ -90,12 +88,3 @@ services:
       - ./docker/certs:/certs:ro
     networks:
       - saml-network
-    command: >
-      sh -c "sed -i 's/:8000/:8001/g' /etc/apache2/sites-available/000-default.conf &&
-             sed -i 's/Listen 8000/Listen 8001/g' /etc/apache2/ports.conf &&
-             docker-php-entrypoint apache2-foreground"
-
-networks:
-  saml-network:
-    driver: bridge
-

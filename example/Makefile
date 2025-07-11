@@ -55,7 +55,7 @@ clean:
 	@echo "Cleanup complete!"
 
 # Service-specific targets
-.PHONY: logs-proxy logs-idp logs-sp
+.PHONY: logs-proxy logs-idp logs-sp status
 
 logs-proxy:
 	docker compose logs -f simple-saml-proxy
@@ -65,3 +65,12 @@ logs-idp:
 
 logs-sp:
 	docker compose logs -f test-sp
+
+# Check service status
+status:
+	@docker compose ps
+	@echo ""
+	@echo "Testing service endpoints:"
+	@curl -s -o /dev/null -w "IdP: %{http_code}\n" http://localhost:8000/simplesaml/ || echo "IdP: Failed"
+	@curl -s -o /dev/null -w "SP: %{http_code}\n" http://localhost:8001/simplesaml/ || echo "SP: Failed"
+	@curl -s -o /dev/null -w "Proxy: %{http_code}\n" http://localhost:8080/metadata || echo "Proxy: Failed"
