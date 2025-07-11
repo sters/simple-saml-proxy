@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # Simple SAML Proxy
+  simple-saml-proxy:
+    build:
+      context: ..
+      dockerfile: example/Dockerfile
+    container_name: simple-saml-proxy
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_LISTEN_ADDRESS=:8080
+      - PROXY_ENTITY_ID=http://simple-saml-proxy:8080
+      - PROXY_SSO_URL=http://simple-saml-proxy:8080/sso
+      - PROXY_ACS_URL=http://simple-saml-proxy:8080/acs
+      - PROXY_METADATA_URL=http://simple-saml-proxy:8080/metadata
+      - PROXY_PRIVATE_KEY_PATH=/certs/proxy.key
+      - PROXY_CERTIFICATE_PATH=/certs/proxy.crt
+      # IdP configuration
+      - IDP_0_ID=test-idp
+      - IDP_0_NAME=Test Identity Provider
+      - IDP_0_SSO_URL=http://test-idp:8000/simplesaml/saml2/idp/SSOService.php
+      - IDP_0_METADATA_URL=http://test-idp:8000/simplesaml/saml2/idp/metadata.php
+      # Allowed SP configuration
+      - PROXY_ALLOWED_SP_0_ENTITY_ID=http://test-sp:8001
+      - PROXY_ALLOWED_SP_0_NAME=Test Service Provider
+      - PROXY_ALLOWED_SP_0_ACS_URL=http://test-sp:8001/simplesaml/module.php/saml/sp/saml2-acs.php/default-sp
+    volumes:
+      - ./docker/certs:/certs:ro
+    depends_on:
+      - test-idp
+      - test-sp
+    networks:
+      - saml-network
+
+  # Test Identity Provider (SimpleSAMLphp)
+  test-idp:
+    image: kenchan0130/simplesamlphp:2.0.4
+    container_name: test-idp
+    ports:
+      - "8000:8000"
+    environment:
+      - SIMPLESAMLPHP_SP_ENTITY_ID=http://simple-saml-proxy:8080
+      - SIMPLESAMLPHP_SP_ASSERTION_CONSUMER_SERVICE=http://simple-saml-proxy:8080/acs
+      - SIMPLESAMLPHP_IDP_ENTITY_ID=http://test-idp:8000/simplesaml/saml2/idp/metadata.php
+      - SIMPLESAMLPHP_ADMIN_PASSWORD=admin123
+      - SIMPLESAMLPHP_SECRET_SALT=defaultsecret
+    volumes:
+      - ./docker/idp/authsources.php:/var/www/simplesamlphp/config/authsources.php:ro
+      - ./docker/idp/saml20-sp-hosted.php:/var/www/simplesamlphp/metadata/saml20-sp-hosted.php:ro
+      - ./docker/certs:/certs:ro
+    networks:
+      - saml-network
+
+  # Test Service Provider (SimpleSAMLphp)
+  test-sp:
+    image: kenchan0130/simplesamlphp:2.0.4
+    container_name: test-sp
+    ports:
+      - "8001:8001"
+    environment:
+      - SIMPLESAMLPHP_SP_ENTITY_ID=http://test-sp:8001
+      - SIMPLESAMLPHP_SP_ASSERTION_CONSUMER_SERVICE=http://test-sp:8001/simplesaml/module.php/saml/sp/saml2-acs.php/default-sp
+      - SIMPLESAMLPHP_IDP_ENTITY_ID=http://simple-saml-proxy:8080
+      - SIMPLESAMLPHP_IDP_SSO_SERVICE=http://simple-saml-proxy:8080/sso
+      - SIMPLESAMLPHP_IDP_METADATA=http://simple-saml-proxy:8080/metadata
+      - SIMPLESAMLPHP_ADMIN_PASSWORD=admin123
+      - SIMPLESAMLPHP_SECRET_SALT=defaultsecret
+      - SIMPLESAMLPHP_BASEURLPATH=http://localhost:8001/simplesaml/
+    volumes:
+      - ./docker/sp/authsources.php:/var/www/simplesamlphp/config/authsources.php:ro
+      - ./docker/sp/saml20-idp-hosted.php:/var/www/simplesamlphp/metadata/saml20-idp-hosted.php:ro
+      - ./docker/certs:/certs:ro
+    networks:
+      - saml-network
+    command: >
+      sh -c "sed -i 's/:8000/:8001/g' /etc/apache2/sites-available/000-default.conf &&
+             sed -i 's/Listen 8000/Listen 8001/g' /etc/apache2/ports.conf &&
+             docker-php-entrypoint apache2-foreground"
+
+networks:
+  saml-network:
+    driver: bridge

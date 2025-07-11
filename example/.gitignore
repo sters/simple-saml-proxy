@@ -1,0 +1,7 @@
+# Generated certificates
+docker/certs/*.crt
+docker/certs/*.key
+docker/certs/*.pem
+
+# Docker volumes
+docker/volumes/
