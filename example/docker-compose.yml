@@ -37,6 +37,8 @@ services:
         condition: service_healthy
       test-sp:
         condition: service_started
+    networks:
+      - saml-network
 
   # Test Identity Provider (SimpleSAMLphp)
   test-idp:
@@ -88,3 +90,7 @@ services:
       - ./docker/certs:/certs:ro
     networks:
       - saml-network
+
+networks:
+  saml-network:
+    driver: bridge
