@@ -2,6 +2,8 @@
 
 This document details the level of SAML 2.0 specification support implemented in simple-saml-proxy.
 
+**Last Updated**: 2025-07-11
+
 ## Overview
 
 simple-saml-proxy implements a subset of the SAML 2.0 specification, focusing on the Web Browser SSO Profile for multi-IdP federation. The proxy acts as both an Identity Provider (IdP) to Service Providers and a Service Provider (SP) to upstream Identity Providers.
@@ -45,7 +47,7 @@ simple-saml-proxy implements a subset of the SAML 2.0 specification, focusing on
 | Basic Assertions | ✅ | Creation and parsing supported |
 | Subject | ✅ | With NameID |
 | Conditions | ✅ | NotBefore, NotOnOrAfter, AudienceRestriction |
-| AuthnStatement | ⚠️ | Basic support, no AuthnContext |
+| AuthnStatement | ✅ | Full support with AuthnInstant |
 | AttributeStatement | ✅ | Configurable attributes |
 | AuthzDecisionStatement | ❌ | Not implemented |
 
@@ -53,8 +55,8 @@ simple-saml-proxy implements a subset of the SAML 2.0 specification, focusing on
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| XML Signatures | ⚠️ | Via underlying libraries (RSA-SHA256) |
-| Signature Validation | ✅ | Automatic validation |
+| XML Signatures | ✅ | Full support with RSA-SHA256 (implemented 2025-07-11) |
+| Signature Validation | ✅ | Automatic validation with X.509 certificates |
 | Assertion Encryption | ❌ | Not supported |
 | Attribute Encryption | ❌ | Not supported |
 | TLS/HTTPS | ✅ | Recommended for deployment |
@@ -115,7 +117,7 @@ simple-saml-proxy implements a subset of the SAML 2.0 specification, focusing on
 | Feature | Status | Notes |
 |---------|--------|-------|
 | SP-Initiated SSO | ✅ | Primary use case |
-| IdP-Initiated SSO | ⚠️ | Basic endpoint exists |
+| IdP-Initiated SSO | ✅ | Full support with SP selection |
 | Multi-IdP Support | ✅ | Core feature with selection UI |
 | Multi-SP Support | ✅ | Configurable allowed SPs |
 | ForceAuthn | ❌ | Not implemented |
@@ -155,10 +157,12 @@ Custom attributes can be configured and will be passed through as-is.
 1. **github.com/zitadel/saml** (v0.3.5)
    - Used for IdP-side functionality
    - Handles metadata generation and SAML response creation
+   - Provides XML signature generation via amdonov/xmlsig
 
 2. **github.com/crewjam/saml** (v0.5.1)
    - Used for SP-side functionality
    - Handles SAML request parsing and response validation
+   - Provides signature validation via russellhaering/goxmldsig
 
 ### Architecture
 
@@ -185,7 +189,7 @@ This implementation provides:
 
 1. **HTTPS Required**: The proxy should always be deployed with TLS
 2. **No Encryption**: Assertions and attributes are not encrypted
-3. **Signature Validation**: Performed by underlying libraries
+3. **Signature Validation**: Full XML digital signature validation with certificate chain support
 4. **No Replay Protection**: Beyond basic time-based validation
 
 ### Limitations
@@ -193,7 +197,7 @@ This implementation provides:
 1. **No persistent sessions**: Restart loses all session data
 2. **No logout support**: Users must close browsers to end sessions
 3. **Limited attribute mapping**: No transformation capabilities
-4. **No advanced security features**: Such as encryption or enhanced signatures
+4. **No encryption support**: Assertions and attributes are not encrypted
 
 ## Use Cases
 
@@ -215,6 +219,13 @@ Potential enhancements could include:
 - 🚧 AuthnContext support
 - 🚧 Enhanced attribute mapping
 - 🚧 SAML 2.0 full conformance
+
+## Recent Improvements (2025)
+
+- **2025-07-11**: Implemented full XML digital signature support with RSA-SHA256
+- **2025-07-11**: Enhanced E2E testing with proper signature validation
+- **2025-07-10**: Improved IdP-initiated SSO flow with SP selection
+- **2025-07-10**: Added comprehensive test coverage for all SAML flows
 
 ## References
 
