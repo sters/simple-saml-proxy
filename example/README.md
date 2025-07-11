@@ -156,12 +156,14 @@ If you encounter certificate validation errors:
 2. Regenerate if needed: `cd docker/certs && ./generate-certs.sh`
 
 ### Connection Issues
-- Check all services are running: `docker-compose ps`
-- View logs: `docker-compose logs -f [service-name]`
+- Check all services are running: `docker compose ps`
+- View logs: `docker compose logs -f [service-name]`
 - Ensure ports 8000, 8001, and 8080 are not in use
+- The IdP service has a health check that ensures it's ready before the proxy starts
+- If you see connection refused errors, increase METADATA_MAX_RETRIES or METADATA_INITIAL_DELAY
 
 ### SAML Errors
-- Check proxy logs: `docker-compose logs -f simple-saml-proxy`
+- Check proxy logs: `docker compose logs -f simple-saml-proxy`
 - Verify metadata is accessible:
   - Proxy: http://localhost:8080/metadata
   - IdP: http://localhost:8000/simplesaml/saml2/idp/metadata.php
