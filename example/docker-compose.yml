@@ -26,6 +26,10 @@ services:
       - PROXY_ALLOWED_SP_0_ENTITY_ID=http://test-sp:8001
       - PROXY_ALLOWED_SP_0_NAME=Test Service Provider
       - PROXY_ALLOWED_SP_0_ACS_URL=http://test-sp:8001/simplesaml/module.php/saml/sp/saml2-acs.php/default-sp
+      # Metadata retry configuration
+      - METADATA_MAX_RETRIES=10
+      - METADATA_INITIAL_DELAY=2s
+      - METADATA_MAX_DELAY=30s
     volumes:
       - ./docker/certs:/certs:ro
     depends_on:

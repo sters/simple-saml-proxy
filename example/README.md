@@ -90,6 +90,15 @@ The proxy is configured to allow one SP:
 - **Name**: Test Service Provider
 - **ACS URL**: `http://test-sp:8001/simplesaml/module.php/saml/sp/saml2-acs.php/default-sp`
 
+### Metadata Retry Configuration
+
+The proxy includes retry logic for fetching metadata from IdPs and SPs:
+- **Max Retries**: 10 attempts
+- **Initial Delay**: 2 seconds
+- **Max Delay**: 30 seconds
+
+This ensures reliable metadata fetching even when services are still starting up.
+
 ## Directory Structure
 
 ```
