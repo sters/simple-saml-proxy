@@ -15,6 +15,17 @@ This example demonstrates how to run the simple-saml-proxy with Docker Compose, 
 
 ## Quick Start
 
+### Using Make (Recommended)
+
+```bash
+make up        # Generate certificates and start all services
+make logs      # View logs from all services
+make down      # Stop all services
+make help      # Show all available commands
+```
+
+### Manual Setup
+
 1. **Generate certificates** (required for SAML):
    ```bash
    cd docker/certs
