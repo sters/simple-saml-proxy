@@ -92,3 +92,7 @@ Configuration is loaded from environment variables:
 ## Linting Configuration
 
 The project uses golangci-lint with all linters enabled except those listed in `.golangci.yml`. Common exclusions for test files include dupl, funlen, and paralleltest.
+
+## Code Quality
+
+The codebase is maintained with no TODO, FIXME, XXX, or HACK comments. All tasks and improvements are tracked through GitHub issues rather than inline comments.
