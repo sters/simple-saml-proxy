@@ -565,7 +565,8 @@ func TestE2EFlowWithAuthFailure(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "urn:oasis:names:tc:SAML:2.0:status:AuthnFailed", failureResp.Status.StatusCode.Value)
-	assert.Contains(t, failureResp.Status.StatusMessage, "Authentication failed")
+	assert.NotNil(t, failureResp.Status.StatusMessage)
+	assert.Equal(t, "Authentication failed", failureResp.Status.StatusMessage.Value)
 
 	// Proxy should return an error because signature validation will fail
 	// In test environment, the proxy can't validate the signature from the mock IDP
