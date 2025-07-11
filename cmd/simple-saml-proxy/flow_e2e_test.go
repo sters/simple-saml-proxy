@@ -53,9 +53,6 @@ func TestE2EFlow(t *testing.T) {
 	providers, err := saml.CreateServiceProviders(ctx, *proxyConfig)
 	require.NoError(t, err)
 
-	// Disable signature validation for testing
-	disableSignatureValidation(providers)
-
 	idp, err := saml.CreateProxyIDP(*proxyConfig)
 	require.NoError(t, err)
 
@@ -226,9 +223,7 @@ func TestE2EFlow(t *testing.T) {
 	require.NoError(t, err)
 	defer resp5.Body.Close()
 
-	// Note: The proxy uses crewjam/saml which enforces signature validation
-	// In a test environment with mock providers, this will fail
-	// We verify the flow up to this point and document the limitation
+	// The proxy should now accept properly signed responses
 	handleSAMLResponseValidation(ctx, t, resp5, proxyServer, resp2, resp3)
 
 	// Step 7: Verify we can get the auth request details
@@ -283,7 +278,6 @@ func TestE2EFlowMultipleIdPs(t *testing.T) {
 	providers, err := saml.CreateServiceProviders(ctx, *proxyConfig)
 	require.NoError(t, err)
 
-	disableSignatureValidation(providers)
 
 	idp, err := saml.CreateProxyIDP(*proxyConfig)
 	require.NoError(t, err)
@@ -423,18 +417,16 @@ func TestE2EFlowMultipleIdPs(t *testing.T) {
 	body5, err := io.ReadAll(resp5.Body)
 	require.NoError(t, err)
 
-	// Note: The proxy uses crewjam/saml which enforces signature validation
-	// In a test environment with mock providers, this will fail
+	// The proxy should accept properly signed responses
 	if resp5.StatusCode == http.StatusBadRequest {
-		t.Log("Expected failure: SAML response signature validation failed in test environment")
-		t.Logf("Error response: %s", string(body5))
-		t.Log("Test verified successful flow through steps 1-5 with multiple IdPs")
-	} else {
-		// If signature validation passes, verify the final response
-		assert.Equal(t, http.StatusOK, resp5.StatusCode)
-		// Verify the flow completed - the response should show SP selection for IdP-initiated
-		assert.Contains(t, string(body5), "Select Service Provider")
+		t.Errorf("SAML response validation failed: %s", string(body5))
+		t.FailNow()
 	}
+	
+	// Verify the response
+	assert.Equal(t, http.StatusOK, resp5.StatusCode)
+	// Verify the flow completed - the response should show SP selection for IdP-initiated
+	assert.Contains(t, string(body5), "Select Service Provider")
 
 	t.Log("Multiple IdP E2E flow test completed successfully!")
 }
@@ -472,7 +464,6 @@ func TestE2EFlowWithAuthFailure(t *testing.T) {
 	providers, err := saml.CreateServiceProviders(ctx, *proxyConfig)
 	require.NoError(t, err)
 
-	disableSignatureValidation(providers)
 
 	idp, err := saml.CreateProxyIDP(*proxyConfig)
 	require.NoError(t, err)
@@ -844,20 +835,11 @@ func handleSAMLResponseValidation(ctx context.Context, t *testing.T, resp5 *http
 
 	if resp5.StatusCode == http.StatusBadRequest {
 		body, _ := io.ReadAll(resp5.Body)
-		t.Log("Expected failure: SAML response signature validation failed in test environment")
-		t.Logf("Error response: %s", string(body))
-
-		// Even though we can't complete the full flow due to signature validation,
-		// we can verify that:
-		// 1. The proxy received the SAML response
-		// 2. The cookies were properly set and passed
-		// 3. The flow proceeded through all the expected steps
-		t.Log("Test verified successful flow through steps 1-5 of the SAML authentication process")
-
-		return
+		t.Errorf("SAML response validation failed: %s", string(body))
+		t.FailNow()
 	}
 
-	// If signature validation is somehow disabled or working, complete the flow
+	// If signature validation passes, complete the flow
 	assert.Equal(t, http.StatusFound, resp5.StatusCode)
 	callbackLocation := resp5.Header.Get("Location")
 	t.Logf("Redirected to: %s", callbackLocation)

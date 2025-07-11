@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
@@ -27,6 +28,7 @@ import (
 
 	"github.com/beevik/etree"
 	"github.com/crewjam/saml"
+	dsig "github.com/russellhaering/goxmldsig"
 	"github.com/stretchr/testify/require"
 )
 
@@ -416,17 +418,53 @@ func (p *MockSAMLProvider) createSAMLResponse(requestID, acsURL, audience string
 		Assertion: assertion,
 	}
 
-	// Convert to XML string
+	// Convert to XML and sign it
 	doc := etree.NewDocument()
 	responseEl := response.Element()
 	doc.SetRoot(responseEl)
 
-	// For now, return unsigned response since proper signing requires
-	// more complex setup. The test will verify that the proxy can at least
-	// parse and handle well-formed SAML responses.
-	xmlStr, _ := doc.WriteToString()
+	// Sign the response
+	signedXML, err := p.signSAMLResponse(doc)
+	if err != nil {
+		p.t.Logf("Failed to sign SAML response: %v", err)
+		// Return unsigned response as fallback
+		xmlStr, _ := doc.WriteToString()
+		return xmlStr
+	}
 
-	return xmlStr
+	return signedXML
+}
+
+// signSAMLResponse signs the SAML response XML document.
+func (p *MockSAMLProvider) signSAMLResponse(doc *etree.Document) (string, error) {
+	// Create a TLS certificate from our RSA key and certificate
+	tlsCert := tls.Certificate{
+		Certificate: [][]byte{p.certificate.Raw},
+		PrivateKey:  p.privateKey,
+	}
+
+	// Create a signing context
+	signingContext := dsig.NewDefaultSigningContext(dsig.TLSCertKeyStore(tlsCert))
+	signingContext.Canonicalizer = dsig.MakeC14N10ExclusiveCanonicalizerWithPrefixList("")
+
+	// Find the Response element to sign
+	responseEl := doc.Root()
+	if responseEl == nil {
+		return "", fmt.Errorf("no root element found")
+	}
+
+	// Sign the response
+	signedEl, err := signingContext.SignEnveloped(responseEl)
+	if err != nil {
+		return "", fmt.Errorf("failed to sign response: %w", err)
+	}
+
+	// Create a new document with the signed element
+	signedDoc := etree.NewDocument()
+	signedDoc.SetRoot(signedEl)
+
+	// Return the signed XML
+	return signedDoc.WriteToString()
 }
 
 // Close shuts down the mock provider.

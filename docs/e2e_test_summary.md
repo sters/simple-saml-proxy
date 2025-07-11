@@ -38,7 +38,7 @@ This document summarizes the implementation of complete SAML flow E2E tests for 
   3. ✅ User selects IdP (or automatic for single IdP)
   4. ✅ Proxy redirects to selected IdP with SAML request
   5. ✅ IdP returns SAML response to proxy ACS
-  6. ⚠️ Response validation fails due to signature requirements (documented limitation)
+  6. ✅ Response validation with proper XML digital signatures (implemented 2025-07-11)
   7. ✅ Test verifies all authentication flow components work correctly
 - Handles both single IdP (auto-redirect) and multiple IdP scenarios
 - Properly manages cookie flow throughout the authentication process
@@ -63,7 +63,7 @@ This document summarizes the implementation of complete SAML flow E2E tests for 
   3. ✅ User selects an IdP and correct cookies are set
   4. ✅ Proxy redirects to selected IdP with proper SAML request
   5. ✅ IdP returns SAML response to proxy ACS endpoint
-  6. ⚠️ Response processing fails due to signature validation (expected)
+  6. ✅ Response processing with signature validation passes successfully
 
 ### 7. Security E2E Tests
 - **Status**: ✅ FULLY PASSING (20/20 security tests)
