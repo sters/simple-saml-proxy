@@ -2,6 +2,7 @@ package saml
 
 import (
 	"testing"
+	"time"
 
 	"github.com/crewjam/saml"
 	"github.com/sters/simple-saml-proxy/config"
@@ -338,4 +339,60 @@ func TestSetUserinfoWithLoginName_AssertionData(t *testing.T) {
 	assert.Equal(t, "john.doe@example.com", userinfo.attributes["Username"])
 	assert.Equal(t, "john.doe@example.com", userinfo.attributes["Email"])
 	assert.Equal(t, "John Doe", userinfo.attributes["FullName"])
+}
+
+func TestCleanupCompletedAuthRequests(t *testing.T) {
+	// Create storage
+	storage := &Storage{
+		authRequests: make(map[string]*AuthRequest),
+	}
+
+	// Create auth requests with different completion times
+	now := time.Now()
+
+	// Completed and old (should be cleaned up)
+	oldCompleted := &AuthRequest{
+		ID:          "old-completed",
+		IsDone:      true,
+		CompletedAt: now.Add(-20 * time.Minute),
+	}
+
+	// Completed but recent (should not be cleaned up)
+	recentCompleted := &AuthRequest{
+		ID:          "recent-completed",
+		IsDone:      true,
+		CompletedAt: now.Add(-5 * time.Minute),
+	}
+
+	// Not completed (should not be cleaned up)
+	notCompleted := &AuthRequest{
+		ID:     "not-completed",
+		IsDone: false,
+	}
+
+	// Completed but no timestamp (should not be cleaned up)
+	completedNoTimestamp := &AuthRequest{
+		ID:     "completed-no-timestamp",
+		IsDone: true,
+	}
+
+	// Add all auth requests to storage
+	storage.authRequests["old-completed"] = oldCompleted
+	storage.authRequests["recent-completed"] = recentCompleted
+	storage.authRequests["not-completed"] = notCompleted
+	storage.authRequests["completed-no-timestamp"] = completedNoTimestamp
+
+	// Run cleanup with 10 minute max age
+	deleted := storage.CleanupCompletedAuthRequests(10 * time.Minute)
+
+	// Verify results
+	assert.Equal(t, 1, deleted, "Should have deleted 1 auth request")
+	assert.Nil(t, storage.authRequests["old-completed"], "Old completed request should be deleted")
+	assert.NotNil(t, storage.authRequests["recent-completed"], "Recent completed request should remain")
+	assert.NotNil(t, storage.authRequests["not-completed"], "Not completed request should remain")
+	assert.NotNil(t, storage.authRequests["completed-no-timestamp"], "Completed request without timestamp should remain")
+
+	// Run cleanup again to verify idempotency
+	deleted = storage.CleanupCompletedAuthRequests(10 * time.Minute)
+	assert.Equal(t, 0, deleted, "No additional requests should be deleted")
 }

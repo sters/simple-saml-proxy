@@ -3,6 +3,7 @@ package proxy
 import (
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/sters/simple-saml-proxy/proxy/saml"
 )
@@ -41,6 +42,7 @@ func handleSAMLACS(idp *saml.IDP, providers *saml.ServiceProviders) http.Handler
 
 		if ar, ok := authRequest.(*saml.AuthRequest); ok {
 			ar.IsDone = true // 自分でDone=trueにしないといけない
+			ar.CompletedAt = time.Now()
 		} else {
 			slog.Error("Failed to cast authRequest to *AuthRequest")
 			http.Error(w, "Invalid request", http.StatusInternalServerError)

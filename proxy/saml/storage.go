@@ -438,6 +438,27 @@ func (s *Storage) GetAllowedSPs() []config.SPConfig {
 	return s.config.Proxy.AllowedSP
 }
 
+// CleanupCompletedAuthRequests removes completed auth requests older than the specified duration.
+func (s *Storage) CleanupCompletedAuthRequests(maxAge time.Duration) int {
+	s.authRequestsLock.Lock()
+	defer s.authRequestsLock.Unlock()
+
+	now := time.Now()
+	deleted := 0
+	for id, authRequest := range s.authRequests {
+		if authRequest.IsDone && !authRequest.CompletedAt.IsZero() && now.Sub(authRequest.CompletedAt) > maxAge {
+			delete(s.authRequests, id)
+			deleted++
+		}
+	}
+
+	if deleted > 0 {
+		slog.Info("Cleaned up completed auth requests", slog.Int("count", deleted))
+	}
+
+	return deleted
+}
+
 // CheckAndMarkLogoutRequestProcessed checks if a logout request ID has been processed
 // and marks it as processed if not. Returns true if this is a replay.
 func (s *Storage) CheckAndMarkLogoutRequestProcessed(contextID, requestID string) (bool, error) {

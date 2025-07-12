@@ -1,6 +1,10 @@
 package saml
 
-import "github.com/crewjam/saml"
+import (
+	"time"
+
+	"github.com/crewjam/saml"
+)
 
 // AuthRequest implements the models.AuthRequestInt interface.
 type AuthRequest struct {
@@ -14,6 +18,7 @@ type AuthRequest struct {
 	Destination              string
 	UserID                   string
 	IsDone                   bool
+	CompletedAt              time.Time
 	// Assertion data from the actual IdP
 	Assertion *saml.Assertion
 }

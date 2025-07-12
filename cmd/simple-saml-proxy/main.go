@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/sters/simple-saml-proxy/config"
 	"github.com/sters/simple-saml-proxy/proxy"
@@ -42,9 +43,25 @@ func main() {
 
 	mux := proxy.SetupHTTPHandlers(idp, providers, cfg)
 
+	// Start cleanup goroutine for auth requests
+	go startAuthRequestCleanup(idp)
+
 	err = proxy.StartServer(cfg, mux)
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("Failed to start server", slog.Any("error", err))
 		os.Exit(1)
+	}
+}
+
+// startAuthRequestCleanup starts a goroutine that periodically cleans up completed auth requests.
+func startAuthRequestCleanup(idp *saml.IDP) {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	// Run cleanup immediately on startup
+	idp.IDPStorage.CleanupCompletedAuthRequests(10 * time.Minute)
+
+	for range ticker.C {
+		idp.IDPStorage.CleanupCompletedAuthRequests(10 * time.Minute)
 	}
 }
