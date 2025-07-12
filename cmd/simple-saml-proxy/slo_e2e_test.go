@@ -116,6 +116,7 @@ func TestSPInitiatedLogoutFlow(t *testing.T) {
 		for _, cookie := range cookies {
 			if cookie.Name == "logout_context_id" {
 				logoutCtxCookie = cookie
+
 				break
 			}
 		}
@@ -251,6 +252,7 @@ func TestIdPInitiatedLogoutFlow(t *testing.T) {
 		for _, cookie := range cookies {
 			if cookie.Name == "logout_context_id" {
 				logoutCtxCookie = cookie
+
 				break
 			}
 		}
