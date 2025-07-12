@@ -4,7 +4,40 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-This is a SAML proxy written in Go that acts as an intermediary between Service Providers (SPs) and Identity Providers (IdPs). It enables multi-IdP support by presenting itself as an IdP to SPs and as an SP to IdPs.
+This is a lightweight and easy-to-use SAML proxy written in Go. **This is NOT a simple request/response proxy** that just forwards SAML messages. Instead, it's an intelligent intermediary that enables multi-tenant SSO capabilities for applications that only support single-tenant SSO.
+
+### Core Concept
+
+The proxy follows a **dual-role pattern**:
+- **To Service Providers (SPs)**: Acts as an Identity Provider (IdP)
+- **To Identity Providers (IdPs)**: Acts as a Service Provider (SP)
+
+### Key Characteristics
+
+1. **Zero External Infrastructure Dependencies**:
+   - No database required
+   - No persistent cache or storage
+   - No configuration files
+   - Single binary deployment
+   - All configuration via environment variables
+
+2. **Multi-IDP Support**:
+   - Supports multiple Identity Providers simultaneously
+   - Enables single-tenant SPs to work with multiple IDPs
+   - Provides IDP selection interface during authentication
+
+3. **Identity Federation Approach**:
+   - Acts as an IDP to SPs but **does not store user accounts or identity information**
+   - Does not perform identity federation or user data mapping
+   - Simply relays authentication assertions between IDPs and SPs
+   - Maintains session state only during the authentication flow
+
+### Use Case
+
+This proxy is designed for organizations that need to:
+- Connect applications that only support single-tenant SSO to multiple Identity Providers
+- Avoid complex identity federation systems when simple authentication relay is sufficient
+- Deploy quickly without database setup or complex configuration management
 
 ## Development Commands
 
@@ -34,9 +67,7 @@ make tidy            # Clean up go.mod dependencies
 
 ## Architecture
 
-The proxy follows a dual-role pattern:
-- **To Service Providers**: Acts as an Identity Provider (IdP)
-- **To Identity Providers**: Acts as a Service Provider (SP)
+The application is structured as a stateless HTTP server with modular SAML handling components.
 
 ### Core Components
 
