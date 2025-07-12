@@ -180,6 +180,15 @@ func NewMockSAMLProvider(t *testing.T) *MockSAMLProvider {
 		}
 	})
 
+	// SLO endpoint - handle logout requests
+	mux.HandleFunc("/saml/slo", func(w http.ResponseWriter, r *http.Request) {
+		// For tests, just return a 200 OK to indicate logout was received
+		// In a real IdP, this would process the logout request and return a response
+		provider.t.Logf("Mock IdP received logout request: %s", r.URL.String())
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("Logout processed"))
+	})
+
 	// SSO endpoint
 	mux.HandleFunc("/saml/sso", func(w http.ResponseWriter, r *http.Request) {
 		// Extract the SAML request
@@ -266,6 +275,7 @@ func NewMockSAMLProvider(t *testing.T) *MockSAMLProvider {
         </X509Data>
       </KeyInfo>
     </KeyDescriptor>
+    <SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="` + provider.server.URL + `/saml/slo"/>
     <SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="` + provider.ssoURL + `"/>
   </IDPSSODescriptor>
 </EntityDescriptor>`)
@@ -623,6 +633,14 @@ func NewMockSAMLProviderWithErrors(t *testing.T) *MockSAMLProviderWithErrors {
 		_, _ = w.Write(provider.metadata)
 	})
 
+	// SLO endpoint - handle logout requests
+	mux.HandleFunc("/saml/slo", func(w http.ResponseWriter, r *http.Request) {
+		// For tests, just return a 200 OK to indicate logout was received
+		provider.t.Logf("Mock IdP received logout request: %s", r.URL.String())
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("Logout processed"))
+	})
+
 	// SSO endpoint with error simulation
 	mux.HandleFunc("/saml/sso", func(w http.ResponseWriter, r *http.Request) {
 		if provider.shouldError {
@@ -688,6 +706,7 @@ func NewMockSAMLProviderWithErrors(t *testing.T) *MockSAMLProviderWithErrors {
         </X509Data>
       </KeyInfo>
     </KeyDescriptor>
+    <SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="` + provider.server.URL + `/saml/slo"/>
     <SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="` + provider.ssoURL + `"/>
   </IDPSSODescriptor>
 </EntityDescriptor>`)

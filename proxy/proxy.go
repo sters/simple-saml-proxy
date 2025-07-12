@@ -29,6 +29,11 @@ func SetupHTTPHandlers(idp *saml.IDP, providers *saml.ServiceProviders, _ config
 	mux.HandleFunc("/saml/acs", handleSAMLACS(idp, providers))
 	mux.HandleFunc("/idp-initiated", handleIDPInitiated)
 
+	// Single Logout endpoints
+	mux.HandleFunc("/slo", handleSLO(idp, providers))
+	mux.HandleFunc("/sls", handleSLS(idp, providers))
+	mux.HandleFunc("/slo/response", handleSLOResponse(idp, providers))
+
 	// Create request handler with routing
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		slog.Info("Received request", slog.String("path", r.URL.Path))
@@ -40,6 +45,22 @@ func SetupHTTPHandlers(idp *saml.IDP, providers *saml.ServiceProviders, _ config
 			return
 		case strings.HasPrefix(r.URL.Path, "/idp_select"):
 			handleIDPSelect(idp, providers)(w, r)
+
+			return
+		case strings.HasPrefix(r.URL.Path, "/logout_idp_selected"):
+			handleLogoutIDPSelected(idp, providers)(w, r)
+
+			return
+		case strings.HasPrefix(r.URL.Path, "/logout_idp_select"):
+			handleLogoutIDPSelect(idp, providers)(w, r)
+
+			return
+		case strings.HasPrefix(r.URL.Path, "/logout_sp_selected"):
+			handleLogoutSPSelected(idp, providers)(w, r)
+
+			return
+		case strings.HasPrefix(r.URL.Path, "/logout_sp_select"):
+			handleLogoutSPSelect(idp, providers)(w, r)
 
 			return
 		}
@@ -77,7 +98,10 @@ func StartServer(cfg config.Config, handler http.Handler) error {
 	slog.Info("Starting SAML IdP proxy", slog.String("address", cfg.Server.ListenAddress))
 	slog.Info("Metadata URL (for SPs)", slog.String("url", cfg.Proxy.MetadataURL))
 	slog.Info("SSO URL (for SPs)", slog.String("url", cfg.Proxy.EntityID+"/sso"))
+	slog.Info("SLO URL (for SPs)", slog.String("url", cfg.Proxy.SLOURL))
+	slog.Info("SLO Response URL", slog.String("url", cfg.Proxy.EntityID+"/slo/response"))
 	slog.Info("ACS URL (for IdPs)", slog.String("url", cfg.Proxy.AcsURL))
+	slog.Info("SLS URL (for IdPs)", slog.String("url", cfg.Proxy.SLSURL))
 	slog.Info("IdP Selection URL", slog.String("url", cfg.Proxy.EntityID+"/idp_selected"))
 
 	// Log information about configured IDP

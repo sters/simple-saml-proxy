@@ -1,7 +1,10 @@
 package proxy
 
 import (
+	"bytes"
+	"compress/flate"
 	"crypto/rand"
+	"fmt"
 	"io"
 	"net/http"
 )
@@ -24,4 +27,25 @@ func randomBytes(n int) []byte {
 	}
 
 	return rv
+}
+
+// deflateCompress compresses data using deflate compression.
+func deflateCompress(data []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	writer, err := flate.NewWriter(&buf, flate.DefaultCompression)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create deflate writer: %w", err)
+	}
+
+	if _, err := writer.Write(data); err != nil {
+		writer.Close()
+
+		return nil, fmt.Errorf("failed to write data: %w", err)
+	}
+
+	if err := writer.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close deflate writer: %w", err)
+	}
+
+	return buf.Bytes(), nil
 }

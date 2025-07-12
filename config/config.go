@@ -31,6 +31,8 @@ type Config struct {
 		EntityID        string     `env:"ENTITY_ID"                 envDefault:"http://localhost:8080"`
 		AcsURL          string     `env:"ACS_URL"                   envDefault:"http://localhost:8080/sso/acs"`
 		MetadataURL     string     `env:"METADATA_URL"              envDefault:"http://localhost:8080/metadata"`
+		SLOURL          string     `env:"SLO_URL"                   envDefault:"http://localhost:8080/slo"`
+		SLSURL          string     `env:"SLS_URL"                   envDefault:"http://localhost:8080/sls"`
 		PrivateKeyPath  string     `env:"PRIVATE_KEY_PATH,required"`
 		CertificatePath string     `env:"CERTIFICATE_PATH,required"`
 		AllowedSP       []SPConfig `envPrefix:"ALLOWED_SP_"`
@@ -48,6 +50,10 @@ type Config struct {
 		InitialDelay time.Duration `env:"INITIAL_DELAY" envDefault:"1s"`
 		MaxDelay     time.Duration `env:"MAX_DELAY"     envDefault:"30s"`
 	} `envPrefix:"METADATA_"`
+
+	SLO struct {
+		ContextTimeout time.Duration `env:"CONTEXT_TIMEOUT" envDefault:"5m"`
+	} `envPrefix:"SLO_"`
 }
 
 // LoadConfig loads configuration from environment variables.

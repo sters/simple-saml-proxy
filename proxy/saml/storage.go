@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/sters/simple-saml-proxy/config"
@@ -25,6 +26,7 @@ var (
 	ErrEntityNotFound         = errors.New("entity not found")
 	ErrAuthRequestNotFound    = errors.New("auth request not found")
 	ErrInvalidAuthRequestType = errors.New("invalid auth request type")
+	ErrLogoutContextNotFound  = errors.New("logout context not found")
 )
 
 // Storage implements the zitadel/saml Storage interfaces.
@@ -42,6 +44,10 @@ type Storage struct {
 
 	entityIDByAppID     map[string]string
 	entityIDByAppIDLock sync.RWMutex
+
+	// Cache for logout contexts
+	logoutContexts     map[string]*LogoutContext
+	logoutContextsLock sync.RWMutex
 }
 
 // NewStorage creates a new Storage.
@@ -57,6 +63,7 @@ func NewStorage(cfg config.Config) (*Storage, error) {
 		spCache:         make(map[string]*serviceprovider.ServiceProvider),
 		authRequests:    make(map[string]*AuthRequest),
 		entityIDByAppID: make(map[string]string),
+		logoutContexts:  make(map[string]*LogoutContext),
 	}, nil
 }
 
@@ -369,4 +376,90 @@ func (s *Storage) AddAuthRequestForTesting(authRequest *AuthRequest) {
 	s.authRequestsLock.Lock()
 	defer s.authRequestsLock.Unlock()
 	s.authRequests[authRequest.ID] = authRequest
+}
+
+// Logout context management methods
+
+// CreateLogoutContext creates a new logout context for tracking logout flow state.
+func (s *Storage) CreateLogoutContext(originType, originID, targetID, relayState string) *LogoutContext {
+	id := uuid.New().String()
+	logoutContext := &LogoutContext{
+		ID:                id,
+		OriginType:        originType,
+		OriginID:          originID,
+		TargetID:          targetID,
+		RelayState:        relayState,
+		CreatedAt:         time.Now(),
+		ProcessedRequests: make(map[string]bool),
+	}
+
+	s.logoutContextsLock.Lock()
+	s.logoutContexts[id] = logoutContext
+	s.logoutContextsLock.Unlock()
+
+	return logoutContext
+}
+
+// GetLogoutContext retrieves a logout context by ID.
+func (s *Storage) GetLogoutContext(id string) (*LogoutContext, error) {
+	s.logoutContextsLock.RLock()
+	logoutContext, ok := s.logoutContexts[id]
+	s.logoutContextsLock.RUnlock()
+
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrLogoutContextNotFound, id)
+	}
+
+	return logoutContext, nil
+}
+
+// DeleteLogoutContext removes a logout context from storage.
+func (s *Storage) DeleteLogoutContext(id string) {
+	s.logoutContextsLock.Lock()
+	delete(s.logoutContexts, id)
+	s.logoutContextsLock.Unlock()
+}
+
+// CleanupExpiredLogoutContexts removes logout contexts older than the specified duration.
+func (s *Storage) CleanupExpiredLogoutContexts(maxAge time.Duration) {
+	s.logoutContextsLock.Lock()
+	defer s.logoutContextsLock.Unlock()
+
+	now := time.Now()
+	for id, ctx := range s.logoutContexts {
+		if now.Sub(ctx.CreatedAt) > maxAge {
+			delete(s.logoutContexts, id)
+		}
+	}
+}
+
+// GetAllowedSPs returns the list of allowed service providers from configuration.
+func (s *Storage) GetAllowedSPs() []config.SPConfig {
+	return s.config.Proxy.AllowedSP
+}
+
+// CheckAndMarkLogoutRequestProcessed checks if a logout request ID has been processed
+// and marks it as processed if not. Returns true if this is a replay.
+func (s *Storage) CheckAndMarkLogoutRequestProcessed(contextID, requestID string) (bool, error) {
+	if requestID == "" {
+		return false, nil // No request ID to check
+	}
+
+	s.logoutContextsLock.Lock()
+	defer s.logoutContextsLock.Unlock()
+
+	logoutContext, ok := s.logoutContexts[contextID]
+	if !ok {
+		return false, fmt.Errorf("%w: %s", ErrLogoutContextNotFound, contextID)
+	}
+
+	// Check if already processed
+	if logoutContext.ProcessedRequests[requestID] {
+		return true, nil // This is a replay
+	}
+
+	// Mark as processed
+	logoutContext.ProcessedRequests[requestID] = true
+
+	return false, nil
 }
