@@ -424,8 +424,9 @@ func TestE2EFlowMultipleIdPs(t *testing.T) {
 
 	// Verify the response
 	assert.Equal(t, http.StatusOK, resp5.StatusCode)
-	// Verify the flow completed - the response should show SP selection for IdP-initiated
-	assert.Contains(t, string(body5), "Select Service Provider")
+	// In SP-initiated flow, we should get a form that posts back to the SP
+	assert.Contains(t, string(body5), "SAMLResponse")
+	assert.Contains(t, string(body5), mockSp.acsURL)
 
 	t.Log("Multiple IdP E2E flow test completed successfully!")
 }
