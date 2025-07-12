@@ -4,7 +4,7 @@
  */
 
 $metadata['default-sp'] = [
-    'entityID' => 'http://test-sp:8001',
+    'entityID' => 'http://test-sp:8000',
     'privatekey' => 'sp.key',
     'certificate' => 'sp.crt',
     
@@ -15,7 +15,7 @@ $metadata['default-sp'] = [
     'AssertionConsumerService' => [
         [
             'Binding' => 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST',
-            'Location' => 'http://test-sp:8001/simplesaml/module.php/saml/sp/saml2-acs.php/default-sp',
+            'Location' => 'http://test-sp:8000/simplesaml/module.php/saml/sp/saml2-acs.php/default-sp',
             'index' => 0,
         ],
     ],
@@ -23,7 +23,7 @@ $metadata['default-sp'] = [
     'SingleLogoutService' => [
         [
             'Binding' => 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
-            'Location' => 'http://test-sp:8001/simplesaml/module.php/saml/sp/saml2-logout.php/default-sp',
+            'Location' => 'http://test-sp:8000/simplesaml/module.php/saml/sp/saml2-logout.php/default-sp',
         ],
     ],
 ];

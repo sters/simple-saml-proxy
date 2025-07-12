@@ -32,7 +32,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var ErrNoLocationHeader = errors.New("no Location header in redirect response")
+var (
+	ErrNoLocationHeader = errors.New("no Location header in redirect response")
+	ErrNoRootElement    = errors.New("no root element found")
+)
 
 // encodeSAMLRequest encodes a SAML request for HTTP-Redirect binding.
 // It deflates and then base64 encodes the request as per SAML specification.
@@ -429,6 +432,7 @@ func (p *MockSAMLProvider) createSAMLResponse(requestID, acsURL, audience string
 		p.t.Logf("Failed to sign SAML response: %v", err)
 		// Return unsigned response as fallback
 		xmlStr, _ := doc.WriteToString()
+
 		return xmlStr
 	}
 
@@ -450,7 +454,7 @@ func (p *MockSAMLProvider) signSAMLResponse(doc *etree.Document) (string, error)
 	// Find the Response element to sign
 	responseEl := doc.Root()
 	if responseEl == nil {
-		return "", fmt.Errorf("no root element found")
+		return "", ErrNoRootElement
 	}
 
 	// Sign the response
@@ -464,7 +468,12 @@ func (p *MockSAMLProvider) signSAMLResponse(doc *etree.Document) (string, error)
 	signedDoc.SetRoot(signedEl)
 
 	// Return the signed XML
-	return signedDoc.WriteToString()
+	result, err := signedDoc.WriteToString()
+	if err != nil {
+		return "", fmt.Errorf("failed to write signed document: %w", err)
+	}
+
+	return result, nil
 }
 
 // Close shuts down the mock provider.
@@ -576,12 +585,6 @@ func (c *MockSAMLClient) FollowRedirect(resp *http.Response) (*http.Response, er
 	}
 
 	return resp2, nil
-}
-
-// disableSignatureValidation disables signature validation for testing.
-func disableSignatureValidation(_ interface{}) {
-	// Note: The crewjam/saml library doesn't expose a simple way to disable signature validation
-	// This function is left as a placeholder for when such functionality is needed
 }
 
 // MockSAMLProviderWithErrors is a mock provider that can simulate errors.

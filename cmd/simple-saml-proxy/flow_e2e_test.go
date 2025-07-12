@@ -278,7 +278,6 @@ func TestE2EFlowMultipleIdPs(t *testing.T) {
 	providers, err := saml.CreateServiceProviders(ctx, *proxyConfig)
 	require.NoError(t, err)
 
-
 	idp, err := saml.CreateProxyIDP(*proxyConfig)
 	require.NoError(t, err)
 
@@ -422,7 +421,7 @@ func TestE2EFlowMultipleIdPs(t *testing.T) {
 		t.Errorf("SAML response validation failed: %s", string(body5))
 		t.FailNow()
 	}
-	
+
 	// Verify the response
 	assert.Equal(t, http.StatusOK, resp5.StatusCode)
 	// Verify the flow completed - the response should show SP selection for IdP-initiated
@@ -463,7 +462,6 @@ func TestE2EFlowWithAuthFailure(t *testing.T) {
 	ctx := t.Context()
 	providers, err := saml.CreateServiceProviders(ctx, *proxyConfig)
 	require.NoError(t, err)
-
 
 	idp, err := saml.CreateProxyIDP(*proxyConfig)
 	require.NoError(t, err)

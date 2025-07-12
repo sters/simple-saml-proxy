@@ -15,9 +15,9 @@ import (
 )
 
 const (
-	defaultMaxRetries = 5
+	defaultMaxRetries   = 5
 	defaultInitialDelay = 1 * time.Second
-	defaultMaxDelay = 30 * time.Second
+	defaultMaxDelay     = 30 * time.Second
 )
 
 // FetchMetadataWithRetry attempts to fetch SAML metadata with exponential backoff retry logic.
@@ -58,6 +58,7 @@ func FetchMetadataWithRetry(ctx context.Context, client *http.Client, metadataUR
 					slog.String("url", metadataURL.String()),
 					slog.Int("attempts", attempt+1))
 			}
+
 			return ed, nil
 		}
 
@@ -69,7 +70,7 @@ func FetchMetadataWithRetry(ctx context.Context, client *http.Client, metadataUR
 			slog.Any("error", err))
 
 		// Exponential backoff with jitter
-		delay = delay * 2
+		delay *= 2
 		if delay > maxDelay {
 			delay = maxDelay
 		}
@@ -116,6 +117,7 @@ func ReadMetadataFromURLWithRetry(ctx context.Context, client *http.Client, meta
 					slog.String("url", metadataURL),
 					slog.Int("attempts", attempt+1))
 			}
+
 			return metadataBytes, nil
 		}
 
@@ -127,7 +129,7 @@ func ReadMetadataFromURLWithRetry(ctx context.Context, client *http.Client, meta
 			slog.Any("error", err))
 
 		// Exponential backoff with jitter
-		delay = delay * 2
+		delay *= 2
 		if delay > maxDelay {
 			delay = maxDelay
 		}

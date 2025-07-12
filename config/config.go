@@ -44,9 +44,9 @@ type Config struct {
 	} `envPrefix:"SERVER_"`
 
 	Metadata struct {
-		MaxRetries   int           `env:"MAX_RETRIES"    envDefault:"5"`
-		InitialDelay time.Duration `env:"INITIAL_DELAY"  envDefault:"1s"`
-		MaxDelay     time.Duration `env:"MAX_DELAY"      envDefault:"30s"`
+		MaxRetries   int           `env:"MAX_RETRIES"   envDefault:"5"`
+		InitialDelay time.Duration `env:"INITIAL_DELAY" envDefault:"1s"`
+		MaxDelay     time.Duration `env:"MAX_DELAY"     envDefault:"30s"`
 	} `envPrefix:"METADATA_"`
 }
 

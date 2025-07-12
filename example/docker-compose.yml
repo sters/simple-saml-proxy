@@ -20,74 +20,53 @@ services:
       # IdP configuration
       - IDP_0_ID=test-idp
       - IDP_0_NAME=Test Identity Provider
-      - IDP_0_SSO_URL=http://test-idp:8000/simplesaml/saml2/idp/SSOService.php
-      - IDP_0_METADATA_URL=http://test-idp:8000/simplesaml/saml2/idp/metadata.php
+      - IDP_0_SSO_URL=http://test-idp:8080/simplesaml/saml2/idp/SSOService.php
+      - IDP_0_METADATA_URL=http://test-idp:8080/simplesaml/saml2/idp/metadata.php
       # Allowed SP configuration
-      - PROXY_ALLOWED_SP_0_ENTITY_ID=http://test-sp:8001
+      - PROXY_ALLOWED_SP_0_ENTITY_ID=http://test-sp/shibboleth
       - PROXY_ALLOWED_SP_0_NAME=Test Service Provider
-      - PROXY_ALLOWED_SP_0_ACS_URL=http://test-sp:8001/simplesaml/module.php/saml/sp/saml2-acs.php/default-sp
+      - PROXY_ALLOWED_SP_0_ACS_URL=http://test-sp/Shibboleth.sso/SAML2/POST
       # Metadata retry configuration
       - METADATA_MAX_RETRIES=10
       - METADATA_INITIAL_DELAY=2s
       - METADATA_MAX_DELAY=30s
     volumes:
       - ./docker/certs:/certs:ro
-    depends_on:
-      test-idp:
-        condition: service_healthy
-      test-sp:
-        condition: service_started
     networks:
       - saml-network
 
-  # Test Identity Provider (SimpleSAMLphp)
+  # Test Identity Provider (kristophjunge/test-saml-idp)
   test-idp:
-    image: kenchan0130/simplesamlphp:1.19.9
+    image: kristophjunge/test-saml-idp:latest
     container_name: test-idp
     ports:
-      - "8000:8000"
+      - "8000:8080"
     environment:
       - SIMPLESAMLPHP_SP_ENTITY_ID=http://simple-saml-proxy:8080
       - SIMPLESAMLPHP_SP_ASSERTION_CONSUMER_SERVICE=http://simple-saml-proxy:8080/acs
-      - SIMPLESAMLPHP_IDP_ENTITY_ID=http://test-idp:8000/simplesaml/saml2/idp/metadata.php
-      - SIMPLESAMLPHP_ADMIN_PASSWORD=admin123
-      - SIMPLESAMLPHP_SECRET_SALT=defaultsecret
-    volumes:
-      - ./docker/idp/config.php:/var/www/simplesamlphp/config/config.php:ro
-      - ./docker/idp/authsources.php:/var/www/simplesamlphp/config/authsources.php:ro
-      - ./docker/idp/saml20-idp-hosted.php:/var/www/simplesamlphp/metadata/saml20-idp-hosted.php:ro
-      - ./docker/idp/saml20-sp-hosted.php:/var/www/simplesamlphp/metadata/saml20-sp-hosted.php:ro
-      - ./docker/certs:/certs:ro
+    networks:
+      - saml-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/simplesaml/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/simplesaml/saml2/idp/metadata.php"]
       interval: 5s
       timeout: 3s
       retries: 10
       start_period: 30s
 
-  # Test Service Provider (SimpleSAMLphp)
+  # Test Service Provider (szabogyula/saml-sp)
   test-sp:
-    build:
-      context: ./docker/sp
-      dockerfile: Dockerfile
+    image: szabogyula/saml-sp:latest
     container_name: test-sp
     ports:
-      - "8001:8001"
+      - "8001:80"
     environment:
-      - SIMPLESAMLPHP_SP_ENTITY_ID=http://test-sp:8001
-      - SIMPLESAMLPHP_SP_ASSERTION_CONSUMER_SERVICE=http://test-sp:8001/simplesaml/module.php/saml/sp/saml2-acs.php/default-sp
-      - SIMPLESAMLPHP_IDP_ENTITY_ID=http://simple-saml-proxy:8080
-      - SIMPLESAMLPHP_IDP_SSO_SERVICE=http://simple-saml-proxy:8080/sso
-      - SIMPLESAMLPHP_IDP_METADATA=http://simple-saml-proxy:8080/metadata
-      - SIMPLESAMLPHP_ADMIN_PASSWORD=admin123
-      - SIMPLESAMLPHP_SECRET_SALT=defaultsecret
-      - SIMPLESAMLPHP_BASEURLPATH=http://localhost:8001/simplesaml/
-    volumes:
-      - ./docker/sp/config.php:/var/www/simplesamlphp/config/config.php:ro
-      - ./docker/sp/authsources.php:/var/www/simplesamlphp/config/authsources.php:ro
-      - ./docker/sp/saml20-sp-hosted.php:/var/www/simplesamlphp/metadata/saml20-sp-hosted.php:ro
-      - ./docker/sp/saml20-idp-hosted.php:/var/www/simplesamlphp/metadata/saml20-idp-hosted.php:ro
-      - ./docker/certs:/certs:ro
+      - VIRTUAL_HOST=test-sp
+      - ENTITY_ID=http://test-sp/shibboleth
+      - IDP_ENTITY_ID=http://simple-saml-proxy:8080
+      - SUPPORT_CONTACT=test@example.com
+      - ALIAS_SECURE=/secure
+      - XML_METADATA_PROVIDER=http://simple-saml-proxy:8080/metadata
+      - NOSSL=true
     networks:
       - saml-network
 

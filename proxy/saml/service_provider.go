@@ -68,9 +68,10 @@ func CreateServiceProviders(ctx context.Context, cfg config.Config) (*ServicePro
 			} else {
 				ed, err = FetchMetadataWithRetry(ctx, http.DefaultClient, *idpMetadataURL, cfg)
 				if err != nil {
-					slog.Error("Failed to fetch IDP metadata after retries", 
+					slog.Error("Failed to fetch IDP metadata after retries",
 						slog.String("url", idpConfig.MetadataURL),
 						slog.Any("error", err))
+
 					return nil, fmt.Errorf("failed to fetch metadata for IDP %s: %w", idpConfig.ID, err)
 				}
 			}
