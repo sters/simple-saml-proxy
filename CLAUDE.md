@@ -14,7 +14,7 @@ The proxy follows a **dual-role pattern**:
 
 ### Key Characteristics
 
-1. **Zero Dependencies Philosophy**:
+1. **Zero External Infrastructure Dependencies**:
    - No database required
    - No persistent cache or storage
    - No configuration files
@@ -67,9 +67,7 @@ make tidy            # Clean up go.mod dependencies
 
 ## Architecture
 
-The proxy follows a dual-role pattern:
-- **To Service Providers**: Acts as an Identity Provider (IdP)
-- **To Identity Providers**: Acts as a Service Provider (SP)
+The application is structured as a stateless HTTP server with modular SAML handling components.
 
 ### Core Components
 
