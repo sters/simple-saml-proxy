@@ -1,0 +1,3367 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>simple-saml-proxy: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/sters/simple-saml-proxy/cmd/simple-saml-proxy/main.go (0.0%)</option>
+				
+				<option value="file1">github.com/sters/simple-saml-proxy/config/config.go (100.0%)</option>
+				
+				<option value="file2">github.com/sters/simple-saml-proxy/proxy/proxy.go (90.5%)</option>
+				
+				<option value="file3">github.com/sters/simple-saml-proxy/proxy/proxy_handler_common.go (66.7%)</option>
+				
+				<option value="file4">github.com/sters/simple-saml-proxy/proxy/proxy_handler_idp_initiated.go (100.0%)</option>
+				
+				<option value="file5">github.com/sters/simple-saml-proxy/proxy/proxy_handler_idp_select.go (83.3%)</option>
+				
+				<option value="file6">github.com/sters/simple-saml-proxy/proxy/proxy_handler_idp_selected.go (91.9%)</option>
+				
+				<option value="file7">github.com/sters/simple-saml-proxy/proxy/proxy_handler_logout_idp_select.go (60.9%)</option>
+				
+				<option value="file8">github.com/sters/simple-saml-proxy/proxy/proxy_handler_logout_idp_selected.go (91.2%)</option>
+				
+				<option value="file9">github.com/sters/simple-saml-proxy/proxy/proxy_handler_logout_sp_select.go (76.0%)</option>
+				
+				<option value="file10">github.com/sters/simple-saml-proxy/proxy/proxy_handler_logout_sp_selected.go (67.9%)</option>
+				
+				<option value="file11">github.com/sters/simple-saml-proxy/proxy/proxy_handler_ping.go (100.0%)</option>
+				
+				<option value="file12">github.com/sters/simple-saml-proxy/proxy/proxy_handler_saml_acs.go (83.6%)</option>
+				
+				<option value="file13">github.com/sters/simple-saml-proxy/proxy/proxy_handler_slo.go (74.3%)</option>
+				
+				<option value="file14">github.com/sters/simple-saml-proxy/proxy/proxy_handler_slo_response.go (94.3%)</option>
+				
+				<option value="file15">github.com/sters/simple-saml-proxy/proxy/proxy_handler_sls.go (68.4%)</option>
+				
+				<option value="file16">github.com/sters/simple-saml-proxy/proxy/proxy_handler_sso.go (82.2%)</option>
+				
+				<option value="file17">github.com/sters/simple-saml-proxy/proxy/saml/auth_request.go (100.0%)</option>
+				
+				<option value="file18">github.com/sters/simple-saml-proxy/proxy/saml/certificate.go (85.7%)</option>
+				
+				<option value="file19">github.com/sters/simple-saml-proxy/proxy/saml/idp.go (89.5%)</option>
+				
+				<option value="file20">github.com/sters/simple-saml-proxy/proxy/saml/metadata.go (94.2%)</option>
+				
+				<option value="file21">github.com/sters/simple-saml-proxy/proxy/saml/service_provider.go (86.0%)</option>
+				
+				<option value="file22">github.com/sters/simple-saml-proxy/proxy/saml/storage.go (91.2%)</option>
+				
+				<option value="file23">github.com/sters/simple-saml-proxy/proxy/saml/test_helpers.go (100.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">no coverage</span>
+				<span class="cov1">low coverage</span>
+				<span class="cov2">*</span>
+				<span class="cov3">*</span>
+				<span class="cov4">*</span>
+				<span class="cov5">*</span>
+				<span class="cov6">*</span>
+				<span class="cov7">*</span>
+				<span class="cov8">*</span>
+				<span class="cov9">*</span>
+				<span class="cov10">high coverage</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package main
+
+import (
+        "context"
+        "errors"
+        "log/slog"
+        "net/http"
+        "os"
+        "time"
+
+        "github.com/sters/simple-saml-proxy/config"
+        "github.com/sters/simple-saml-proxy/proxy"
+        "github.com/sters/simple-saml-proxy/proxy/saml"
+)
+
+func main() <span class="cov0" title="0">{
+        ctx := context.Background()
+
+        logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+        slog.SetDefault(logger)
+
+        cfg, err := config.LoadConfig()
+        if err != nil </span><span class="cov0" title="0">{
+                slog.Error("Failed to process config", slog.Any("error", err))
+                os.Exit(1)
+        }</span>
+        <span class="cov0" title="0">slog.Info(
+                "config loaded",
+                slog.Any("config", cfg),
+        )
+
+        providers, err := saml.CreateServiceProviders(ctx, cfg)
+        if err != nil </span><span class="cov0" title="0">{
+                slog.Error("Failed to create SAML SPs", slog.Any("error", err))
+                os.Exit(1)
+        }</span>
+
+        <span class="cov0" title="0">idp, err := saml.CreateProxyIDP(cfg)
+        if err != nil </span><span class="cov0" title="0">{
+                slog.Error("Failed to create SAML IDP", slog.Any("error", err))
+                os.Exit(1)
+        }</span>
+
+        <span class="cov0" title="0">mux := proxy.SetupHTTPHandlers(idp, providers, cfg)
+
+        // Start cleanup goroutine for auth requests
+        go startAuthRequestCleanup(idp)
+
+        err = proxy.StartServer(cfg, mux)
+        if err != nil &amp;&amp; !errors.Is(err, http.ErrServerClosed) </span><span class="cov0" title="0">{
+                slog.Error("Failed to start server", slog.Any("error", err))
+                os.Exit(1)
+        }</span>
+}
+
+// startAuthRequestCleanup starts a goroutine that periodically cleans up completed auth requests.
+func startAuthRequestCleanup(idp *saml.IDP) <span class="cov0" title="0">{
+        ticker := time.NewTicker(5 * time.Minute)
+        defer ticker.Stop()
+
+        // Run cleanup immediately on startup
+        idp.IDPStorage.CleanupCompletedAuthRequests(10 * time.Minute)
+
+        for range ticker.C </span><span class="cov0" title="0">{
+                idp.IDPStorage.CleanupCompletedAuthRequests(10 * time.Minute)
+        }</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package config
+
+import (
+        "errors"
+        "fmt"
+        "time"
+
+        "github.com/caarlos0/env/v11"
+)
+
+var ErrNoIDPConfigured = errors.New("at least one IDP must be configured")
+
+// IDPConfig holds the configuration for a single Identity Provider.
+type IDPConfig struct {
+        ID              string `env:"ID,required"`
+        EntityID        string `env:"ENTITY_ID"`
+        SSOURL          string `env:"SSO_URL"`
+        CertificatePath string `env:"CERTIFICATE_PATH"`
+        MetadataURL     string `env:"METADATA_URL"`
+}
+
+type SPConfig struct {
+        EntityID    string `env:"ENTITY_ID"`
+        AcsURL      string `env:"ACS_URL"`
+        MetadataURL string `env:"METADATA_URL"`
+}
+
+// Config holds all the configuration parameters for the SAML proxy.
+type Config struct {
+        Proxy struct {
+                EntityID        string     `env:"ENTITY_ID"                 envDefault:"http://localhost:8080"`
+                AcsURL          string     `env:"ACS_URL"                   envDefault:"http://localhost:8080/sso/acs"`
+                MetadataURL     string     `env:"METADATA_URL"              envDefault:"http://localhost:8080/metadata"`
+                SLOURL          string     `env:"SLO_URL"                   envDefault:"http://localhost:8080/slo"`
+                SLSURL          string     `env:"SLS_URL"                   envDefault:"http://localhost:8080/sls"`
+                PrivateKeyPath  string     `env:"PRIVATE_KEY_PATH,required"`
+                CertificatePath string     `env:"CERTIFICATE_PATH,required"`
+                AllowedSP       []SPConfig `envPrefix:"ALLOWED_SP_"`
+        } `envPrefix:"PROXY_"`
+
+        // Support for multiple IDP
+        IDP []IDPConfig `envPrefix:"IDP_"`
+
+        Server struct {
+                ListenAddress string `env:"LISTEN_ADDRESS" envDefault:":8080"`
+        } `envPrefix:"SERVER_"`
+
+        Metadata struct {
+                MaxRetries   int           `env:"MAX_RETRIES"   envDefault:"5"`
+                InitialDelay time.Duration `env:"INITIAL_DELAY" envDefault:"1s"`
+                MaxDelay     time.Duration `env:"MAX_DELAY"     envDefault:"30s"`
+        } `envPrefix:"METADATA_"`
+
+        SLO struct {
+                ContextTimeout time.Duration `env:"CONTEXT_TIMEOUT" envDefault:"5m"`
+        } `envPrefix:"SLO_"`
+}
+
+// LoadConfig loads configuration from environment variables.
+func LoadConfig() (Config, error) <span class="cov10" title="22">{
+        var config Config
+
+        if err := env.Parse(&amp;config); err != nil </span><span class="cov5" title="4">{
+                return config, fmt.Errorf("failed to parse environment variables: %w", err)
+        }</span>
+
+        <span class="cov9" title="18">if len(config.IDP) == 0 </span><span class="cov3" title="2">{
+                return config, ErrNoIDPConfigured
+        }</span>
+
+        <span class="cov9" title="16">return config, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package proxy
+
+import (
+        "fmt"
+        "log/slog"
+        "net/http"
+        "strings"
+        "time"
+
+        "github.com/sters/simple-saml-proxy/config"
+        "github.com/sters/simple-saml-proxy/proxy/saml"
+)
+
+// SetupHTTPHandlers sets up the HTTP handlers for the SAML proxy.
+// This proxy acts as a SAML Identity Provider (IdP) proxy:
+// - To Service Providers (SPs), it appears as an IdP
+// - To Identity Providers (IdPs), it appears as an SP
+// It allows users to select which IdP they want to use for authentication.
+func SetupHTTPHandlers(idp *saml.IDP, providers *saml.ServiceProviders, _ config.Config) http.Handler <span class="cov9" title="58">{
+        mux := http.NewServeMux()
+
+        // Basic endpoints
+        mux.HandleFunc("/ping", handlePing)
+        mux.Handle("/metadata", idp.IDP.HttpHandler())
+        mux.Handle("/sso", handleSSO(idp))
+        mux.Handle("/callback", idp.IDP.HttpHandler())
+
+        // SAML proxy endpoints
+        mux.HandleFunc("/saml/acs", handleSAMLACS(idp, providers))
+        mux.HandleFunc("/idp-initiated", handleIDPInitiated)
+
+        // Single Logout endpoints
+        mux.HandleFunc("/slo", handleSLO(idp, providers))
+        mux.HandleFunc("/sls", handleSLS(idp, providers))
+        mux.HandleFunc("/slo/response", handleSLOResponse(idp, providers))
+
+        // Create request handler with routing
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span><span class="cov10" title="94">{
+                slog.Info("Received request", slog.String("path", r.URL.Path))
+
+                switch </span>{
+                case strings.HasPrefix(r.URL.Path, "/idp_selected"):<span class="cov6" title="13">
+                        handleIDPSelected(idp, providers)(w, r)
+
+                        return</span>
+                case strings.HasPrefix(r.URL.Path, "/idp_select"):<span class="cov6" title="14">
+                        handleIDPSelect(idp, providers)(w, r)
+
+                        return</span>
+                case strings.HasPrefix(r.URL.Path, "/logout_idp_selected"):<span class="cov1" title="1">
+                        handleLogoutIDPSelected(idp, providers)(w, r)
+
+                        return</span>
+                case strings.HasPrefix(r.URL.Path, "/logout_idp_select"):<span class="cov1" title="1">
+                        handleLogoutIDPSelect(idp, providers)(w, r)
+
+                        return</span>
+                case strings.HasPrefix(r.URL.Path, "/logout_sp_selected"):<span class="cov1" title="1">
+                        handleLogoutSPSelected(idp, providers)(w, r)
+
+                        return</span>
+                case strings.HasPrefix(r.URL.Path, "/logout_sp_select"):<span class="cov0" title="0">
+                        handleLogoutSPSelect(idp, providers)(w, r)
+
+                        return</span>
+                }
+
+                <span class="cov9" title="64">mux.ServeHTTP(w, r)</span>
+        })
+}
+
+// StartServer starts the HTTP server with the given configuration and handler.
+func StartServer(cfg config.Config, handler http.Handler) error <span class="cov3" title="3">{
+        server := &amp;http.Server{
+                Addr:              cfg.Server.ListenAddress,
+                Handler:           handler,
+                ReadHeaderTimeout: 10 * time.Second,
+        }
+
+        slog.Info("Starting SAML IdP proxy", slog.String("address", cfg.Server.ListenAddress))
+        slog.Info("Metadata URL (for SPs)", slog.String("url", cfg.Proxy.MetadataURL))
+        slog.Info("SSO URL (for SPs)", slog.String("url", cfg.Proxy.EntityID+"/sso"))
+        slog.Info("SLO URL (for SPs)", slog.String("url", cfg.Proxy.SLOURL))
+        slog.Info("SLO Response URL", slog.String("url", cfg.Proxy.EntityID+"/slo/response"))
+        slog.Info("ACS URL (for IdPs)", slog.String("url", cfg.Proxy.AcsURL))
+        slog.Info("SLS URL (for IdPs)", slog.String("url", cfg.Proxy.SLSURL))
+        slog.Info("IdP Selection URL", slog.String("url", cfg.Proxy.EntityID+"/idp_selected"))
+
+        // Log information about configured IDP
+        slog.Info("Configured IDP")
+        for _, idp := range cfg.IDP </span><span class="cov0" title="0">{
+                slog.Info("IDP details",
+                        slog.String("id", idp.ID),
+                )
+        }</span>
+
+        <span class="cov3" title="3">err := server.ListenAndServe()
+        if err != nil </span><span class="cov2" title="2">{
+                return fmt.Errorf("failed to start server: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package proxy
+
+import (
+        "bytes"
+        "compress/flate"
+        "crypto/rand"
+        "fmt"
+        "io"
+        "net/http"
+)
+
+const (
+        cookieNameAuthRequestID = "authID"
+        cookieNameIDPID         = "idpID"
+        relayStateLength        = 42
+)
+
+// isSecureCookie determines if cookies should be secure based on the request.
+func isSecureCookie(r *http.Request) bool <span class="cov10" title="55">{
+        return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+}</span>
+
+func randomBytes(n int) []byte <span class="cov8" title="30">{
+        rv := make([]byte, n)
+        if _, err := io.ReadFull(rand.Reader, rv); err != nil </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+
+        <span class="cov8" title="30">return rv</span>
+}
+
+// deflateCompress compresses data using deflate compression.
+func deflateCompress(data []byte) ([]byte, error) <span class="cov9" title="45">{
+        var buf bytes.Buffer
+        writer, err := flate.NewWriter(&amp;buf, flate.DefaultCompression)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to create deflate writer: %w", err)
+        }</span>
+
+        <span class="cov9" title="45">if _, err := writer.Write(data); err != nil </span><span class="cov0" title="0">{
+                writer.Close()
+
+                return nil, fmt.Errorf("failed to write data: %w", err)
+        }</span>
+
+        <span class="cov9" title="45">if err := writer.Close(); err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to close deflate writer: %w", err)
+        }</span>
+
+        <span class="cov9" title="45">return buf.Bytes(), nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package proxy
+
+import "net/http"
+
+// handleIDPInitiated handles the IdP-initiated flow endpoint.
+func handleIDPInitiated(w http.ResponseWriter, _ *http.Request) <span class="cov10" title="22">{
+        http.Error(w, "IdP-Initiated flow not yet implemented", http.StatusNotImplemented)
+}</span>
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">package proxy
+
+import (
+        "html/template"
+        "log/slog"
+        "net/http"
+
+        "github.com/sters/simple-saml-proxy/proxy/saml"
+)
+
+// idpSelectionTemplate is the HTML template for the IdP selection page.
+const idpSelectionTemplate = `
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;title&gt;Select Identity Provider&lt;/title&gt;
+    &lt;style&gt;
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        h1 { color: #333; }
+        .idp-list { margin-top: 20px; }
+        .idp-button {
+            display: block;
+            margin: 10px 0;
+            padding: 10px 15px;
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-decoration: none;
+            color: #333;
+            width: 300px;
+        }
+        .idp-button:hover {
+            background-color: #e0e0e0;
+        }
+    &lt;/style&gt;
+        &lt;script&gt;
+                const onClick = (idpID) =&gt; {
+                        const url = new URL("{{$.SelectURL}}", location.origin);
+                        url.searchParams.append("idpID", idpID);
+                        {{if $.RelayState}}url.searchParams.append("RelayState", "{{$.RelayState}}");{{end}}
+                        window.location.href = url.toString();
+                        return false;
+                };
+        &lt;/script&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;h1&gt;Select an Identity Provider&lt;/h1&gt;
+    {{if $.RelayState}}&lt;input type="hidden" id="RelayState" value="{{$.RelayState}}"&gt;{{end}}
+    &lt;div class="idp-list"&gt;
+        {{range .Providers}}
+        &lt;a href="#" class="idp-button" onclick="onClick('{{.ID}}')"&gt;
+            {{.ID}}
+        &lt;/a&gt;
+        {{end}}
+    &lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+`
+
+// handleIDPSelect handles the IdP selection page.
+func handleIDPSelect(idp *saml.IDP, providers *saml.ServiceProviders) http.HandlerFunc <span class="cov9" title="15">{
+        return func(w http.ResponseWriter, r *http.Request) </span><span class="cov10" title="19">{
+                authRequestID := r.FormValue("id")
+                if authRequestID == "" </span><span class="cov3" title="2">{
+                        http.Error(w, "Invalid request", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                <span class="cov9" title="17">authRequest, err := idp.IDPStorage.AuthRequestByID(r.Context(), authRequestID)
+                if err != nil </span><span class="cov1" title="1">{
+                        slog.Error("Failed to get auth request",
+                                slog.String("id", authRequestID),
+                                slog.String("error", err.Error()),
+                        )
+                        http.Error(w, "Invalid request", http.StatusInternalServerError)
+
+                        return
+                }</span>
+
+                <span class="cov9" title="16">http.SetCookie(w, &amp;http.Cookie{
+                        Name:     cookieNameAuthRequestID,
+                        Value:    authRequestID,
+                        Path:     "/",
+                        HttpOnly: true,
+                        Secure:   isSecureCookie(r),
+                })
+
+                // If there's only one IdP configured, auto-redirect to it
+                if len(providers.Providers) == 1 </span><span class="cov6" title="6">{
+                        // Get the single IdP ID
+                        var singleIDPID string
+                        for id := range providers.Providers </span><span class="cov6" title="6">{
+                                singleIDPID = id
+
+                                break</span>
+                        }
+                        // Set the IdP cookie
+                        <span class="cov6" title="6">http.SetCookie(w, &amp;http.Cookie{
+                                Name:     cookieNameIDPID,
+                                Value:    singleIDPID,
+                                Path:     "/",
+                                HttpOnly: true,
+                                Secure:   isSecureCookie(r),
+                        })
+
+                        // Redirect to the IdP selected handler
+                        redirectURL := "/idp_selected?idpID=" + singleIDPID
+                        if ar, ok := authRequest.(*saml.AuthRequest); ok &amp;&amp; ar.RelayState != "" </span><span class="cov5" title="5">{
+                                redirectURL += "&amp;RelayState=" + ar.RelayState
+                        }</span>
+                        <span class="cov6" title="6">http.Redirect(w, r, redirectURL, http.StatusFound)
+
+                        return</span>
+                }
+
+                <span class="cov8" title="10">relayState := ""
+                if ar, ok := authRequest.(*saml.AuthRequest); ok </span><span class="cov8" title="10">{
+                        relayState = ar.RelayState
+                }</span>
+
+                <span class="cov8" title="10">data := struct {
+                        Providers  map[string]*saml.ServiceProvider
+                        SelectURL  string
+                        RelayState string
+                }{
+                        Providers:  providers.Providers,
+                        SelectURL:  "/idp_selected",
+                        RelayState: relayState,
+                }
+
+                tmpl, err := template.New("idpSelection").Parse(idpSelectionTemplate)
+                if err != nil </span><span class="cov0" title="0">{
+                        slog.Error("Failed to parse IdP selection template", slog.String("error", err.Error()))
+                        http.Error(w, "Internal server error", http.StatusInternalServerError)
+
+                        return
+                }</span>
+
+                <span class="cov8" title="10">err = tmpl.Execute(w, data)
+                if err != nil </span><span class="cov0" title="0">{
+                        slog.Error("Failed to execute template", slog.String("error", err.Error()))
+                        http.Error(w, "Internal server error", http.StatusInternalServerError)
+
+                        return
+                }</span>
+        }
+}
+</pre>
+		
+		<pre class="file" id="file6" style="display: none">package proxy
+
+import (
+        "encoding/base64"
+        "log/slog"
+        "net/http"
+
+        "github.com/sters/simple-saml-proxy/proxy/saml"
+)
+
+// handleIDPSelected handles the IdP selection result and redirects to the selected IdP.
+func handleIDPSelected(idp *saml.IDP, providers *saml.ServiceProviders) http.HandlerFunc <span class="cov8" title="14">{
+        return func(w http.ResponseWriter, r *http.Request) </span><span class="cov10" title="20">{
+                authRequestIDCookie, err := r.Cookie(cookieNameAuthRequestID)
+                if err != nil </span><span class="cov6" title="6">{
+                        slog.Error("Failed to get auth request ID cookie", slog.String("error", err.Error()))
+                        http.Error(w, "Invalid request", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                <span class="cov8" title="14">authRequestID := authRequestIDCookie.Value
+                if authRequestID == "" </span><span class="cov1" title="1">{
+                        slog.Error("Auth request ID cookie is empty")
+                        http.Error(w, "Invalid request", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                <span class="cov8" title="13">authRequest, err := idp.IDPStorage.AuthRequestByID(r.Context(), authRequestID)
+                if err != nil </span><span class="cov1" title="1">{
+                        slog.Error("Failed to get auth request",
+                                slog.String("id", authRequestID),
+                                slog.String("error", err.Error()),
+                        )
+                        http.Error(w, "Invalid request", http.StatusInternalServerError)
+
+                        return
+                }</span>
+
+                <span class="cov8" title="12">idpID := r.FormValue("idpID")
+                slog.Info("IdP selection",
+                        slog.String("idp", idpID),
+                        slog.Any("query", r.URL.Query()),
+                )
+
+                provider, ok := providers.Providers[idpID]
+                if !ok </span><span class="cov3" title="2">{
+                        slog.Info("Invalid IDP ID", slog.String("idp", idpID))
+                        http.Error(w, "Invalid IDP ID", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                <span class="cov7" title="10">http.SetCookie(w, &amp;http.Cookie{
+                        Name:     cookieNameIDPID,
+                        Value:    idpID,
+                        Path:     "/",
+                        HttpOnly: true,
+                        Secure:   isSecureCookie(r),
+                })
+
+                slog.Info("IDP found", slog.String("idp", idpID))
+
+                // Use original relay state from auth request if available
+                var relayState string
+                if ar, ok := authRequest.(*saml.AuthRequest); ok &amp;&amp; ar.RelayState != "" </span><span class="cov7" title="9">{
+                        relayState = ar.RelayState
+                }</span> else<span class="cov1" title="1"> {
+                        relayState = base64.RawURLEncoding.EncodeToString(randomBytes(relayStateLength))
+                }</span>
+                <span class="cov7" title="10">redirectURL, err := provider.Middleware.ServiceProvider.MakeRedirectAuthenticationRequest(relayState)
+                if err != nil </span><span class="cov0" title="0">{
+                        slog.Error("Failed to create redirect URL", slog.String("error", err.Error()))
+                        http.Error(w, "Internal server error", http.StatusInternalServerError)
+
+                        return
+                }</span>
+
+                <span class="cov7" title="10">w.Header().Add("Location", redirectURL.String())
+                w.WriteHeader(http.StatusFound)
+
+                slog.Info("Redirecting to IdP", slog.String("url", redirectURL.String()))</span>
+        }
+}
+</pre>
+		
+		<pre class="file" id="file7" style="display: none">package proxy
+
+import (
+        "html/template"
+        "log/slog"
+        "net/http"
+
+        "github.com/sters/simple-saml-proxy/proxy/saml"
+)
+
+// handleLogoutIDPSelect displays the IdP selection page for logout.
+func handleLogoutIDPSelect(_ *saml.IDP, providers *saml.ServiceProviders) http.HandlerFunc <span class="cov8" title="1">{
+        return func(w http.ResponseWriter, r *http.Request) </span><span class="cov8" title="1">{
+                slog.Info("Displaying logout IdP selection page")
+
+                // Get logout context ID from cookie
+                logoutCtxCookie, err := r.Cookie("logout_context_id")
+                if err != nil </span><span class="cov0" title="0">{
+                        slog.Error("Failed to get logout context cookie", slog.String("error", err.Error()))
+                        http.Error(w, "Invalid logout request", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                // Prepare data for template
+                <span class="cov8" title="1">type templateData struct {
+                        IDPs []struct {
+                                ID   string
+                                Name string
+                        }
+                }
+
+                data := templateData{}
+                for id := range providers.Providers </span><span class="cov8" title="1">{
+                        data.IDPs = append(data.IDPs, struct {
+                                ID   string
+                                Name string
+                        }{
+                                ID:   id,
+                                Name: id, // Could be enhanced with display names
+                        })
+                }</span>
+
+                // HTML template for IdP selection
+                <span class="cov8" title="1">tmpl := `&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;title&gt;Select Identity Provider for Logout&lt;/title&gt;
+    &lt;style&gt;
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        h1 { color: #333; }
+        .idp-list { list-style: none; padding: 0; }
+        .idp-item { 
+            margin: 10px 0; 
+            padding: 15px; 
+            background: #f5f5f5; 
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .idp-item:hover { background: #e0e0e0; }
+        form { margin: 0; }
+        button {
+            background: none;
+            border: none;
+            width: 100%;
+            text-align: left;
+            font-size: 16px;
+            cursor: pointer;
+            color: #333;
+        }
+    &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;div class="container"&gt;
+        &lt;h1&gt;Select Identity Provider for Logout&lt;/h1&gt;
+        &lt;p&gt;Please select the identity provider you used to sign in:&lt;/p&gt;
+        &lt;ul class="idp-list"&gt;
+            {{range .IDPs}}
+            &lt;li class="idp-item"&gt;
+                &lt;form method="POST" action="/logout_idp_selected"&gt;
+                    &lt;input type="hidden" name="idpID" value="{{.ID}}"&gt;
+                    &lt;button type="submit"&gt;{{.Name}}&lt;/button&gt;
+                &lt;/form&gt;
+            &lt;/li&gt;
+            {{end}}
+        &lt;/ul&gt;
+    &lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;`
+
+                // Parse and execute template
+                t, err := template.New("logout_idp_select").Parse(tmpl)
+                if err != nil </span><span class="cov0" title="0">{
+                        slog.Error("Failed to parse template", slog.String("error", err.Error()))
+                        http.Error(w, "Internal server error", http.StatusInternalServerError)
+
+                        return
+                }</span>
+
+                <span class="cov8" title="1">w.Header().Set("Content-Type", "text/html; charset=utf-8")
+                if err := t.Execute(w, data); err != nil </span><span class="cov0" title="0">{
+                        slog.Error("Failed to execute template", slog.String("error", err.Error()))
+                        http.Error(w, "Internal server error", http.StatusInternalServerError)
+
+                        return
+                }</span>
+
+                <span class="cov8" title="1">slog.Info("Logout IdP selection page rendered",
+                        slog.String("logoutContextID", logoutCtxCookie.Value),
+                )</span>
+        }
+}
+</pre>
+		
+		<pre class="file" id="file8" style="display: none">package proxy
+
+import (
+        "encoding/base64"
+        "fmt"
+        "log/slog"
+        "net/http"
+        "net/url"
+        "time"
+
+        "github.com/beevik/etree"
+        crewjamsaml "github.com/crewjam/saml"
+        "github.com/sters/simple-saml-proxy/proxy/saml"
+)
+
+// handleLogoutIDPSelected handles the IdP selection for logout and creates the upstream logout request.
+func handleLogoutIDPSelected(idp *saml.IDP, providers *saml.ServiceProviders) http.HandlerFunc <span class="cov4" title="3">{
+        return func(w http.ResponseWriter, r *http.Request) </span><span class="cov10" title="20">{
+                // Get logout context ID from cookie
+                logoutCtxCookie, err := r.Cookie("logout_context_id")
+                if err != nil </span><span class="cov1" title="1">{
+                        slog.Error("Failed to get logout context cookie", slog.String("error", err.Error()))
+                        http.Error(w, "Invalid logout request", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                // Get logout context from storage
+                <span class="cov9" title="19">storage := idp.GetStorage()
+                logoutCtx, err := storage.GetLogoutContext(logoutCtxCookie.Value)
+                if err != nil </span><span class="cov1" title="1">{
+                        slog.Error("Failed to get logout context",
+                                slog.String("id", logoutCtxCookie.Value),
+                                slog.String("error", err.Error()),
+                        )
+                        http.Error(w, "Invalid logout request", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                // Get selected IdP
+                <span class="cov9" title="18">idpID := r.FormValue("idpID")
+                if idpID == "" </span><span class="cov1" title="1">{
+                        slog.Error("No IdP ID provided")
+                        http.Error(w, "Invalid request", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                <span class="cov9" title="17">provider, ok := providers.Providers[idpID]
+                if !ok </span><span class="cov1" title="1">{
+                        slog.Error("Invalid IdP ID", slog.String("idp", idpID))
+                        http.Error(w, "Invalid IdP ID", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                // Update logout context with target IdP
+                <span class="cov9" title="16">logoutCtx.TargetID = idpID
+
+                slog.Info("IdP selected for logout",
+                        slog.String("idp", idpID),
+                        slog.String("originSP", logoutCtx.OriginID),
+                )
+
+                // Create logout request to upstream IdP
+                logoutRequest := &amp;crewjamsaml.LogoutRequest{
+                        ID:           fmt.Sprintf("id-%x", randomBytes(20)),
+                        IssueInstant: time.Now(),
+                        Version:      "2.0",
+                        Issuer: &amp;crewjamsaml.Issuer{
+                                Value: idp.IDP.GetEntityID(r.Context()),
+                        },
+                        NameID: &amp;crewjamsaml.NameID{
+                                // This would normally come from the original logout request or session
+                                // For now, using a placeholder
+                                Value:  "user@example.com",
+                                Format: "urn:oasis:names:tc:SAML:2.0:nameid-format:emailAddress",
+                        },
+                }
+
+                // Check if the provider's SP has a SingleLogoutService URL
+                if provider.Middleware.ServiceProvider.IDPMetadata == nil ||
+                        len(provider.Middleware.ServiceProvider.IDPMetadata.IDPSSODescriptors) == 0 ||
+                        len(provider.Middleware.ServiceProvider.IDPMetadata.IDPSSODescriptors[0].SingleLogoutServices) == 0 </span><span class="cov4" title="3">{
+                        slog.Error("IdP does not support Single Logout")
+                        http.Error(w, "Selected IdP does not support Single Logout", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                <span class="cov8" title="13">sloService := provider.Middleware.ServiceProvider.IDPMetadata.IDPSSODescriptors[0].SingleLogoutServices[0]
+                logoutRequest.Destination = sloService.Location
+
+                // Build the logout URL
+                logoutURL, err := buildLogoutURL(logoutRequest, sloService.Location, logoutCtx.ID)
+                if err != nil </span><span class="cov0" title="0">{
+                        slog.Error("Failed to build logout URL", slog.String("error", err.Error()))
+                        http.Error(w, "Failed to create logout request", http.StatusInternalServerError)
+
+                        return
+                }</span>
+
+                // Store IdP ID in cookie for response handling
+                <span class="cov8" title="13">http.SetCookie(w, &amp;http.Cookie{
+                        Name:     "logout_idp_id",
+                        Value:    idpID,
+                        Path:     "/",
+                        HttpOnly: true,
+                        Secure:   isSecureCookie(r),
+                        MaxAge:   300, // 5 minutes
+                })
+
+                // Redirect to upstream IdP
+                slog.Info("Redirecting to upstream IdP for logout", slog.String("url", logoutURL))
+                http.Redirect(w, r, logoutURL, http.StatusFound)</span>
+        }
+}
+
+// buildLogoutURL creates the logout URL with encoded SAML request.
+func buildLogoutURL(logoutRequest *crewjamsaml.LogoutRequest, destination string, relayState string) (string, error) <span class="cov9" title="19">{
+        // Marshal the logout request
+        doc := etree.NewDocument()
+        doc.SetRoot(logoutRequest.Element())
+        xmlBytes, err := doc.WriteToString()
+        if err != nil </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("failed to marshal logout request: %w", err)
+        }</span>
+
+        // Compress using deflate
+        <span class="cov9" title="19">compressed, err := deflateCompress([]byte(xmlBytes))
+        if err != nil </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("failed to compress logout request: %w", err)
+        }</span>
+
+        // Base64 encode
+        <span class="cov9" title="19">encoded := base64.StdEncoding.EncodeToString(compressed)
+
+        // Build URL
+        logoutURL, err := url.Parse(destination)
+        if err != nil </span><span class="cov1" title="1">{
+                return "", fmt.Errorf("failed to parse destination URL: %w", err)
+        }</span>
+
+        <span class="cov9" title="18">query := logoutURL.Query()
+        query.Set("SAMLRequest", encoded)
+        if relayState != "" </span><span class="cov9" title="16">{
+                query.Set("RelayState", relayState)
+        }</span>
+        <span class="cov9" title="18">logoutURL.RawQuery = query.Encode()
+
+        return logoutURL.String(), nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file9" style="display: none">package proxy
+
+import (
+        "html/template"
+        "log/slog"
+        "net/http"
+
+        "github.com/sters/simple-saml-proxy/proxy/saml"
+)
+
+// handleLogoutSPSelect displays the SP selection page for IdP-initiated logout.
+func handleLogoutSPSelect(idp *saml.IDP, _ *saml.ServiceProviders) http.HandlerFunc <span class="cov6" title="4">{
+        return func(w http.ResponseWriter, r *http.Request) </span><span class="cov8" title="8">{
+                slog.Info("Displaying logout SP selection page")
+
+                // Get logout context ID from cookie
+                logoutCtxCookie, err := r.Cookie("logout_context_id")
+                if err != nil </span><span class="cov1" title="1">{
+                        slog.Error("Failed to get logout context cookie", slog.String("error", err.Error()))
+                        http.Error(w, "Invalid logout request", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                // Get the configured allowed SPs
+                <span class="cov8" title="7">storage := idp.GetStorage()
+                allowedSPs := storage.GetAllowedSPs()
+
+                // Prepare data for template
+                type templateData struct {
+                        SPs []struct {
+                                EntityID string
+                                Name     string
+                        }
+                }
+
+                data := templateData{}
+                for _, sp := range allowedSPs </span><span class="cov10" title="11">{
+                        data.SPs = append(data.SPs, struct {
+                                EntityID string
+                                Name     string
+                        }{
+                                EntityID: sp.EntityID,
+                                Name:     sp.EntityID, // Could be enhanced with display names
+                        })
+                }</span>
+
+                // HTML template for SP selection
+                <span class="cov8" title="7">tmpl := `&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;title&gt;Select Service Provider for Logout&lt;/title&gt;
+    &lt;style&gt;
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        h1 { color: #333; }
+        .sp-list { list-style: none; padding: 0; }
+        .sp-item { 
+            margin: 10px 0; 
+            padding: 15px; 
+            background: #f5f5f5; 
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .sp-item:hover { background: #e0e0e0; }
+        form { margin: 0; }
+        button {
+            background: none;
+            border: none;
+            width: 100%;
+            text-align: left;
+            font-size: 16px;
+            cursor: pointer;
+            color: #333;
+        }
+        .note {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
+            border-radius: 5px;
+            color: #856404;
+        }
+    &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;div class="container"&gt;
+        &lt;h1&gt;Select Service Provider for Logout&lt;/h1&gt;
+        &lt;p&gt;Your identity provider has initiated a logout. Please select which service provider you want to log out from:&lt;/p&gt;
+        &lt;ul class="sp-list"&gt;
+            {{range .SPs}}
+            &lt;li class="sp-item"&gt;
+                &lt;form method="POST" action="/logout_sp_selected"&gt;
+                    &lt;input type="hidden" name="spEntityID" value="{{.EntityID}}"&gt;
+                    &lt;button type="submit"&gt;{{.Name}}&lt;/button&gt;
+                &lt;/form&gt;
+            &lt;/li&gt;
+            {{end}}
+        &lt;/ul&gt;
+        &lt;div class="note"&gt;
+            &lt;strong&gt;Note:&lt;/strong&gt; You will only be logged out from the selected service provider. 
+            To log out from other services, you may need to repeat this process or log out from each service individually.
+        &lt;/div&gt;
+    &lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;`
+
+                // Parse and execute template
+                t, err := template.New("logout_sp_select").Parse(tmpl)
+                if err != nil </span><span class="cov0" title="0">{
+                        slog.Error("Failed to parse template", slog.String("error", err.Error()))
+                        http.Error(w, "Internal server error", http.StatusInternalServerError)
+
+                        return
+                }</span>
+
+                <span class="cov8" title="7">w.Header().Set("Content-Type", "text/html; charset=utf-8")
+                if err := t.Execute(w, data); err != nil </span><span class="cov0" title="0">{
+                        slog.Error("Failed to execute template", slog.String("error", err.Error()))
+                        http.Error(w, "Internal server error", http.StatusInternalServerError)
+
+                        return
+                }</span>
+
+                <span class="cov8" title="7">slog.Info("Logout SP selection page rendered",
+                        slog.String("logoutContextID", logoutCtxCookie.Value),
+                        slog.Int("spCount", len(data.SPs)),
+                )</span>
+        }
+}
+</pre>
+		
+		<pre class="file" id="file10" style="display: none">package proxy
+
+import (
+        "encoding/base64"
+        "fmt"
+        "log/slog"
+        "net/http"
+        "net/url"
+        "time"
+
+        "github.com/beevik/etree"
+        crewjamsaml "github.com/crewjam/saml"
+        "github.com/sters/simple-saml-proxy/proxy/saml"
+)
+
+// handleLogoutSPSelected handles the SP selection for IdP-initiated logout and creates the logout request to the SP.
+func handleLogoutSPSelected(idp *saml.IDP, _ *saml.ServiceProviders) http.HandlerFunc <span class="cov8" title="1">{
+        return func(w http.ResponseWriter, r *http.Request) </span><span class="cov8" title="1">{
+                // Get logout context ID from cookie
+                logoutCtxCookie, err := r.Cookie("logout_context_id")
+                if err != nil </span><span class="cov0" title="0">{
+                        slog.Error("Failed to get logout context cookie", slog.String("error", err.Error()))
+                        http.Error(w, "Invalid logout request", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                // Get logout context from storage
+                <span class="cov8" title="1">storage := idp.GetStorage()
+                logoutCtx, err := storage.GetLogoutContext(logoutCtxCookie.Value)
+                if err != nil </span><span class="cov0" title="0">{
+                        slog.Error("Failed to get logout context",
+                                slog.String("id", logoutCtxCookie.Value),
+                                slog.String("error", err.Error()),
+                        )
+                        http.Error(w, "Invalid logout request", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                // Get selected SP
+                <span class="cov8" title="1">spEntityID := r.FormValue("spEntityID")
+                if spEntityID == "" </span><span class="cov0" title="0">{
+                        slog.Error("No SP entity ID provided")
+                        http.Error(w, "Invalid request", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                // Verify the SP is allowed
+                <span class="cov8" title="1">sp, err := storage.GetEntityByID(r.Context(), spEntityID)
+                if err != nil </span><span class="cov0" title="0">{
+                        slog.Error("Invalid SP entity ID",
+                                slog.String("entityID", spEntityID),
+                                slog.String("error", err.Error()),
+                        )
+                        http.Error(w, "Invalid SP", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                // Update logout context with target SP
+                <span class="cov8" title="1">logoutCtx.TargetID = spEntityID
+
+                // Get the NameID from cookie (stored during IdP-initiated logout)
+                nameIDValue := ""
+                if nameIDCookie, err := r.Cookie("logout_name_id"); err == nil </span><span class="cov8" title="1">{
+                        nameIDValue = nameIDCookie.Value
+                }</span>
+
+                <span class="cov8" title="1">slog.Info("SP selected for logout",
+                        slog.String("sp", spEntityID),
+                        slog.String("originIdP", logoutCtx.OriginID),
+                        slog.String("nameID", nameIDValue),
+                )
+
+                // Create logout request to the SP
+                logoutRequest := &amp;crewjamsaml.LogoutRequest{
+                        ID:           fmt.Sprintf("id-%x", randomBytes(20)),
+                        IssueInstant: time.Now(),
+                        Version:      "2.0",
+                        Issuer: &amp;crewjamsaml.Issuer{
+                                Value: idp.IDP.GetEntityID(r.Context()),
+                        },
+                        NameID: &amp;crewjamsaml.NameID{
+                                Value:  nameIDValue,
+                                Format: "urn:oasis:names:tc:SAML:2.0:nameid-format:emailAddress",
+                        },
+                }
+
+                // For now, we'll assume a standard logout endpoint
+                // In production, this should come from SP metadata
+                logoutURL := spEntityID + "/logout"
+
+                // TODO: Extract SingleLogoutService from SP metadata when available
+                _ = sp // silence unused variable warning
+
+                // Build the logout URL
+                logoutURLStr, err := buildLogoutURLToSP(logoutRequest, logoutURL, logoutCtx.ID)
+                if err != nil </span><span class="cov0" title="0">{
+                        slog.Error("Failed to build logout URL", slog.String("error", err.Error()))
+                        http.Error(w, "Failed to create logout request", http.StatusInternalServerError)
+
+                        return
+                }</span>
+
+                // Store SP ID in cookie for response handling
+                <span class="cov8" title="1">http.SetCookie(w, &amp;http.Cookie{
+                        Name:     "logout_sp_id",
+                        Value:    spEntityID,
+                        Path:     "/",
+                        HttpOnly: true,
+                        Secure:   isSecureCookie(r),
+                        MaxAge:   300, // 5 minutes
+                })
+
+                // Redirect to SP with logout request
+                slog.Info("Redirecting to SP for logout", slog.String("url", logoutURLStr))
+                http.Redirect(w, r, logoutURLStr, http.StatusFound)</span>
+        }
+}
+
+// buildLogoutURLToSP creates the logout URL with encoded SAML request for the SP.
+func buildLogoutURLToSP(logoutRequest *crewjamsaml.LogoutRequest, destination string, relayState string) (string, error) <span class="cov8" title="1">{
+        // Marshal the logout request
+        doc := etree.NewDocument()
+        doc.SetRoot(logoutRequest.Element())
+        xmlBytes, err := doc.WriteToString()
+        if err != nil </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("failed to marshal logout request: %w", err)
+        }</span>
+
+        // Compress using deflate
+        <span class="cov8" title="1">compressed, err := deflateCompress([]byte(xmlBytes))
+        if err != nil </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("failed to compress logout request: %w", err)
+        }</span>
+
+        // Base64 encode
+        <span class="cov8" title="1">encoded := base64.StdEncoding.EncodeToString(compressed)
+
+        // Build URL
+        logoutURL, err := url.Parse(destination)
+        if err != nil </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("failed to parse destination URL: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">query := logoutURL.Query()
+        query.Set("SAMLRequest", encoded)
+        if relayState != "" </span><span class="cov8" title="1">{
+                query.Set("RelayState", relayState)
+        }</span>
+        <span class="cov8" title="1">logoutURL.RawQuery = query.Encode()
+
+        return logoutURL.String(), nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file11" style="display: none">package proxy
+
+import (
+        "log/slog"
+        "net/http"
+)
+
+// handlePing handles the /ping health check endpoint.
+func handlePing(w http.ResponseWriter, _ *http.Request) <span class="cov10" title="3">{
+        // Health check endpoint
+        _, err := w.Write([]byte("pong"))
+        if err != nil </span><span class="cov1" title="1">{
+                slog.Error("Failed to write response", slog.String("error", err.Error()))
+        }</span>
+}
+</pre>
+		
+		<pre class="file" id="file12" style="display: none">package proxy
+
+import (
+        "log/slog"
+        "net/http"
+        "time"
+
+        "github.com/sters/simple-saml-proxy/proxy/saml"
+)
+
+// handleSAMLACS handles the SAML assertion consumer service endpoint.
+func handleSAMLACS(idp *saml.IDP, providers *saml.ServiceProviders) http.HandlerFunc <span class="cov10" title="59">{
+        return func(w http.ResponseWriter, r *http.Request) </span><span class="cov8" title="28">{
+                slog.Info("Processing SAML response from actual IdP")
+
+                authRequestIDCookie, err := r.Cookie(cookieNameAuthRequestID)
+                if err != nil </span><span class="cov6" title="12">{
+                        slog.Error("Failed to get auth request ID cookie", slog.String("error", err.Error()))
+                        http.Error(w, "Invalid request", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                <span class="cov7" title="16">authRequestID := authRequestIDCookie.Value
+                if authRequestID == "" </span><span class="cov1" title="1">{
+                        slog.Error("Auth request ID cookie is empty")
+                        http.Error(w, "Invalid request", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                <span class="cov6" title="15">authRequest, err := idp.IDPStorage.AuthRequestByID(r.Context(), authRequestID)
+                if err != nil </span><span class="cov1" title="1">{
+                        slog.Error("Failed to get auth request",
+                                slog.String("id", authRequestID),
+                                slog.String("error", err.Error()),
+                        )
+                        http.Error(w, "Invalid request", http.StatusInternalServerError)
+
+                        return
+                }</span>
+
+                <span class="cov6" title="14">if ar, ok := authRequest.(*saml.AuthRequest); ok </span><span class="cov6" title="14">{
+                        ar.IsDone = true // 自分でDone=trueにしないといけない
+                        ar.CompletedAt = time.Now()
+                }</span> else<span class="cov0" title="0"> {
+                        slog.Error("Failed to cast authRequest to *AuthRequest")
+                        http.Error(w, "Invalid request", http.StatusInternalServerError)
+
+                        return
+                }</span>
+
+                <span class="cov6" title="14">idpIDCookie, err := r.Cookie(cookieNameIDPID)
+                if err != nil </span><span class="cov1" title="1">{
+                        slog.Error("Failed to get IDP ID cookie", slog.String("error", err.Error()))
+                        http.Error(w, "Invalid request", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                <span class="cov6" title="13">idpID := idpIDCookie.Value
+                if idpID == "" </span><span class="cov1" title="1">{
+                        slog.Error("IDP ID cookie is empty")
+                        http.Error(w, "Invalid request", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                <span class="cov6" title="12">provider, ok := providers.Providers[idpID]
+                if !ok </span><span class="cov1" title="1">{
+                        slog.Error("Invalid IDP ID", slog.String("idp", idpID))
+                        http.Error(w, "Invalid IDP ID", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                <span class="cov6" title="11">if err := r.ParseForm(); err != nil </span><span class="cov0" title="0">{
+                        slog.Error("Failed to parse form", slog.String("error", err.Error()))
+                        http.Error(w, "Invalid request", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                <span class="cov6" title="11">trackedRequests := provider.Middleware.RequestTracker.GetTrackedRequests(r)
+                possibleRequestIDs := make([]string, len(trackedRequests))
+                for i, tr := range trackedRequests </span><span class="cov0" title="0">{
+                        possibleRequestIDs[i] = tr.SAMLRequestID
+                }</span>
+
+                <span class="cov6" title="11">assertion, err := provider.Middleware.ServiceProvider.ParseResponse(r, possibleRequestIDs)
+                if err != nil </span><span class="cov5" title="9">{
+                        slog.Error("Failed to parse response", slog.String("error", err.Error()))
+                        http.Error(w, "Invalid request", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                <span class="cov2" title="2">slog.Info(
+                        "Assertion",
+                        slog.Any("subject", assertion.Subject),
+                        slog.Any("attributes", assertion.AttributeStatements),
+                )
+
+                if assertion.Subject == nil || assertion.Subject.NameID == nil </span><span class="cov0" title="0">{
+                        slog.Error("Assertion does not contain NameID")
+                        http.Error(w, "Invalid request", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                // Store the assertion in the auth request
+                <span class="cov2" title="2">if ar, ok := authRequest.(*saml.AuthRequest); ok </span><span class="cov2" title="2">{
+                        ar.Assertion = assertion
+                        // Update the UserID with the actual NameID from the assertion
+                        ar.UserID = assertion.Subject.NameID.Value
+                }</span>
+
+                <span class="cov2" title="2">callbackURL := idp.IDP.AuthCallbackURL()(r.Context(), authRequestID)
+                http.Redirect(w, r, callbackURL, http.StatusFound)</span>
+        }
+}
+</pre>
+		
+		<pre class="file" id="file13" style="display: none">package proxy
+
+import (
+        "bytes"
+        "compress/flate"
+        "encoding/base64"
+        "encoding/xml"
+        "errors"
+        "fmt"
+        "io"
+        "log/slog"
+        "net/http"
+        "time"
+
+        crewjamsaml "github.com/crewjam/saml"
+        "github.com/sters/simple-saml-proxy/proxy/saml"
+)
+
+var (
+        errLogoutRequestMissingIssuer      = errors.New("logout request missing issuer")
+        errLogoutRequestIssueInstantFuture = errors.New("logout request issue instant is in the future")
+        errLogoutRequestTooOld             = errors.New("logout request is too old")
+)
+
+// handleSLO handles Single Logout requests initiated by Service Providers.
+// Flow: SP → Proxy → Upstream IdP.
+func handleSLO(idp *saml.IDP, _ *saml.ServiceProviders) http.HandlerFunc <span class="cov10" title="58">{
+        return func(w http.ResponseWriter, r *http.Request) </span><span class="cov4" title="4">{
+                slog.Info("Received SLO request from SP",
+                        slog.String("method", r.Method),
+                        slog.String("url", r.URL.String()),
+                )
+
+                // Get the SAMLRequest parameter
+                samlRequestParam := r.URL.Query().Get("SAMLRequest")
+                if samlRequestParam == "" </span><span class="cov0" title="0">{
+                        slog.Error("No SAMLRequest parameter in logout request")
+                        http.Error(w, "Missing SAMLRequest parameter", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                // Parse the logout request
+                <span class="cov4" title="4">logoutRequest, err := parseLogoutRequest(samlRequestParam)
+                if err != nil </span><span class="cov0" title="0">{
+                        slog.Error("Failed to parse logout request", slog.String("error", err.Error()))
+                        http.Error(w, "Invalid logout request", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                // Validate the SP is allowed
+                <span class="cov4" title="4">storage := idp.GetStorage()
+                sp, err := storage.GetEntityByID(r.Context(), logoutRequest.Issuer.Value)
+                if err != nil </span><span class="cov1" title="1">{
+                        slog.Warn("Unauthorized SP attempted to initiate logout",
+                                slog.String("entityID", logoutRequest.Issuer.Value),
+                                slog.String("error", err.Error()),
+                        )
+                        http.Error(w, "Unauthorized service provider", http.StatusForbidden)
+
+                        return
+                }</span>
+
+                // TODO: Validate logout request signature when SAML library supports it
+                // For now, we accept unsigned logout requests (common with HTTP-Redirect binding)
+                <span class="cov3" title="3">if logoutRequest.Signature != nil </span><span class="cov0" title="0">{
+                        slog.Warn("Logout request signature validation not implemented",
+                                slog.String("issuer", logoutRequest.Issuer.Value),
+                        )
+                }</span>
+                <span class="cov3" title="3">_ = sp // Mark as used for future signature validation
+
+                // Check for replay attack - verify IssueInstant is recent
+                if err := validateIssueInstant(logoutRequest.IssueInstant); err != nil </span><span class="cov2" title="2">{
+                        slog.Error("Logout request failed time validation",
+                                slog.String("issuer", logoutRequest.Issuer.Value),
+                                slog.String("error", err.Error()),
+                        )
+                        http.Error(w, "Invalid logout request", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                // Get relay state if present
+                <span class="cov1" title="1">relayState := r.URL.Query().Get("RelayState")
+
+                slog.Info("Parsed logout request",
+                        slog.String("issuer", logoutRequest.Issuer.Value),
+                        slog.String("nameID", getNameIDValue(logoutRequest)),
+                        slog.String("sessionIndex", getSessionIndex(logoutRequest)),
+                        slog.String("relayState", relayState),
+                )
+
+                // Create a logout context to track this logout flow
+                logoutCtx := storage.CreateLogoutContext(
+                        "sp",                       // Origin type
+                        logoutRequest.Issuer.Value, // Origin ID (SP entity ID)
+                        "",                         // Target ID (to be set when IdP is selected)
+                        relayState,                 // Preserve relay state
+                )
+                logoutCtx.LogoutRequestID = logoutRequest.ID
+
+                // Check for replay attack using request ID
+                isReplay, err := storage.CheckAndMarkLogoutRequestProcessed(logoutCtx.ID, logoutRequest.ID)
+                if err != nil </span><span class="cov0" title="0">{
+                        slog.Error("Failed to check logout request replay",
+                                slog.String("error", err.Error()),
+                        )
+                        http.Error(w, "Internal server error", http.StatusInternalServerError)
+
+                        return
+                }</span>
+                <span class="cov1" title="1">if isReplay </span><span class="cov0" title="0">{
+                        slog.Warn("Replay attack detected - duplicate logout request ID",
+                                slog.String("requestID", logoutRequest.ID),
+                                slog.String("issuer", logoutRequest.Issuer.Value),
+                        )
+                        http.Error(w, "Duplicate logout request", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                // Store logout request ID in a cookie for later retrieval
+                <span class="cov1" title="1">http.SetCookie(w, &amp;http.Cookie{
+                        Name:     "logout_context_id",
+                        Value:    logoutCtx.ID,
+                        Path:     "/",
+                        HttpOnly: true,
+                        Secure:   isSecureCookie(r),
+                        MaxAge:   300, // 5 minutes
+                })
+
+                // For now, redirect to IdP selection page
+                // In a production implementation, you might track which IdP was used for login
+                http.Redirect(w, r, "/logout_idp_select", http.StatusFound)</span>
+        }
+}
+
+// parseLogoutRequest parses a SAML logout request from the SAMLRequest parameter.
+func parseLogoutRequest(samlRequestParam string) (*crewjamsaml.LogoutRequest, error) <span class="cov4" title="5">{
+        // Base64 decode (the samlRequestParam should already be URL-decoded by Go's query parsing)
+        compressed, err := base64.StdEncoding.DecodeString(samlRequestParam)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to base64 decode logout request: %w", err)
+        }</span>
+
+        // Decompress using flate
+        <span class="cov4" title="5">decompressed, err := decodeDeflatedRequest(compressed)
+        if err != nil </span><span class="cov0" title="0">{
+                // Try without decompression in case it's not compressed
+                decompressed = compressed
+        }</span>
+
+        // Parse as LogoutRequest
+        <span class="cov4" title="5">var logoutRequest crewjamsaml.LogoutRequest
+        if err := xml.Unmarshal(decompressed, &amp;logoutRequest); err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to unmarshal logout request: %w", err)
+        }</span>
+
+        // Validate required fields
+        <span class="cov4" title="5">if logoutRequest.Issuer == nil || logoutRequest.Issuer.Value == "" </span><span class="cov0" title="0">{
+                return nil, errLogoutRequestMissingIssuer
+        }</span>
+
+        <span class="cov4" title="5">return &amp;logoutRequest, nil</span>
+}
+
+// decodeDeflatedRequest decodes a deflated SAML request.
+func decodeDeflatedRequest(compressed []byte) ([]byte, error) <span class="cov4" title="5">{
+        reader := flate.NewReader(bytes.NewReader(compressed))
+        defer reader.Close()
+
+        var buf bytes.Buffer
+        // Limit the amount of data we'll read to prevent decompression bombs
+        limited := io.LimitReader(reader, 10*1024*1024) // 10MB limit
+        _, err := io.Copy(&amp;buf, limited)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to decompress request: %w", err)
+        }</span>
+
+        <span class="cov4" title="5">return buf.Bytes(), nil</span>
+}
+
+// getNameIDValue extracts the NameID value from a logout request.
+func getNameIDValue(req *crewjamsaml.LogoutRequest) string <span class="cov2" title="2">{
+        if req.NameID != nil </span><span class="cov2" title="2">{
+                return req.NameID.Value
+        }</span>
+
+        <span class="cov0" title="0">return ""</span>
+}
+
+// getSessionIndex extracts the session index from a logout request.
+func getSessionIndex(req *crewjamsaml.LogoutRequest) string <span class="cov2" title="2">{
+        if req.SessionIndex != nil </span><span class="cov1" title="1">{
+                return req.SessionIndex.Value
+        }</span>
+
+        <span class="cov1" title="1">return ""</span>
+}
+
+// validateIssueInstant checks if the logout request was issued recently to prevent replay attacks.
+func validateIssueInstant(issueInstant time.Time) error <span class="cov3" title="3">{
+        const maxAge = 5 * time.Minute
+
+        now := time.Now()
+        age := now.Sub(issueInstant)
+
+        if age &lt; 0 </span><span class="cov1" title="1">{
+                // Issue instant is in the future
+                return fmt.Errorf("%w: %v", errLogoutRequestIssueInstantFuture, issueInstant)
+        }</span>
+
+        <span class="cov2" title="2">if age &gt; maxAge </span><span class="cov1" title="1">{
+                return fmt.Errorf("%w: issued %v ago", errLogoutRequestTooOld, age)
+        }</span>
+
+        <span class="cov1" title="1">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file14" style="display: none">package proxy
+
+import (
+        "bytes"
+        "compress/flate"
+        "encoding/base64"
+        "encoding/xml"
+        "errors"
+        "fmt"
+        "io"
+        "log/slog"
+        "net/http"
+        "net/url"
+        "time"
+
+        "github.com/beevik/etree"
+        crewjamsaml "github.com/crewjam/saml"
+        "github.com/sters/simple-saml-proxy/proxy/saml"
+)
+
+var (
+        errResponseIssueInstantInFuture = errors.New("logout response issue instant is in the future")
+        errResponseTooOld               = errors.New("logout response is too old")
+)
+
+// handleSLOResponse handles logout responses from SPs in the IdP-initiated flow.
+// This completes the IdP-initiated logout by sending a response back to the originating IdP.
+func handleSLOResponse(idp *saml.IDP, _ *saml.ServiceProviders) http.HandlerFunc <span class="cov10" title="60">{
+        return func(w http.ResponseWriter, r *http.Request) </span><span class="cov5" title="9">{
+                slog.Info("Received logout response from SP",
+                        slog.String("method", r.Method),
+                        slog.String("url", r.URL.String()),
+                )
+
+                // Get the SAMLResponse parameter
+                samlResponseParam := r.URL.Query().Get("SAMLResponse")
+                if samlResponseParam == "" </span><span class="cov1" title="1">{
+                        slog.Error("No SAMLResponse parameter in logout response")
+                        http.Error(w, "Missing SAMLResponse parameter", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                // Parse the logout response from SP
+                <span class="cov5" title="8">logoutResponse, err := parseLogoutResponse(samlResponseParam)
+                if err != nil </span><span class="cov1" title="1">{
+                        slog.Error("Failed to parse SP logout response", slog.String("error", err.Error()))
+                        http.Error(w, "Invalid logout response", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                // Validate response issue instant
+                <span class="cov5" title="7">if err := validateResponseIssueInstant(logoutResponse.IssueInstant); err != nil </span><span class="cov1" title="1">{
+                        slog.Error("SP logout response failed time validation",
+                                slog.String("error", err.Error()),
+                        )
+                        http.Error(w, "Invalid logout response", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                // Get logout context from cookie
+                <span class="cov4" title="6">logoutCtxCookie, err := r.Cookie("logout_context_id")
+                if err != nil </span><span class="cov1" title="1">{
+                        slog.Error("Failed to get logout context cookie", slog.String("error", err.Error()))
+                        http.Error(w, "Invalid logout response", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                // Get logout context from storage
+                <span class="cov4" title="5">storage := idp.GetStorage()
+                logoutCtx, err := storage.GetLogoutContext(logoutCtxCookie.Value)
+                if err != nil </span><span class="cov1" title="1">{
+                        slog.Error("Failed to get logout context",
+                                slog.String("id", logoutCtxCookie.Value),
+                                slog.String("error", err.Error()),
+                        )
+                        http.Error(w, "Invalid logout response", http.StatusBadRequest)
+
+                        return
+                }</span>
+
+                <span class="cov4" title="4">slog.Info("Parsed SP logout response",
+                        slog.String("status", getLogoutResponseStatus(logoutResponse)),
+                        slog.String("originIdP", logoutCtx.OriginID),
+                        slog.String("targetSP", logoutCtx.TargetID),
+                )
+
+                // Create logout response to send back to the originating IdP
+                finalResponse := &amp;crewjamsaml.LogoutResponse{
+                        ID:           fmt.Sprintf("id-%x", randomBytes(20)),
+                        InResponseTo: "", // Would be set if we tracked the original request ID
+                        Version:      "2.0",
+                        IssueInstant: logoutResponse.IssueInstant,
+                        Issuer: &amp;crewjamsaml.Issuer{
+                                Value: idp.IDP.GetEntityID(r.Context()),
+                        },
+                        Status: logoutResponse.Status, // Pass through the status from SP
+                }
+
+                // For IdP-initiated flow, we need to send response back to the originating IdP
+                // The response URL should be in the IdP's metadata
+                // For now, we'll use a standard pattern
+                idpResponseURL := logoutCtx.OriginID + "/slo/response"
+
+                // Build the logout response URL
+                responseURL, err := buildLogoutResponseURL(finalResponse, idpResponseURL, logoutCtx.RelayState)
+                if err != nil </span><span class="cov0" title="0">{
+                        slog.Error("Failed to build logout response URL", slog.String("error", err.Error()))
+                        http.Error(w, "Failed to create logout response", http.StatusInternalServerError)
+
+                        return
+                }</span>
+
+                // Clean up the logout context
+                <span class="cov4" title="4">storage.DeleteLogoutContext(logoutCtx.ID)
+
+                // Clear cookies
+                http.SetCookie(w, &amp;http.Cookie{
+                        Name:   "logout_context_id",
+                        Value:  "",
+                        Path:   "/",
+                        MaxAge: -1,
+                })
+                http.SetCookie(w, &amp;http.Cookie{
+                        Name:   "logout_sp_id",
+                        Value:  "",
+                        Path:   "/",
+                        MaxAge: -1,
+                })
+                http.SetCookie(w, &amp;http.Cookie{
+                        Name:   "logout_name_id",
+                        Value:  "",
+                        Path:   "/",
+                        MaxAge: -1,
+                })
+
+                // Redirect to IdP with logout response
+                slog.Info("Redirecting to IdP with logout response", slog.String("url", responseURL))
+                http.Redirect(w, r, responseURL, http.StatusFound)</span>
+        }
+}
+
+// getLogoutResponseStatus extracts the status code from a logout response.
+func getLogoutResponseStatus(resp *crewjamsaml.LogoutResponse) string <span class="cov5" title="7">{
+        if resp.Status.StatusCode.Value != "" </span><span class="cov4" title="6">{
+                return resp.Status.StatusCode.Value
+        }</span>
+
+        <span class="cov1" title="1">return "unknown"</span>
+}
+
+// parseLogoutResponse parses a SAML logout response.
+func parseLogoutResponse(samlResponseParam string) (*crewjamsaml.LogoutResponse, error) <span class="cov7" title="17">{
+        // Base64 decode (the samlResponseParam should already be URL-decoded by Go's query parsing)
+        compressed, err := base64.StdEncoding.DecodeString(samlResponseParam)
+        if err != nil </span><span class="cov2" title="2">{
+                return nil, fmt.Errorf("failed to base64 decode logout response: %w", err)
+        }</span>
+
+        // Try to decompress
+        <span class="cov6" title="15">decompressed, err := decodeDeflatedData(compressed)
+        if err != nil </span><span class="cov4" title="4">{
+                // Try without decompression
+                decompressed = compressed
+        }</span>
+
+        // Parse as LogoutResponse
+        <span class="cov6" title="15">var logoutResponse crewjamsaml.LogoutResponse
+        if err := xml.Unmarshal(decompressed, &amp;logoutResponse); err != nil </span><span class="cov3" title="3">{
+                return nil, fmt.Errorf("failed to unmarshal logout response: %w", err)
+        }</span>
+
+        <span class="cov6" title="12">return &amp;logoutResponse, nil</span>
+}
+
+// decodeDeflatedData decodes deflated data.
+func decodeDeflatedData(compressed []byte) ([]byte, error) <span class="cov7" title="20">{
+        reader := flate.NewReader(bytes.NewReader(compressed))
+        defer reader.Close()
+
+        var buf bytes.Buffer
+        limited := io.LimitReader(reader, 10*1024*1024) // 10MB limit
+        _, err := io.Copy(&amp;buf, limited)
+        if err != nil </span><span class="cov4" title="6">{
+                return nil, fmt.Errorf("failed to decompress data: %w", err)
+        }</span>
+
+        <span class="cov6" title="14">return buf.Bytes(), nil</span>
+}
+
+// buildLogoutResponseURL creates the logout response URL with encoded SAML response.
+func buildLogoutResponseURL(logoutResponse *crewjamsaml.LogoutResponse, destination string, relayState string) (string, error) <span class="cov6" title="10">{
+        // Marshal the logout response
+        doc := etree.NewDocument()
+        doc.SetRoot(logoutResponse.Element())
+        xmlBytes, err := doc.WriteToString()
+        if err != nil </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("failed to marshal logout response: %w", err)
+        }</span>
+
+        // Compress using deflate
+        <span class="cov6" title="10">compressed, err := deflateCompress([]byte(xmlBytes))
+        if err != nil </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("failed to compress logout response: %w", err)
+        }</span>
+
+        // Base64 encode
+        <span class="cov6" title="10">encoded := base64.StdEncoding.EncodeToString(compressed)
+
+        // Build URL
+        responseURL, err := url.Parse(destination)
+        if err != nil </span><span class="cov1" title="1">{
+                return "", fmt.Errorf("failed to parse destination URL: %w", err)
+        }</span>
+
+        <span class="cov5" title="9">query := responseURL.Query()
+        query.Set("SAMLResponse", encoded)
+        if relayState != "" </span><span class="cov4" title="6">{
+                query.Set("RelayState", relayState)
+        }</span>
+        <span class="cov5" title="9">responseURL.RawQuery = query.Encode()
+
+        return responseURL.String(), nil</span>
+}
+
+// validateResponseIssueInstant checks if the logout response was issued recently.
+func validateResponseIssueInstant(issueInstant time.Time) error <span class="cov6" title="14">{
+        const maxAge = 5 * time.Minute
+
+        now := time.Now()
+        age := now.Sub(issueInstant)
+
+        if age &lt; 0 </span><span class="cov2" title="2">{
+                // Issue instant is in the future
+                return fmt.Errorf("%w: %v", errResponseIssueInstantInFuture, issueInstant)
+        }</span>
+
+        <span class="cov6" title="12">if age &gt; maxAge </span><span class="cov3" title="3">{
+                return fmt.Errorf("%w: issued %v ago", errResponseTooOld, age)
+        }</span>
+
+        <span class="cov5" title="9">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file15" style="display: none">package proxy
+
+import (
+        "errors"
+        "fmt"
+        "log/slog"
+        "net/http"
+        "time"
+
+        crewjamsaml "github.com/crewjam/saml"
+        "github.com/sters/simple-saml-proxy/proxy/saml"
+)
+
+var (
+        errLogoutRequestIssueInstantInFuture  = errors.New("logout request issue instant is in the future")
+        errLogoutRequestIsOld                 = errors.New("logout request is too old")
+        errLogoutResponseIssueInstantInFuture = errors.New("logout response issue instant is in the future")
+        errLogoutResponseIsOld                = errors.New("logout response is too old")
+)
+
+// handleSLS handles Single Logout Service responses and requests.
+// This endpoint receives:
+// 1. Logout responses from upstream IdPs (for SP-initiated flow)
+// 2. Logout requests from upstream IdPs (for IdP-initiated flow).
+func handleSLS(idp *saml.IDP, providers *saml.ServiceProviders) http.HandlerFunc <span class="cov10" title="58">{
+        return func(w http.ResponseWriter, r *http.Request) </span><span class="cov4" title="4">{
+                slog.Info("Received SLS request",
+                        slog.String("method", r.Method),
+                        slog.String("url", r.URL.String()),
+                )
+
+                // Check if this is a response (has SAMLResponse) or request (has SAMLRequest)
+                samlResponse := r.URL.Query().Get("SAMLResponse")
+                samlRequest := r.URL.Query().Get("SAMLRequest")
+
+                switch </span>{
+                case samlResponse != "":<span class="cov3" title="3">
+                        // Handle logout response from upstream IdP (SP-initiated flow completion)
+                        handleLogoutResponse(w, r, idp, providers, samlResponse)</span>
+                case samlRequest != "":<span class="cov1" title="1">
+                        // Handle logout request from upstream IdP (IdP-initiated flow)
+                        handleIDPInitiatedLogout(w, r, idp, providers, samlRequest)</span>
+                default:<span class="cov0" title="0">
+                        slog.Error("No SAMLResponse or SAMLRequest in SLS request")
+                        http.Error(w, "Invalid request", http.StatusBadRequest)</span>
+                }
+        }
+}
+
+// handleLogoutResponse handles logout responses from upstream IdP.
+func handleLogoutResponse(w http.ResponseWriter, r *http.Request, idp *saml.IDP, _ *saml.ServiceProviders, samlResponseParam string) <span class="cov3" title="3">{
+        slog.Info("Handling logout response from upstream IdP")
+
+        // Get logout context from cookie
+        logoutCtxCookie, err := r.Cookie("logout_context_id")
+        if err != nil </span><span class="cov0" title="0">{
+                slog.Error("Failed to get logout context cookie", slog.String("error", err.Error()))
+                http.Error(w, "Invalid logout response", http.StatusBadRequest)
+
+                return
+        }</span>
+
+        // Get logout context from storage
+        <span class="cov3" title="3">storage := idp.GetStorage()
+        logoutCtx, err := storage.GetLogoutContext(logoutCtxCookie.Value)
+        if err != nil </span><span class="cov0" title="0">{
+                slog.Error("Failed to get logout context",
+                        slog.String("id", logoutCtxCookie.Value),
+                        slog.String("error", err.Error()),
+                )
+                http.Error(w, "Invalid logout response", http.StatusBadRequest)
+
+                return
+        }</span>
+
+        // Parse the logout response
+        <span class="cov3" title="3">logoutResponse, err := parseLogoutResponse(samlResponseParam)
+        if err != nil </span><span class="cov0" title="0">{
+                slog.Error("Failed to parse logout response", slog.String("error", err.Error()))
+                http.Error(w, "Invalid logout response", http.StatusBadRequest)
+
+                return
+        }</span>
+
+        // Validate response issue instant
+        <span class="cov3" title="3">if err := validateLogoutResponseIssueInstant(logoutResponse.IssueInstant); err != nil </span><span class="cov1" title="1">{
+                slog.Error("Logout response failed time validation",
+                        slog.String("error", err.Error()),
+                )
+                http.Error(w, "Invalid logout response", http.StatusBadRequest)
+
+                return
+        }</span>
+
+        <span class="cov2" title="2">slog.Info("Parsed logout response",
+                slog.String("status", getStatusCode(logoutResponse)),
+                slog.String("originSP", logoutCtx.OriginID),
+        )
+
+        // Create logout response to send back to the original SP
+        finalResponse := &amp;crewjamsaml.LogoutResponse{
+                ID:           fmt.Sprintf("id-%x", randomBytes(20)),
+                InResponseTo: "", // Would be set if we tracked the original request ID
+                Version:      "2.0",
+                IssueInstant: logoutResponse.IssueInstant,
+                Issuer: &amp;crewjamsaml.Issuer{
+                        Value: idp.IDP.GetEntityID(r.Context()),
+                },
+                Status: logoutResponse.Status, // Pass through the status from upstream IdP
+        }
+
+        // Get the SP's logout response location
+        sp, err := storage.GetEntityByID(r.Context(), logoutCtx.OriginID)
+        if err != nil </span><span class="cov0" title="0">{
+                slog.Error("Failed to get SP entity",
+                        slog.String("entityID", logoutCtx.OriginID),
+                        slog.String("error", err.Error()),
+                )
+                http.Error(w, "Invalid SP", http.StatusInternalServerError)
+
+                return
+        }</span>
+
+        // For now, we'll assume a standard logout response endpoint
+        // In production, this should come from SP metadata
+        <span class="cov2" title="2">logoutResponseURL := logoutCtx.OriginID + "/logout/response"
+
+        // TODO: Extract SingleLogoutService from SP metadata when available
+        // The zitadel/saml ServiceProvider doesn't expose parsed metadata directly
+        // We would need to parse the metadata XML to extract SLO endpoints
+        _ = sp // silence unused variable warning
+
+        // Build the logout response URL
+        responseURL, err := buildLogoutResponseURL(finalResponse, logoutResponseURL, logoutCtx.RelayState)
+        if err != nil </span><span class="cov0" title="0">{
+                slog.Error("Failed to build logout response URL", slog.String("error", err.Error()))
+                http.Error(w, "Failed to create logout response", http.StatusInternalServerError)
+
+                return
+        }</span>
+
+        // Clean up the logout context
+        <span class="cov2" title="2">storage.DeleteLogoutContext(logoutCtx.ID)
+
+        // Clear cookies
+        http.SetCookie(w, &amp;http.Cookie{
+                Name:   "logout_context_id",
+                Value:  "",
+                Path:   "/",
+                MaxAge: -1,
+        })
+        http.SetCookie(w, &amp;http.Cookie{
+                Name:   "logout_idp_id",
+                Value:  "",
+                Path:   "/",
+                MaxAge: -1,
+        })
+
+        // Redirect to SP with logout response
+        slog.Info("Redirecting to SP with logout response", slog.String("url", responseURL))
+        http.Redirect(w, r, responseURL, http.StatusFound)</span>
+}
+
+// handleIDPInitiatedLogout handles logout requests from upstream IdP.
+func handleIDPInitiatedLogout(w http.ResponseWriter, r *http.Request, idp *saml.IDP, providers *saml.ServiceProviders, samlRequestParam string) <span class="cov1" title="1">{
+        slog.Info("Handling IdP-initiated logout request")
+
+        // Parse the logout request from IdP
+        logoutRequest, err := parseLogoutRequest(samlRequestParam)
+        if err != nil </span><span class="cov0" title="0">{
+                slog.Error("Failed to parse IdP logout request", slog.String("error", err.Error()))
+                http.Error(w, "Invalid logout request", http.StatusBadRequest)
+
+                return
+        }</span>
+
+        // Validate the request comes from a known IdP
+        <span class="cov1" title="1">idpFound := false
+        for _, provider := range providers.Providers </span><span class="cov1" title="1">{
+                if provider.Middleware.ServiceProvider.IDPMetadata != nil &amp;&amp;
+                        provider.Middleware.ServiceProvider.IDPMetadata.EntityID == logoutRequest.Issuer.Value </span><span class="cov1" title="1">{
+                        idpFound = true
+
+                        break</span>
+                }
+        }
+
+        <span class="cov1" title="1">if !idpFound </span><span class="cov0" title="0">{
+                slog.Warn("Logout request from unknown IdP",
+                        slog.String("issuer", logoutRequest.Issuer.Value),
+                )
+                http.Error(w, "Unknown identity provider", http.StatusForbidden)
+
+                return
+        }</span>
+
+        // Check for replay attack - verify IssueInstant is recent
+        <span class="cov1" title="1">if err := validateLogoutRequestIssueInstant(logoutRequest.IssueInstant); err != nil </span><span class="cov0" title="0">{
+                slog.Error("IdP logout request failed time validation",
+                        slog.String("issuer", logoutRequest.Issuer.Value),
+                        slog.String("error", err.Error()),
+                )
+                http.Error(w, "Invalid logout request", http.StatusBadRequest)
+
+                return
+        }</span>
+
+        // Get the IdP that sent this request (we need to determine this from the request)
+        // For now, we'll need to show an SP selection page
+        <span class="cov1" title="1">relayState := r.URL.Query().Get("RelayState")
+
+        slog.Info("Parsed IdP-initiated logout request",
+                slog.String("issuer", logoutRequest.Issuer.Value),
+                slog.String("nameID", getNameIDValue(logoutRequest)),
+                slog.String("sessionIndex", getSessionIndex(logoutRequest)),
+                slog.String("relayState", relayState),
+        )
+
+        // Create a logout context to track this logout flow
+        storage := idp.GetStorage()
+        logoutCtx := storage.CreateLogoutContext(
+                "idp",                      // Origin type
+                logoutRequest.Issuer.Value, // Origin ID (IdP entity ID)
+                "",                         // Target ID (to be set when SP is selected)
+                relayState,                 // Preserve relay state
+        )
+
+        // Store the original logout request data in the context for later use
+        // We'll need the NameID and SessionIndex when creating logout requests to SPs
+        // For now, store in cookies (in production, might want to extend LogoutContext)
+        http.SetCookie(w, &amp;http.Cookie{
+                Name:     "logout_context_id",
+                Value:    logoutCtx.ID,
+                Path:     "/",
+                HttpOnly: true,
+                Secure:   isSecureCookie(r),
+                MaxAge:   300, // 5 minutes
+        })
+
+        // Store NameID for later use
+        if logoutRequest.NameID != nil </span><span class="cov1" title="1">{
+                http.SetCookie(w, &amp;http.Cookie{
+                        Name:     "logout_name_id",
+                        Value:    logoutRequest.NameID.Value,
+                        Path:     "/",
+                        HttpOnly: true,
+                        Secure:   isSecureCookie(r),
+                        MaxAge:   300, // 5 minutes
+                })
+        }</span>
+
+        // Redirect to SP selection page
+        <span class="cov1" title="1">http.Redirect(w, r, "/logout_sp_select", http.StatusFound)</span>
+}
+
+// getStatusCode extracts the status code from a logout response.
+func getStatusCode(resp *crewjamsaml.LogoutResponse) string <span class="cov2" title="2">{
+        if resp.Status.StatusCode.Value != "" </span><span class="cov2" title="2">{
+                return resp.Status.StatusCode.Value
+        }</span>
+
+        <span class="cov0" title="0">return "unknown"</span>
+}
+
+// validateLogoutRequestIssueInstant checks if the logout request was issued recently to prevent replay attacks.
+func validateLogoutRequestIssueInstant(issueInstant time.Time) error <span class="cov1" title="1">{
+        const maxAge = 5 * time.Minute
+
+        now := time.Now()
+        age := now.Sub(issueInstant)
+
+        if age &lt; 0 </span><span class="cov0" title="0">{
+                // Issue instant is in the future
+                return fmt.Errorf("%w: %v", errLogoutRequestIssueInstantInFuture, issueInstant)
+        }</span>
+
+        <span class="cov1" title="1">if age &gt; maxAge </span><span class="cov0" title="0">{
+                return fmt.Errorf("%w: issued %v ago", errLogoutRequestIsOld, age)
+        }</span>
+
+        <span class="cov1" title="1">return nil</span>
+}
+
+// validateLogoutResponseIssueInstant checks if the logout response was issued recently.
+func validateLogoutResponseIssueInstant(issueInstant time.Time) error <span class="cov3" title="3">{
+        const maxAge = 5 * time.Minute
+
+        now := time.Now()
+        age := now.Sub(issueInstant)
+
+        if age &lt; 0 </span><span class="cov0" title="0">{
+                // Issue instant is in the future
+                return fmt.Errorf("%w: %v", errLogoutResponseIssueInstantInFuture, issueInstant)
+        }</span>
+
+        <span class="cov3" title="3">if age &gt; maxAge </span><span class="cov1" title="1">{
+                return fmt.Errorf("%w: issued %v ago", errLogoutResponseIsOld, age)
+        }</span>
+
+        <span class="cov2" title="2">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file16" style="display: none">package proxy
+
+import (
+        "bytes"
+        "compress/flate"
+        "encoding/base64"
+        "encoding/xml"
+        "errors"
+        "fmt"
+        "html"
+        "io"
+        "log/slog"
+        "net/http"
+        "net/url"
+
+        crewjamsaml "github.com/crewjam/saml"
+        "github.com/sters/simple-saml-proxy/proxy/saml"
+)
+
+var errNoIssuer = errors.New("no issuer in SAML request")
+
+// handleSSO wraps the IDP's SSO handler to add SP authorization validation.
+func handleSSO(idp *saml.IDP) http.HandlerFunc <span class="cov10" title="60">{
+        // Get the original handler
+        originalHandler := idp.IDP.HttpHandler()
+
+        return func(w http.ResponseWriter, r *http.Request) </span><span class="cov8" title="30">{
+                // Only validate for SAML requests
+                samlRequestParam := r.URL.Query().Get("SAMLRequest")
+                if samlRequestParam == "" </span><span class="cov4" title="6">{
+                        // No SAML request, let the original handler deal with it
+                        originalHandler.ServeHTTP(w, r)
+
+                        return
+                }</span>
+
+                // Decode and parse the SAML request to get the issuer
+                <span class="cov7" title="24">issuerEntityID, err := extractIssuerFromSAMLRequest(samlRequestParam)
+                if err != nil </span><span class="cov7" title="24">{
+                        slog.Error("Failed to extract issuer from SAML request", slog.String("error", err.Error()))
+                        // Let the original handler deal with the error
+                        originalHandler.ServeHTTP(w, r)
+
+                        return
+                }</span>
+
+                // Check if the SP is allowed
+                <span class="cov0" title="0">storage := idp.GetStorage()
+                _, err = storage.GetEntityByID(r.Context(), issuerEntityID)
+                if err != nil </span><span class="cov0" title="0">{
+                        slog.Warn("Unauthorized SP attempted to access SSO",
+                                slog.String("entityID", issuerEntityID),
+                                slog.String("error", err.Error()),
+                        )
+
+                        // Return SAML error response
+                        respondWithSAMLError(w, r, idp, issuerEntityID, "RequestDenied", "Unauthorized service provider")
+
+                        return
+                }</span>
+
+                // SP is authorized, continue with normal flow
+                <span class="cov0" title="0">originalHandler.ServeHTTP(w, r)</span>
+        }
+}
+
+// extractIssuerFromSAMLRequest decodes a SAML request and extracts the issuer entity ID.
+func extractIssuerFromSAMLRequest(samlRequestParam string) (string, error) <span class="cov8" title="31">{
+        // URL decode
+        decoded, err := url.QueryUnescape(samlRequestParam)
+        if err != nil </span><span class="cov1" title="1">{
+                return "", fmt.Errorf("failed to URL decode SAML request: %w", err)
+        }</span>
+
+        // Base64 decode
+        <span class="cov8" title="30">compressed, err := base64.StdEncoding.DecodeString(decoded)
+        if err != nil </span><span class="cov8" title="25">{
+                return "", fmt.Errorf("failed to base64 decode SAML request: %w", err)
+        }</span>
+
+        // Decompress using flate
+        <span class="cov4" title="5">decompressed, err := decodeDeflatedSAMLRequest(compressed)
+        if err != nil </span><span class="cov3" title="3">{
+                // Try without decompression in case it's not compressed
+                decompressed = compressed
+        }</span>
+
+        // Parse as AuthnRequest
+        <span class="cov4" title="5">var authnRequest crewjamsaml.AuthnRequest
+        if err := xml.Unmarshal(decompressed, &amp;authnRequest); err != nil </span><span class="cov2" title="2">{
+                return "", fmt.Errorf("failed to unmarshal SAML request: %w", err)
+        }</span>
+
+        <span class="cov3" title="3">if authnRequest.Issuer == nil </span><span class="cov1" title="1">{
+                return "", errNoIssuer
+        }</span>
+
+        <span class="cov2" title="2">return authnRequest.Issuer.Value, nil</span>
+}
+
+// decodeDeflatedSAMLRequest decodes a deflated SAML request.
+func decodeDeflatedSAMLRequest(compressed []byte) ([]byte, error) <span class="cov5" title="9">{
+        reader := flate.NewReader(bytes.NewReader(compressed))
+        defer reader.Close()
+
+        var buf bytes.Buffer
+        // Limit the amount of data we'll read to prevent decompression bombs
+        limited := io.LimitReader(reader, 10*1024*1024) // 10MB limit
+        _, err := io.Copy(&amp;buf, limited)
+        if err != nil </span><span class="cov4" title="5">{
+                return nil, fmt.Errorf("failed to decompress SAML request: %w", err)
+        }</span>
+
+        <span class="cov4" title="4">return buf.Bytes(), nil</span>
+}
+
+// respondWithSAMLError sends a SAML error response.
+func respondWithSAMLError(w http.ResponseWriter, _ *http.Request, _ *saml.IDP, issuerEntityID, statusCode, statusMessage string) <span class="cov3" title="3">{
+        // For simplicity, we'll return an HTML error page since we don't have the ACS URL
+
+        // Create a proper error response
+        w.WriteHeader(http.StatusForbidden)
+        _, err := io.WriteString(w, `&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;title&gt;Access Denied&lt;/title&gt;
+    &lt;style&gt;
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .error { color: #d32f2f; }
+        .container { max-width: 600px; margin: 0 auto; }
+    &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;div class="container"&gt;
+        &lt;h1 class="error"&gt;Access Denied&lt;/h1&gt;
+        &lt;p&gt;The service provider &lt;strong&gt;`+html.EscapeString(issuerEntityID)+`&lt;/strong&gt; is not authorized to use this SAML proxy.&lt;/p&gt;
+        &lt;p&gt;Status: `+html.EscapeString(statusCode)+`&lt;/p&gt;
+        &lt;p&gt;Message: `+html.EscapeString(statusMessage)+`&lt;/p&gt;
+    &lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;`)
+        if err != nil </span><span class="cov0" title="0">{
+                slog.Error("Failed to write error response", slog.String("error", err.Error()))
+        }</span>
+}
+</pre>
+		
+		<pre class="file" id="file17" style="display: none">package saml
+
+import (
+        "time"
+
+        "github.com/crewjam/saml"
+)
+
+// AuthRequest implements the models.AuthRequestInt interface.
+type AuthRequest struct {
+        ID                       string
+        ApplicationID            string
+        RelayState               string
+        AccessConsumerServiceURL string
+        BindingType              string
+        AuthRequestID            string
+        Issuer                   string
+        Destination              string
+        UserID                   string
+        IsDone                   bool
+        CompletedAt              time.Time
+        // Assertion data from the actual IdP
+        Assertion *saml.Assertion
+}
+
+func (a *AuthRequest) GetID() string <span class="cov10" title="15">{
+        return a.ID
+}</span>
+
+func (a *AuthRequest) GetApplicationID() string <span class="cov6" title="5">{
+        return a.ApplicationID
+}</span>
+
+func (a *AuthRequest) GetRelayState() string <span class="cov4" title="3">{
+        return a.RelayState
+}</span>
+
+func (a *AuthRequest) GetAccessConsumerServiceURL() string <span class="cov4" title="3">{
+        return a.AccessConsumerServiceURL
+}</span>
+
+func (a *AuthRequest) GetBindingType() string <span class="cov4" title="3">{
+        return a.BindingType
+}</span>
+
+func (a *AuthRequest) GetAuthRequestID() string <span class="cov4" title="3">{
+        return a.AuthRequestID
+}</span>
+
+func (a *AuthRequest) GetIssuer() string <span class="cov1" title="1">{
+        return a.Issuer
+}</span>
+
+func (a *AuthRequest) GetDestination() string <span class="cov1" title="1">{
+        return a.Destination
+}</span>
+
+func (a *AuthRequest) GetUserID() string <span class="cov4" title="3">{
+        return a.UserID
+}</span>
+
+func (a *AuthRequest) Done() bool <span class="cov4" title="3">{
+        return a.IsDone
+}</span>
+</pre>
+		
+		<pre class="file" id="file18" style="display: none">package saml
+
+import (
+        "crypto/tls"
+        "crypto/x509"
+        "errors"
+        "fmt"
+)
+
+var (
+        ErrDecodePEMBlock      = errors.New("failed to decode PEM block containing certificate")
+        ErrPrivateKeyNotRSAKey = errors.New("private key is not an RSA key")
+)
+
+// LoadCertificate loads and parses the SP certificate and private key.
+func LoadCertificate(certPath, keyPath string) (tls.Certificate, error) <span class="cov10" title="158">{
+        keyPair, err := tls.LoadX509KeyPair(certPath, keyPath)
+        if err != nil </span><span class="cov3" title="5">{
+                return tls.Certificate{}, fmt.Errorf("failed to load certificate and key: %w", err)
+        }</span>
+
+        <span class="cov9" title="153">keyPair.Leaf, err = x509.ParseCertificate(keyPair.Certificate[0])
+        if err != nil </span><span class="cov0" title="0">{
+                return tls.Certificate{}, fmt.Errorf("failed to load certificate and key: %w", err)
+        }</span>
+
+        <span class="cov9" title="153">return keyPair, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file19" style="display: none">package saml
+
+import (
+        "fmt"
+        "log/slog"
+        "net/http"
+        "time"
+
+        "github.com/sters/simple-saml-proxy/config"
+        "github.com/zitadel/saml/pkg/provider"
+)
+
+// IDP represents the SAML Identity Provider configuration.
+type IDP struct {
+        // Using zitadel/saml
+        EntityID   string
+        IDP        *provider.Provider // Exported for proxy package access
+        IDPStorage *Storage           // Exported for proxy package access
+}
+
+// GetStorage returns the IDP's storage for testing purposes.
+func (i *IDP) GetStorage() *Storage <span class="cov10" title="75">{
+        return i.IDPStorage
+}</span>
+
+// GetProvider returns the zitadel/saml provider.
+func (i *IDP) GetProvider() *provider.Provider <span class="cov0" title="0">{
+        return i.IDP
+}</span>
+
+// CreateProxyIDP creates a SAML Identity Provider middleware from the configuration.
+func CreateProxyIDP(cfg config.Config) (*IDP, error) <span class="cov9" title="73">{
+        // Create a new storage
+        storage, err := NewStorage(cfg)
+        if err != nil </span><span class="cov2" title="2">{
+                return nil, fmt.Errorf("failed to create storage: %w", err)
+        }</span>
+
+        <span class="cov9" title="71">slog.Info(
+                "Creating SAML IDP with zitadel/saml",
+                slog.String("entityID", cfg.Proxy.EntityID),
+        )
+
+        // Create metadata endpoint
+        metadataEndpoint := provider.NewEndpoint(provider.DefaultMetadataEndpoint)
+
+        // Create endpoints
+        ssoEndpoint := provider.NewEndpoint("/sso")
+        callbackEndpoint := provider.NewEndpoint("/callback")
+
+        // Create IDP config
+        idpConfig := &amp;provider.IdentityProviderConfig{
+                MetadataIDPConfig: &amp;provider.MetadataIDPConfig{
+                        ValidUntil:    24 * time.Hour, // Metadata valid for 24 hours
+                        CacheDuration: "PT24H",        // Cache for 24 hours
+                },
+                Endpoints: &amp;provider.EndpointConfig{
+                        SingleSignOn: &amp;ssoEndpoint,
+                        Callback:     &amp;callbackEndpoint,
+                },
+                SignatureAlgorithm: "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+        }
+
+        // Create provider config
+        providerConfig := &amp;provider.Config{
+                Metadata:  &amp;metadataEndpoint,
+                IDPConfig: idpConfig,
+                Organisation: &amp;provider.Organisation{
+                        Name:        "SAML Proxy",
+                        DisplayName: "SAML Proxy",
+                        URL:         cfg.Proxy.EntityID,
+                },
+        }
+
+        // Create issuer function
+        issuerFunc := func(_ bool) (provider.IssuerFromRequest, error) </span><span class="cov9" title="71">{
+                return func(r *http.Request) string </span><span class="cov8" title="35">{
+                        r.FormValue("SAMLRequest")
+
+                        return cfg.Proxy.EntityID
+                }</span>, nil
+        }
+
+        // Create provider
+        <span class="cov9" title="71">p, err := provider.NewProvider(
+                storage,
+                issuerFunc,
+                providerConfig,
+                provider.WithAllowInsecure(), // Allow HTTP for development
+        )
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to create provider: %w", err)
+        }</span>
+
+        <span class="cov9" title="71">return &amp;IDP{
+                EntityID:   cfg.Proxy.EntityID,
+                IDP:        p,
+                IDPStorage: storage,
+        }, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file20" style="display: none">package saml
+
+import (
+        "context"
+        "fmt"
+        "log/slog"
+        "net/http"
+        "net/url"
+        "time"
+
+        "github.com/crewjam/saml"
+        "github.com/crewjam/saml/samlsp"
+        "github.com/sters/simple-saml-proxy/config"
+        "github.com/zitadel/saml/pkg/provider/xml"
+)
+
+const (
+        defaultMaxRetries   = 5
+        defaultInitialDelay = 1 * time.Second
+        defaultMaxDelay     = 30 * time.Second
+)
+
+// FetchMetadataWithRetry attempts to fetch SAML metadata with exponential backoff retry logic.
+func FetchMetadataWithRetry(ctx context.Context, client *http.Client, metadataURL url.URL, cfg config.Config) (*saml.EntityDescriptor, error) <span class="cov9" title="73">{
+        var lastErr error
+        delay := cfg.Metadata.InitialDelay
+        if delay == 0 </span><span class="cov9" title="61">{
+                delay = defaultInitialDelay
+        }</span>
+        <span class="cov9" title="73">maxRetries := cfg.Metadata.MaxRetries
+        if maxRetries == 0 </span><span class="cov9" title="61">{
+                maxRetries = defaultMaxRetries
+        }</span>
+        <span class="cov9" title="73">maxDelay := cfg.Metadata.MaxDelay
+        if maxDelay == 0 </span><span class="cov9" title="61">{
+                maxDelay = defaultMaxDelay
+        }</span>
+
+        <span class="cov9" title="73">for attempt := 0; attempt &lt;= maxRetries; attempt++ </span><span class="cov10" title="76">{
+                if attempt &gt; 0 </span><span class="cov3" title="3">{
+                        slog.Info("Retrying metadata fetch",
+                                slog.String("url", metadataURL.String()),
+                                slog.Int("attempt", attempt),
+                                slog.Duration("delay", delay))
+
+                        select </span>{
+                        case &lt;-time.After(delay):<span class="cov1" title="1"></span>
+                                // Continue with retry
+                        case &lt;-ctx.Done():<span class="cov2" title="2">
+                                return nil, fmt.Errorf("context cancelled while retrying metadata fetch: %w", ctx.Err())</span>
+                        }
+                }
+
+                <span class="cov9" title="74">ed, err := samlsp.FetchMetadata(ctx, client, metadataURL)
+                if err == nil </span><span class="cov9" title="71">{
+                        if attempt &gt; 0 </span><span class="cov0" title="0">{
+                                slog.Info("Successfully fetched metadata after retry",
+                                        slog.String("url", metadataURL.String()),
+                                        slog.Int("attempts", attempt+1))
+                        }</span>
+
+                        <span class="cov9" title="71">return ed, nil</span>
+                }
+
+                <span class="cov3" title="3">lastErr = err
+                slog.Warn("Failed to fetch metadata",
+                        slog.String("url", metadataURL.String()),
+                        slog.Int("attempt", attempt+1),
+                        slog.Int("max_attempts", maxRetries+1),
+                        slog.Any("error", err))
+
+                // Exponential backoff with jitter
+                delay *= 2
+                if delay &gt; maxDelay </span><span class="cov0" title="0">{
+                        delay = maxDelay
+                }</span>
+        }
+
+        <span class="cov0" title="0">return nil, fmt.Errorf("failed to fetch metadata after %d attempts: %w", maxRetries+1, lastErr)</span>
+}
+
+// ReadMetadataFromURLWithRetry attempts to read SAML metadata from URL with exponential backoff retry logic.
+func ReadMetadataFromURLWithRetry(ctx context.Context, client *http.Client, metadataURL string, cfg config.Config) ([]byte, error) <span class="cov6" title="16">{
+        var lastErr error
+        delay := cfg.Metadata.InitialDelay
+        if delay == 0 </span><span class="cov3" title="4">{
+                delay = defaultInitialDelay
+        }</span>
+        <span class="cov6" title="16">maxRetries := cfg.Metadata.MaxRetries
+        if maxRetries == 0 </span><span class="cov3" title="4">{
+                maxRetries = defaultMaxRetries
+        }</span>
+        <span class="cov6" title="16">maxDelay := cfg.Metadata.MaxDelay
+        if maxDelay == 0 </span><span class="cov3" title="4">{
+                maxDelay = defaultMaxDelay
+        }</span>
+
+        <span class="cov6" title="16">for attempt := 0; attempt &lt;= maxRetries; attempt++ </span><span class="cov8" title="31">{
+                if attempt &gt; 0 </span><span class="cov6" title="15">{
+                        slog.Info("Retrying metadata read",
+                                slog.String("url", metadataURL),
+                                slog.Int("attempt", attempt),
+                                slog.Duration("delay", delay))
+
+                        select </span>{
+                        case &lt;-time.After(delay):<span class="cov6" title="14"></span>
+                                // Continue with retry
+                        case &lt;-ctx.Done():<span class="cov1" title="1">
+                                return nil, fmt.Errorf("context cancelled while retrying metadata read: %w", ctx.Err())</span>
+                        }
+                }
+
+                <span class="cov8" title="30">metadataBytes, err := xml.ReadMetadataFromURL(client, metadataURL)
+                if err == nil </span><span class="cov5" title="11">{
+                        if attempt &gt; 0 </span><span class="cov3" title="3">{
+                                slog.Info("Successfully read metadata after retry",
+                                        slog.String("url", metadataURL),
+                                        slog.Int("attempts", attempt+1))
+                        }</span>
+
+                        <span class="cov5" title="11">return metadataBytes, nil</span>
+                }
+
+                <span class="cov7" title="19">lastErr = err
+                slog.Warn("Failed to read metadata",
+                        slog.String("url", metadataURL),
+                        slog.Int("attempt", attempt+1),
+                        slog.Int("max_attempts", maxRetries+1),
+                        slog.Any("error", err))
+
+                // Exponential backoff with jitter
+                delay *= 2
+                if delay &gt; maxDelay </span><span class="cov3" title="4">{
+                        delay = maxDelay
+                }</span>
+        }
+
+        <span class="cov3" title="4">return nil, fmt.Errorf("failed to read metadata after %d attempts: %w", maxRetries+1, lastErr)</span>
+}
+</pre>
+		
+		<pre class="file" id="file21" style="display: none">package saml
+
+import (
+        "context"
+        "crypto/rsa"
+        "encoding/base64"
+        "encoding/pem"
+        "fmt"
+        "log/slog"
+        "net/http"
+        "net/url"
+        "os"
+
+        "github.com/crewjam/saml"
+        "github.com/crewjam/saml/samlsp"
+        "github.com/sters/simple-saml-proxy/config"
+)
+
+// ServiceProvider represents a SAML Service Provider for a specific IDP.
+type ServiceProvider struct {
+        ID         string
+        Middleware *samlsp.Middleware
+}
+
+// ServiceProviders manages multiple SAML Service Providers.
+type ServiceProviders struct {
+        Providers map[string]*ServiceProvider
+        Default   *ServiceProvider
+}
+
+// GetProvider returns the IDP Service Provider for the given ID or the default if not found.
+func (s *ServiceProviders) GetProvider(id string) *ServiceProvider <span class="cov3" title="4">{
+        if id == "" </span><span class="cov1" title="1">{
+                return s.Default
+        }</span>
+
+        <span class="cov3" title="3">if provider, ok := s.Providers[id]; ok </span><span class="cov2" title="2">{
+                return provider
+        }</span>
+
+        <span class="cov1" title="1">return s.Default</span>
+}
+
+// CreateServiceProviders creates Service Providers for all configured IDP.
+func CreateServiceProviders(ctx context.Context, cfg config.Config) (*ServiceProviders, error) <span class="cov9" title="69">{
+        providers := &amp;ServiceProviders{
+                Providers: make(map[string]*ServiceProvider),
+        }
+
+        keyPair, err := LoadCertificate(cfg.Proxy.CertificatePath, cfg.Proxy.PrivateKeyPath)
+        if err != nil </span><span class="cov1" title="1">{
+                return nil, fmt.Errorf("failed to load certificate and key: %w", err)
+        }</span>
+
+        <span class="cov9" title="68">for _, idpConfig := range cfg.IDP </span><span class="cov10" title="84">{
+                rootURL, err := url.Parse(cfg.Proxy.EntityID)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("failed to parse IDP URL for IDP %s: %w", idpConfig.ID, err)
+                }</span>
+
+                <span class="cov10" title="84">var ed *saml.EntityDescriptor
+
+                // read metadata if specified
+                if idpConfig.MetadataURL != "" </span><span class="cov9" title="73">{
+                        idpMetadataURL, err := url.Parse(idpConfig.MetadataURL)
+                        if err != nil </span><span class="cov0" title="0">{
+                                slog.Warn("Invalid IDP metadata URL", slog.String("url", idpConfig.MetadataURL))
+                        }</span> else<span class="cov9" title="73"> {
+                                ed, err = FetchMetadataWithRetry(ctx, http.DefaultClient, *idpMetadataURL, cfg)
+                                if err != nil </span><span class="cov2" title="2">{
+                                        slog.Error("Failed to fetch IDP metadata after retries",
+                                                slog.String("url", idpConfig.MetadataURL),
+                                                slog.Any("error", err))
+
+                                        return nil, fmt.Errorf("failed to fetch metadata for IDP %s: %w", idpConfig.ID, err)
+                                }</span>
+                        }
+                }
+
+                <span class="cov9" title="82">if ed == nil </span><span class="cov5" title="11">{
+                        idpCertPEM, err := os.ReadFile(idpConfig.CertificatePath)
+                        if err != nil </span><span class="cov0" title="0">{
+                                return nil, fmt.Errorf("failed to read IDP certificate for IDP %s: %w", idpConfig.ID, err)
+                        }</span>
+
+                        <span class="cov5" title="11">idpCertBlock, _ := pem.Decode(idpCertPEM)
+                        if idpCertBlock == nil </span><span class="cov0" title="0">{
+                                return nil, fmt.Errorf("%w for IDP %s", ErrDecodePEMBlock, idpConfig.ID)
+                        }</span>
+
+                        <span class="cov5" title="11">base64cert := base64.StdEncoding.EncodeToString(idpCertBlock.Bytes)
+
+                        ed = &amp;saml.EntityDescriptor{
+                                EntityID: idpConfig.EntityID,
+                                IDPSSODescriptors: []saml.IDPSSODescriptor{
+                                        {
+                                                SSODescriptor: saml.SSODescriptor{
+                                                        RoleDescriptor: saml.RoleDescriptor{
+                                                                KeyDescriptors: []saml.KeyDescriptor{
+                                                                        {
+                                                                                Use: "signing",
+                                                                                KeyInfo: saml.KeyInfo{
+                                                                                        X509Data: saml.X509Data{
+                                                                                                X509Certificates: []saml.X509Certificate{
+                                                                                                        {
+                                                                                                                Data: base64cert,
+                                                                                                        },
+                                                                                                },
+                                                                                        },
+                                                                                },
+                                                                        },
+                                                                },
+                                                        },
+                                                },
+                                                SingleSignOnServices: []saml.Endpoint{
+                                                        {
+                                                                Binding:  saml.HTTPRedirectBinding,
+                                                                Location: idpConfig.SSOURL,
+                                                        },
+                                                },
+                                        },
+                                },
+                        }</span>
+                }
+
+                <span class="cov9" title="82">slog.Info("Creating SAML SP for IDP", slog.Any("EntityDescriptor", ed))
+
+                privateKey, ok := keyPair.PrivateKey.(*rsa.PrivateKey)
+                if !ok </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("%w for IDP %s", ErrPrivateKeyNotRSAKey, idpConfig.ID)
+                }</span>
+
+                <span class="cov9" title="82">sp, err := samlsp.New(samlsp.Options{
+                        URL:               *rootURL,
+                        Key:               privateKey,
+                        Certificate:       keyPair.Leaf,
+                        IDPMetadata:       ed,
+                        AllowIDPInitiated: true,
+                })
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("failed to create SAML SP for IDP %s: %w", idpConfig.ID, err)
+                }</span>
+
+                <span class="cov9" title="82">provider := &amp;ServiceProvider{
+                        ID:         idpConfig.ID,
+                        Middleware: sp,
+                }
+
+                providers.Providers[idpConfig.ID] = provider
+
+                // Set the first IDP as the default
+                if providers.Default == nil </span><span class="cov9" title="66">{
+                        providers.Default = provider
+                }</span>
+        }
+
+        <span class="cov9" title="66">return providers, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file22" style="display: none">package saml
+
+import (
+        "context"
+        "crypto/rsa"
+        "crypto/tls"
+        "errors"
+        "fmt"
+        "log/slog"
+        "net/http"
+        "sync"
+        "time"
+
+        "github.com/google/uuid"
+        "github.com/sters/simple-saml-proxy/config"
+        "github.com/zitadel/saml/pkg/provider/key"
+        "github.com/zitadel/saml/pkg/provider/models"
+        "github.com/zitadel/saml/pkg/provider/serviceprovider"
+        "github.com/zitadel/saml/pkg/provider/xml"
+        "github.com/zitadel/saml/pkg/provider/xml/samlp"
+)
+
+var (
+        ErrPrivateKeyIsNil        = errors.New("private key is nil")
+        ErrPrivateKeyNotRSA       = errors.New("private key is not an RSA key")
+        ErrEntityNotFound         = errors.New("entity not found")
+        ErrAuthRequestNotFound    = errors.New("auth request not found")
+        ErrInvalidAuthRequestType = errors.New("invalid auth request type")
+        ErrLogoutContextNotFound  = errors.New("logout context not found")
+)
+
+// Storage implements the zitadel/saml Storage interfaces.
+type Storage struct {
+        config config.Config
+        cert   tls.Certificate
+
+        // Cache for service providers
+        spCache     map[string]*serviceprovider.ServiceProvider
+        spCacheLock sync.RWMutex
+
+        // Cache for auth requests
+        authRequests     map[string]*AuthRequest
+        authRequestsLock sync.RWMutex
+
+        entityIDByAppID     map[string]string
+        entityIDByAppIDLock sync.RWMutex
+
+        // Cache for logout contexts
+        logoutContexts     map[string]*LogoutContext
+        logoutContextsLock sync.RWMutex
+}
+
+// NewStorage creates a new Storage.
+func NewStorage(cfg config.Config) (*Storage, error) <span class="cov10" title="87">{
+        cert, err := LoadCertificate(cfg.Proxy.CertificatePath, cfg.Proxy.PrivateKeyPath)
+        if err != nil </span><span class="cov3" title="3">{
+                return nil, fmt.Errorf("failed to load certificate and key: %w", err)
+        }</span>
+
+        <span class="cov9" title="84">return &amp;Storage{
+                config:          cfg,
+                cert:            cert,
+                spCache:         make(map[string]*serviceprovider.ServiceProvider),
+                authRequests:    make(map[string]*AuthRequest),
+                entityIDByAppID: make(map[string]string),
+                logoutContexts:  make(map[string]*LogoutContext),
+        }, nil</span>
+}
+
+// EntityStorage interface implementation
+
+func (s *Storage) GetCA(_ context.Context) (*key.CertificateAndKey, error) <span class="cov1" title="1">{
+        // For simplicity, we'll use the same certificate for CA, metadata signing, and response signing
+        return s.getCertificateAndKey()
+}</span>
+
+func (s *Storage) GetMetadataSigningKey(_ context.Context) (*key.CertificateAndKey, error) <span class="cov3" title="3">{
+        return s.getCertificateAndKey()
+}</span>
+
+// IdentityProviderStorage interface implementation
+
+func (s *Storage) GetEntityByID(ctx context.Context, entityID string) (*serviceprovider.ServiceProvider, error) <span class="cov7" title="23">{
+        s.spCacheLock.RLock()
+        sp, ok := s.spCache[entityID]
+        s.spCacheLock.RUnlock()
+
+        if ok </span><span class="cov3" title="3">{
+                return sp, nil
+        }</span>
+
+        // If not in cache, create a new one
+        <span class="cov7" title="20">for _, allowedSP := range s.config.Proxy.AllowedSP </span><span class="cov7" title="20">{
+                if allowedSP.EntityID != entityID </span><span class="cov3" title="3">{
+                        continue</span>
+                }
+
+                // Create a service provider config for requester info
+                <span class="cov6" title="17">var metadataBytes []byte
+                if allowedSP.MetadataURL != "" </span><span class="cov0" title="0">{
+                        b, err := ReadMetadataFromURLWithRetry(ctx, http.DefaultClient, allowedSP.MetadataURL, s.config)
+                        if err != nil </span><span class="cov0" title="0">{
+                                return nil, fmt.Errorf("failed to read metadata from URL: %w", err)
+                        }</span>
+                        <span class="cov0" title="0">metadataBytes = b</span>
+                } else<span class="cov6" title="17"> {
+                        // Create a minimal but valid metadata for SP without a metadata URL
+                        metadataBytes = []byte(`&lt;EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="` + entityID + `"&gt;
+                                &lt;SPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol"&gt;
+                                        &lt;AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="` + entityID + `/acs" index="0"/&gt;
+                                &lt;/SPSSODescriptor&gt;
+                        &lt;/EntityDescriptor&gt;`)
+                }</span>
+
+                // Validate the metadata can be parsed
+                <span class="cov6" title="17">_, err := xml.ParseMetadataXmlIntoStruct(metadataBytes)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("failed to parse metadata: %w", err)
+                }</span>
+                <span class="cov6" title="17">spConfig := &amp;serviceprovider.Config{
+                        Metadata: metadataBytes,
+                }
+
+                // loginURL for Proxy IdP (Not for SP, Not for actual IdP)
+                loginURL := func(id string) string </span><span class="cov6" title="14">{
+                        slog.Info("login URL", slog.String("id", id))
+
+                        return "/idp_select?id=" + id
+                }</span>
+
+                // Create a new service provider
+                <span class="cov6" title="17">sp, err := serviceprovider.NewServiceProvider(entityID, spConfig, loginURL)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("failed to create service provider: %w", err)
+                }</span>
+
+                // Cache the service provider
+                <span class="cov6" title="17">s.spCacheLock.Lock()
+                s.spCache[entityID] = sp
+                s.spCacheLock.Unlock()
+
+                return sp, nil</span>
+        }
+
+        <span class="cov3" title="3">return nil, fmt.Errorf("%w: %s", ErrEntityNotFound, entityID)</span>
+}
+
+func (s *Storage) GetEntityIDByAppID(_ context.Context, appID string) (string, error) <span class="cov2" title="2">{
+        s.entityIDByAppIDLock.RLock()
+        entityID, ok := s.entityIDByAppID[appID]
+        s.entityIDByAppIDLock.RUnlock()
+
+        if !ok </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("%w: %s", ErrEntityNotFound, appID)
+        }</span>
+
+        <span class="cov2" title="2">return entityID, nil</span>
+}
+
+func (s *Storage) GetResponseSigningKey(_ context.Context) (*key.CertificateAndKey, error) <span class="cov8" title="33">{
+        return s.getCertificateAndKey()
+}</span>
+
+// AuthStorage interface implementation
+
+//nolint:ireturn,lll // Required by interface
+func (s *Storage) CreateAuthRequest(_ context.Context, authnRequest *samlp.AuthnRequestType, appID, bindingType, relayState, userID string) (models.AuthRequestInt, error) <span class="cov6" title="14">{
+        id := uuid.New().String()
+
+        authRequest := &amp;AuthRequest{
+                ID:                       id,
+                ApplicationID:            appID,
+                RelayState:               relayState,
+                AccessConsumerServiceURL: authnRequest.AssertionConsumerServiceURL,
+                BindingType:              bindingType,
+                AuthRequestID:            authnRequest.Id,
+                Issuer:                   authnRequest.Issuer.Text,
+                Destination:              authnRequest.Destination,
+                UserID:                   userID,
+                IsDone:                   false,
+        }
+
+        s.authRequestsLock.Lock()
+        s.authRequests[id] = authRequest
+        s.authRequestsLock.Unlock()
+
+        s.entityIDByAppIDLock.Lock()
+        s.entityIDByAppID[appID] = authnRequest.Issuer.Text
+        s.entityIDByAppIDLock.Unlock()
+
+        return authRequest, nil
+}</span>
+
+//nolint:ireturn // Required by interface
+func (s *Storage) AuthRequestByID(_ context.Context, id string) (models.AuthRequestInt, error) <span class="cov9" title="55">{
+        s.authRequestsLock.RLock()
+        authRequest, ok := s.authRequests[id]
+        s.authRequestsLock.RUnlock()
+
+        if !ok </span><span class="cov4" title="5">{
+                return nil, fmt.Errorf("%w: %s", ErrAuthRequestNotFound, id)
+        }</span>
+
+        <span class="cov8" title="50">return authRequest, nil</span>
+}
+
+// UserStorage interface implementation
+
+func (s *Storage) SetUserinfoWithUserID(
+        ctx context.Context,
+        authRequestID string,
+        userinfo models.AttributeSetter,
+        userID string,
+        _ []int,
+) error <span class="cov4" title="7">{
+        // Get the auth request to retrieve the assertion
+        authRequestInt, err := s.AuthRequestByID(ctx, authRequestID)
+        if err != nil </span><span class="cov2" title="2">{
+                slog.Error("Failed to get auth request", slog.String("error", err.Error()))
+
+                return err
+        }</span>
+
+        <span class="cov4" title="5">authRequest, ok := authRequestInt.(*AuthRequest)
+        if !ok </span><span class="cov0" title="0">{
+                slog.Error("Failed to cast auth request")
+
+                return ErrInvalidAuthRequestType
+        }</span>
+
+        // Use assertion data if available
+        <span class="cov4" title="5">if authRequest.Assertion == nil || authRequest.Assertion.Subject == nil </span><span class="cov1" title="1">{
+                // Fallback to original behavior if no assertion is available
+                slog.Warn("No assertion data available, using fallback values")
+                userinfo.SetUserID(userID)
+                userinfo.SetUsername(userID)
+                userinfo.SetEmail(userID + "@example.com")
+                userinfo.SetFullName("Test User")
+                userinfo.SetGivenName("Test")
+                userinfo.SetSurname("User")
+
+                return nil
+        }</span>
+
+        // Set the NameID as UserID
+        <span class="cov3" title="4">if authRequest.Assertion.Subject.NameID != nil </span><span class="cov3" title="4">{
+                userinfo.SetUserID(authRequest.Assertion.Subject.NameID.Value)
+                userinfo.SetUsername(authRequest.Assertion.Subject.NameID.Value)
+        }</span>
+
+        // Extract attributes from the assertion
+        <span class="cov3" title="4">for _, attrStatement := range authRequest.Assertion.AttributeStatements </span><span class="cov3" title="4">{
+                for _, attr := range attrStatement.Attributes </span><span class="cov6" title="16">{
+                        switch attr.Name </span>{
+                        case "email", "Email", "mail":<span class="cov3" title="4">
+                                if len(attr.Values) &gt; 0 </span><span class="cov3" title="4">{
+                                        userinfo.SetEmail(attr.Values[0].Value)
+                                }</span>
+                        case "name", "Name", "displayName", "DisplayName":<span class="cov3" title="4">
+                                if len(attr.Values) &gt; 0 </span><span class="cov3" title="4">{
+                                        userinfo.SetFullName(attr.Values[0].Value)
+                                }</span>
+                        case "givenName", "GivenName", "firstName", "FirstName":<span class="cov3" title="4">
+                                if len(attr.Values) &gt; 0 </span><span class="cov3" title="4">{
+                                        userinfo.SetGivenName(attr.Values[0].Value)
+                                }</span>
+                        case "surname", "Surname", "lastName", "LastName", "sn":<span class="cov3" title="4">
+                                if len(attr.Values) &gt; 0 </span><span class="cov3" title="4">{
+                                        userinfo.SetSurname(attr.Values[0].Value)
+                                }</span>
+                        default:<span class="cov0" title="0">
+                                // For other attributes, we could add custom attribute support here
+                                slog.Debug("Unhandled attribute",
+                                        slog.String("name", attr.Name),
+                                        slog.Any("values", attr.Values))</span>
+                        }
+                }
+        }
+
+        <span class="cov3" title="4">return nil</span>
+}
+
+func (s *Storage) SetUserinfoWithLoginName(
+        _ context.Context,
+        userinfo models.AttributeSetter,
+        loginName string,
+        _ []int,
+) error <span class="cov6" title="18">{
+        // For login name, we don't have access to the auth request ID,
+        // so we need to find the auth request by user ID
+        // This is a limitation of the current design
+
+        // Try to find an auth request with matching UserID
+        s.authRequestsLock.RLock()
+        var foundAuthRequest *AuthRequest
+        for _, ar := range s.authRequests </span><span class="cov9" title="69">{
+                if ar.UserID == loginName &amp;&amp; ar.Assertion != nil </span><span class="cov6" title="15">{
+                        foundAuthRequest = ar
+
+                        break</span>
+                }
+        }
+        <span class="cov6" title="18">s.authRequestsLock.RUnlock()
+
+        if foundAuthRequest == nil || foundAuthRequest.Assertion == nil </span><span class="cov3" title="3">{
+                // Fallback to original behavior
+                slog.Warn("No assertion data available for login name, using fallback values", slog.String("loginName", loginName))
+                userinfo.SetUserID(loginName)
+                userinfo.SetUsername(loginName)
+                userinfo.SetEmail(loginName + "@example.com")
+                userinfo.SetFullName("Test User")
+                userinfo.SetGivenName("Test")
+                userinfo.SetSurname("User")
+
+                return nil
+        }</span>
+
+        // Use the same logic as SetUserinfoWithUserID
+        <span class="cov6" title="15">if foundAuthRequest.Assertion.Subject != nil &amp;&amp; foundAuthRequest.Assertion.Subject.NameID != nil </span><span class="cov6" title="15">{
+                userinfo.SetUserID(foundAuthRequest.Assertion.Subject.NameID.Value)
+                userinfo.SetUsername(foundAuthRequest.Assertion.Subject.NameID.Value)
+        }</span>
+
+        // Extract attributes from the assertion
+        <span class="cov6" title="15">for _, attrStatement := range foundAuthRequest.Assertion.AttributeStatements </span><span class="cov4" title="5">{
+                for _, attr := range attrStatement.Attributes </span><span class="cov6" title="15">{
+                        switch attr.Name </span>{
+                        case "email", "Email", "mail":<span class="cov4" title="5">
+                                if len(attr.Values) &gt; 0 </span><span class="cov3" title="4">{
+                                        userinfo.SetEmail(attr.Values[0].Value)
+                                }</span>
+                        case "name", "Name", "displayName", "DisplayName":<span class="cov3" title="4">
+                                if len(attr.Values) &gt; 0 </span><span class="cov3" title="4">{
+                                        userinfo.SetFullName(attr.Values[0].Value)
+                                }</span>
+                        case "givenName", "GivenName", "firstName", "FirstName":<span class="cov3" title="3">
+                                if len(attr.Values) &gt; 0 </span><span class="cov3" title="3">{
+                                        userinfo.SetGivenName(attr.Values[0].Value)
+                                }</span>
+                        case "surname", "Surname", "lastName", "LastName", "sn":<span class="cov3" title="3">
+                                if len(attr.Values) &gt; 0 </span><span class="cov3" title="3">{
+                                        userinfo.SetSurname(attr.Values[0].Value)
+                                }</span>
+                        }
+                }
+        }
+
+        <span class="cov6" title="15">return nil</span>
+}
+
+func (s *Storage) Health(_ context.Context) error <span class="cov4" title="6">{
+        return nil
+}</span>
+
+// Helper methods
+
+func (s *Storage) getCertificateAndKey() (*key.CertificateAndKey, error) <span class="cov8" title="39">{
+        // Extract the certificate and private key from the tls.Certificate
+        if s.cert.PrivateKey == nil </span><span class="cov0" title="0">{
+                return nil, ErrPrivateKeyIsNil
+        }</span>
+
+        <span class="cov8" title="39">privateKey, ok := s.cert.PrivateKey.(*rsa.PrivateKey)
+        if !ok </span><span class="cov0" title="0">{
+                return nil, ErrPrivateKeyNotRSA
+        }</span>
+
+        <span class="cov8" title="39">return &amp;key.CertificateAndKey{
+                Certificate: s.cert.Certificate[0],
+                Key:         privateKey,
+        }, nil</span>
+}
+
+// AddAuthRequestForTesting adds an auth request to storage for testing purposes.
+func (s *Storage) AddAuthRequestForTesting(authRequest *AuthRequest) <span class="cov6" title="14">{
+        s.authRequestsLock.Lock()
+        defer s.authRequestsLock.Unlock()
+        s.authRequests[authRequest.ID] = authRequest
+}</span>
+
+// Logout context management methods
+
+// CreateLogoutContext creates a new logout context for tracking logout flow state.
+func (s *Storage) CreateLogoutContext(originType, originID, targetID, relayState string) *LogoutContext <span class="cov7" title="26">{
+        id := uuid.New().String()
+        logoutContext := &amp;LogoutContext{
+                ID:                id,
+                OriginType:        originType,
+                OriginID:          originID,
+                TargetID:          targetID,
+                RelayState:        relayState,
+                CreatedAt:         time.Now(),
+                ProcessedRequests: make(map[string]bool),
+        }
+
+        s.logoutContextsLock.Lock()
+        s.logoutContexts[id] = logoutContext
+        s.logoutContextsLock.Unlock()
+
+        return logoutContext
+}</span>
+
+// GetLogoutContext retrieves a logout context by ID.
+func (s *Storage) GetLogoutContext(id string) (*LogoutContext, error) <span class="cov7" title="30">{
+        s.logoutContextsLock.RLock()
+        logoutContext, ok := s.logoutContexts[id]
+        s.logoutContextsLock.RUnlock()
+
+        if !ok </span><span class="cov3" title="4">{
+                return nil, fmt.Errorf("%w: %s", ErrLogoutContextNotFound, id)
+        }</span>
+
+        <span class="cov7" title="26">return logoutContext, nil</span>
+}
+
+// DeleteLogoutContext removes a logout context from storage.
+func (s *Storage) DeleteLogoutContext(id string) <span class="cov4" title="6">{
+        s.logoutContextsLock.Lock()
+        delete(s.logoutContexts, id)
+        s.logoutContextsLock.Unlock()
+}</span>
+
+// GetAllowedSPs returns the list of allowed service providers from configuration.
+func (s *Storage) GetAllowedSPs() []config.SPConfig <span class="cov6" title="13">{
+        return s.config.Proxy.AllowedSP
+}</span>
+
+// CleanupCompletedAuthRequests removes completed auth requests older than the specified duration.
+func (s *Storage) CleanupCompletedAuthRequests(maxAge time.Duration) int <span class="cov2" title="2">{
+        s.authRequestsLock.Lock()
+        defer s.authRequestsLock.Unlock()
+
+        now := time.Now()
+        deleted := 0
+        for id, authRequest := range s.authRequests </span><span class="cov4" title="7">{
+                if authRequest.IsDone &amp;&amp; !authRequest.CompletedAt.IsZero() &amp;&amp; now.Sub(authRequest.CompletedAt) &gt; maxAge </span><span class="cov1" title="1">{
+                        delete(s.authRequests, id)
+                        deleted++
+                }</span>
+        }
+
+        <span class="cov2" title="2">if deleted &gt; 0 </span><span class="cov1" title="1">{
+                slog.Info("Cleaned up completed auth requests", slog.Int("count", deleted))
+        }</span>
+
+        <span class="cov2" title="2">return deleted</span>
+}
+
+// CheckAndMarkLogoutRequestProcessed checks if a logout request ID has been processed
+// and marks it as processed if not. Returns true if this is a replay.
+func (s *Storage) CheckAndMarkLogoutRequestProcessed(contextID, requestID string) (bool, error) <span class="cov1" title="1">{
+        if requestID == "" </span><span class="cov0" title="0">{
+                return false, nil // No request ID to check
+        }</span>
+
+        <span class="cov1" title="1">s.logoutContextsLock.Lock()
+        defer s.logoutContextsLock.Unlock()
+
+        logoutContext, ok := s.logoutContexts[contextID]
+        if !ok </span><span class="cov0" title="0">{
+                return false, fmt.Errorf("%w: %s", ErrLogoutContextNotFound, contextID)
+        }</span>
+
+        // Check if already processed
+        <span class="cov1" title="1">if logoutContext.ProcessedRequests[requestID] </span><span class="cov0" title="0">{
+                return true, nil // This is a replay
+        }</span>
+
+        // Mark as processed
+        <span class="cov1" title="1">logoutContext.ProcessedRequests[requestID] = true
+
+        return false, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file23" style="display: none">package saml
+
+import (
+        "crypto/rand"
+        "crypto/rsa"
+        "crypto/x509"
+        "crypto/x509/pkix"
+        "encoding/pem"
+        "math/big"
+        "os"
+        "path/filepath"
+        "testing"
+        "time"
+
+        "github.com/stretchr/testify/require"
+)
+
+// GenerateTestCertificate generates a self-signed certificate and private key for testing.
+func GenerateTestCertificate(t *testing.T) (string, string) <span class="cov10" title="24">{
+        t.Helper()
+        var certPath, keyPath string
+        tempDir := t.TempDir()
+
+        // Generate a private key
+        privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+        require.NoError(t, err)
+
+        // Create a certificate template
+        template := x509.Certificate{
+                SerialNumber: big.NewInt(1),
+                Subject: pkix.Name{
+                        CommonName: "Test Certificate",
+                },
+                NotBefore:             time.Now(),
+                NotAfter:              time.Now().Add(time.Hour * 24),
+                KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+                ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+                BasicConstraintsValid: true,
+        }
+
+        // Create a self-signed certificate
+        derBytes, err := x509.CreateCertificate(rand.Reader, &amp;template, &amp;template, &amp;privateKey.PublicKey, privateKey)
+        require.NoError(t, err)
+
+        // Write the certificate to a file
+        certPath = filepath.Join(tempDir, "cert.pem")
+        certOut, err := os.Create(certPath)
+        require.NoError(t, err)
+        defer certOut.Close()
+
+        err = pem.Encode(certOut, &amp;pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+        require.NoError(t, err)
+
+        // Write the private key to a file
+        keyPath = filepath.Join(tempDir, "key.pem")
+        keyOut, err := os.Create(keyPath)
+        require.NoError(t, err)
+        defer keyOut.Close()
+
+        privBytes := x509.MarshalPKCS1PrivateKey(privateKey)
+        err = pem.Encode(keyOut, &amp;pem.Block{Type: "RSA PRIVATE KEY", Bytes: privBytes})
+        require.NoError(t, err)
+
+        return certPath, keyPath
+}</span>
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

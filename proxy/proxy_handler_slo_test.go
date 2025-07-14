@@ -49,7 +49,7 @@ func TestHandleSLO(t *testing.T) {
 	}
 
 	// Create service providers
-	ctx := context.Background()
+	ctx := t.Context()
 	sps, err := saml.CreateServiceProviders(ctx, cfg)
 	require.NoError(t, err)
 
@@ -257,7 +257,7 @@ func TestDecodeDeflatedRequest(t *testing.T) {
 			result, err := decodeDeflatedRequest(tt.input)
 
 			if tt.expectedError {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Nil(t, result)
 			} else {
 				assert.NoError(t, err)

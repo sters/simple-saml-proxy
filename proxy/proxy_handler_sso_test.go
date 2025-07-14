@@ -134,12 +134,12 @@ func TestExtractIssuerFromSAMLRequest(t *testing.T) {
 			got, err := extractIssuerFromSAMLRequest(tt.input)
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				if tt.errMsg != "" {
 					assert.Contains(t, err.Error(), tt.errMsg)
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.want, got)
 			}
 		})
