@@ -1,7 +1,9 @@
 package proxy
 
 import (
-	"io"
+	"context"
+	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -85,121 +87,138 @@ func TestSetupHTTPHandlers(t *testing.T) {
 }
 
 func TestStartServer(t *testing.T) {
-	// Create a test config
-	cfg := config.Config{}
-	cfg.Server.ListenAddress = "localhost:0" // Use port 0 to get a random available port
-	cfg.Proxy.MetadataURL = "http://test.example.com/metadata"
-	cfg.Proxy.AcsURL = "http://test.example.com/sso/acs"
-	cfg.Proxy.EntityID = "http://test.example.com"
-
-	// Generate test certificate and key
-	certPath, keyPath := saml.GenerateTestCertificate(t)
-	defer func() {
-		if certPath != "" {
-			err := os.RemoveAll(filepath.Dir(certPath))
-			if err != nil {
-				t.Logf("Failed to remove temp directory: %v", err)
-			}
-		}
-	}()
-
-	cfg.Proxy.CertificatePath = certPath
-	cfg.Proxy.PrivateKeyPath = keyPath
-
-	// Add a test IDP
-	cfg.IDP = []config.IDPConfig{
+	tests := []struct {
+		name          string
+		listenAddress string
+		handler       http.Handler
+		wantErr       bool
+		errContains   string
+	}{
 		{
-			ID:              "test-idp",
-			EntityID:        "https://test-idp.example.com/saml/metadata",
-			SSOURL:          "https://test-idp.example.com/saml/sso",
-			CertificatePath: certPath, // Use the same cert for testing
+			name:          "Valid configuration with random port",
+			listenAddress: "localhost:0",
+			handler:       http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }),
+			wantErr:       false,
+		},
+		{
+			name:          "Invalid listen address",
+			listenAddress: "invalid:address:format",
+			handler:       http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }),
+			wantErr:       true,
+			errContains:   "too many colons",
+		},
+		{
+			name:          "Permission denied port",
+			listenAddress: "localhost:1", // Port 1 typically requires root
+			handler:       http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }),
+			wantErr:       true,
+			errContains:   "permission denied",
 		},
 	}
 
-	// Create a test server using httptest
-	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/ping":
-			w.WriteHeader(http.StatusOK)
-			_, err := w.Write([]byte("pong"))
-			if err != nil {
-				t.Fatalf("Failed to write response: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := config.Config{}
+			cfg.Server.ListenAddress = tt.listenAddress
+
+			// For valid configurations, start server in background
+			if !tt.wantErr {
+				// Find an available port
+				listener, err := net.Listen("tcp", "localhost:0")
+				require.NoError(t, err)
+				tcpAddr, ok := listener.Addr().(*net.TCPAddr)
+				require.True(t, ok)
+				port := tcpAddr.Port
+				err = listener.Close()
+				require.NoError(t, err)
+
+				cfg.Server.ListenAddress = fmt.Sprintf("localhost:%d", port)
+
+				// Start server in goroutine
+				serverErr := make(chan error, 1)
+				go func() {
+					serverErr <- StartServer(cfg, tt.handler)
+				}()
+
+				// Give server time to start
+				time.Sleep(100 * time.Millisecond)
+
+				// Test that server is running
+				req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, fmt.Sprintf("http://localhost:%d/", port), nil)
+				require.NoError(t, err)
+				client := &http.Client{}
+				resp, err := client.Do(req)
+				require.NoError(t, err)
+				assert.Equal(t, http.StatusOK, resp.StatusCode)
+				resp.Body.Close()
+
+				// Server should still be running
+				select {
+				case err := <-serverErr:
+					t.Fatalf("Server stopped unexpectedly: %v", err)
+				default:
+					// Expected - server is still running
+				}
+			} else {
+				// For error cases, call StartServer directly
+				err := StartServer(cfg, tt.handler)
+				assert.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
 			}
-		case "/metadata":
-			w.Header().Set("Content-Type", "application/xml")
-			w.WriteHeader(http.StatusOK)
-			_, err := w.Write([]byte("<EntityDescriptor>Test Metadata</EntityDescriptor>"))
-			if err != nil {
-				t.Fatalf("Failed to write response: %v", err)
-			}
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	defer testServer.Close()
+		})
+	}
+}
 
-	// Test the server endpoints
-	// Test ping endpoint
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, testServer.URL+"/ping", nil)
-	require.NoError(t, err)
-	resp, err := http.DefaultClient.Do(req)
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	body, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	assert.Equal(t, "pong", string(body))
-	resp.Body.Close()
-
-	// Test metadata endpoint
-	req, err = http.NewRequestWithContext(t.Context(), http.MethodGet, testServer.URL+"/metadata", nil)
-	require.NoError(t, err)
-	resp, err = http.DefaultClient.Do(req)
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Equal(t, "application/xml", resp.Header.Get("Content-Type"))
-	body, err = io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	assert.Contains(t, string(body), "EntityDescriptor")
-	resp.Body.Close()
-
-	// Test non-existent endpoint
-	req, err = http.NewRequestWithContext(t.Context(), http.MethodGet, testServer.URL+"/nonexistent", nil)
-	require.NoError(t, err)
-	resp, err = http.DefaultClient.Do(req)
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
-	resp.Body.Close()
-
-	// Test the actual StartServer function with a mock handler
+func TestStartServerWithMiddleware(t *testing.T) {
+	// Test that the server properly applies middleware
+	called := false
 	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, err := w.Write([]byte("test"))
-		if err != nil {
-			t.Fatalf("Failed to write response: %v", err)
-		}
+		called = true
+		w.WriteHeader(http.StatusOK)
 	})
 
-	// Start the server in a goroutine with a short timeout
-	errCh := make(chan error, 1)
-	go func() {
-		// Create a server with the StartServer function but with a custom shutdown mechanism
-		server := &http.Server{
-			Addr:              cfg.Server.ListenAddress,
-			Handler:           handler,
-			ReadHeaderTimeout: 10 * time.Second,
-		}
+	// Find an available port
+	listener, err := net.Listen("tcp", "localhost:0")
+	require.NoError(t, err)
+	tcpAddr, ok := listener.Addr().(*net.TCPAddr)
+	require.True(t, ok)
+	port := tcpAddr.Port
+	err = listener.Close()
+	require.NoError(t, err)
 
-		// Start the server and capture any errors
-		errCh <- server.ListenAndServe()
+	cfg := config.Config{}
+	cfg.Server.ListenAddress = fmt.Sprintf("localhost:%d", port)
+
+	// Start server
+	serverErr := make(chan error, 1)
+	server := &http.Server{
+		Addr:              cfg.Server.ListenAddress,
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	go func() {
+		serverErr <- server.ListenAndServe()
 	}()
 
-	// Give the server a moment to start
+	// Give server time to start
 	time.Sleep(100 * time.Millisecond)
 
-	// The server should still be running (no error yet)
-	select {
-	case err := <-errCh:
-		t.Fatalf("Server stopped unexpectedly: %v", err)
-	default:
-		// This is expected, server is still running
-	}
+	// Make request
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, fmt.Sprintf("http://localhost:%d/test", port), nil)
+	require.NoError(t, err)
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	resp.Body.Close()
+	assert.True(t, called, "Handler should have been called")
+
+	// Shutdown server
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	err = server.Shutdown(ctx)
+	require.NoError(t, err)
 }

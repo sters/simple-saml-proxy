@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"log/slog"
 	"net/http"
@@ -132,9 +133,9 @@ func respondWithSAMLError(w http.ResponseWriter, _ *http.Request, _ *saml.IDP, i
 <body>
     <div class="container">
         <h1 class="error">Access Denied</h1>
-        <p>The service provider <strong>`+issuerEntityID+`</strong> is not authorized to use this SAML proxy.</p>
-        <p>Status: `+statusCode+`</p>
-        <p>Message: `+statusMessage+`</p>
+        <p>The service provider <strong>`+html.EscapeString(issuerEntityID)+`</strong> is not authorized to use this SAML proxy.</p>
+        <p>Status: `+html.EscapeString(statusCode)+`</p>
+        <p>Message: `+html.EscapeString(statusMessage)+`</p>
     </div>
 </body>
 </html>`)
