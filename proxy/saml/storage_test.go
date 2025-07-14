@@ -284,6 +284,7 @@ func TestSetUserinfoWithUserID_AssertionData(t *testing.T) {
 	}
 }
 
+//nolint:maintidx // Test function needs to be complex to thoroughly test assertion data handling
 func TestSetUserinfoWithLoginName_AssertionData(t *testing.T) {
 	tests := []struct {
 		name           string

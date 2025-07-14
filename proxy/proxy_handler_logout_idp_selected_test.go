@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+//nolint:maintidx // Test function needs to be complex to cover all logout scenarios
 func TestHandleLogoutIDPSelected(t *testing.T) {
 	// Generate test certificate
 	certPath, keyPath := saml.GenerateTestCertificate(t)

@@ -29,6 +29,7 @@ func createConfigWithMetadata(maxRetries int, initialDelay, maxDelay time.Durati
 	return cfg
 }
 
+//nolint:maintidx // Test function needs to be complex to cover all retry scenarios and edge cases
 func TestReadMetadataFromURLWithRetry(t *testing.T) {
 	validMetadata := `<?xml version="1.0" encoding="UTF-8"?>
 <EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="https://test.example.com">
