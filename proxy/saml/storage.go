@@ -420,19 +420,6 @@ func (s *Storage) DeleteLogoutContext(id string) {
 	s.logoutContextsLock.Unlock()
 }
 
-// CleanupExpiredLogoutContexts removes logout contexts older than the specified duration.
-func (s *Storage) CleanupExpiredLogoutContexts(maxAge time.Duration) {
-	s.logoutContextsLock.Lock()
-	defer s.logoutContextsLock.Unlock()
-
-	now := time.Now()
-	for id, ctx := range s.logoutContexts {
-		if now.Sub(ctx.CreatedAt) > maxAge {
-			delete(s.logoutContexts, id)
-		}
-	}
-}
-
 // GetAllowedSPs returns the list of allowed service providers from configuration.
 func (s *Storage) GetAllowedSPs() []config.SPConfig {
 	return s.config.Proxy.AllowedSP

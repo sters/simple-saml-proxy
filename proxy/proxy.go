@@ -69,24 +69,6 @@ func SetupHTTPHandlers(idp *saml.IDP, providers *saml.ServiceProviders, _ config
 	})
 }
 
-// isAllowedServiceURL checks if the given service URL is allowed based on the prefix match configuration.
-// If no allowed prefixes are configured, all service URLs are allowed.
-func isAllowedServiceURL(serviceURL string, allowedPrefixes []string) bool {
-	// If no allowed prefixes are configured, allow all service URLs
-	if len(allowedPrefixes) == 0 {
-		return true
-	}
-
-	// Check if the service URL starts with any of the allowed prefixes
-	for _, prefix := range allowedPrefixes {
-		if strings.HasPrefix(serviceURL, prefix) {
-			return true
-		}
-	}
-
-	return false
-}
-
 // StartServer starts the HTTP server with the given configuration and handler.
 func StartServer(cfg config.Config, handler http.Handler) error {
 	server := &http.Server{

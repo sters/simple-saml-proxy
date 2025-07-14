@@ -84,21 +84,6 @@ func TestSetupHTTPHandlers(t *testing.T) {
 	assert.Equal(t, "text/xml; charset=utf-8", w.Header().Get("Content-Type"))
 }
 
-func TestServiceURLValidation(t *testing.T) {
-	// Test with allowed prefixes
-	allowedPrefixes := []string{"https://example.com", "https://test.example.com"}
-
-	// URL that matches an allowed prefix
-	assert.True(t, isAllowedServiceURL("https://example.com/path", allowedPrefixes))
-
-	// URL that doesn't match any allowed prefix
-	assert.False(t, isAllowedServiceURL("https://malicious.com", allowedPrefixes))
-
-	// Test with no allowed prefixes (all URLs are allowed)
-	assert.True(t, isAllowedServiceURL("https://any.domain.com", nil))
-	assert.True(t, isAllowedServiceURL("https://any.domain.com", []string{}))
-}
-
 func TestStartServer(t *testing.T) {
 	// Create a test config
 	cfg := config.Config{}
