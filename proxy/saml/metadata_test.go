@@ -14,6 +14,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var (
+	errMockClientNotConfigured  = errors.New("mock client not configured")
+	errNetworkConnectionRefused = errors.New("network error: connection refused")
+)
+
 // Helper function to create config with metadata settings.
 func createConfigWithMetadata(maxRetries int, initialDelay, maxDelay time.Duration) config.Config {
 	cfg := config.Config{}
@@ -322,7 +327,7 @@ func (m *MockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 		return m.DoFunc(req)
 	}
 
-	return nil, errors.New("mock client not configured")
+	return nil, errMockClientNotConfigured
 }
 
 func TestReadMetadataFromURLWithRetry_HTTPClientError(t *testing.T) {
@@ -346,5 +351,5 @@ func TestReadMetadataFromURLWithRetry_HTTPClientError(t *testing.T) {
 type failingTransport struct{}
 
 func (f *failingTransport) RoundTrip(_ *http.Request) (*http.Response, error) {
-	return nil, errors.New("network error: connection refused")
+	return nil, errNetworkConnectionRefused
 }

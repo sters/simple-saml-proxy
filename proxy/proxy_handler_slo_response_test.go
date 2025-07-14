@@ -403,6 +403,7 @@ func TestHandleSLOResponse(t *testing.T) {
 			},
 			expectedStatus: http.StatusFound,
 			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
+				t.Helper()
 				// Check redirect
 				location := w.Header().Get("Location")
 				assert.NotEmpty(t, location)
@@ -432,6 +433,7 @@ func TestHandleSLOResponse(t *testing.T) {
 			},
 			expectedStatus: http.StatusBadRequest,
 			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
+				t.Helper()
 				assert.Contains(t, w.Body.String(), "Missing SAMLResponse parameter")
 			},
 		},
@@ -448,6 +450,7 @@ func TestHandleSLOResponse(t *testing.T) {
 			},
 			expectedStatus: http.StatusBadRequest,
 			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
+				t.Helper()
 				assert.Contains(t, w.Body.String(), "Invalid logout response")
 			},
 		},
@@ -471,6 +474,7 @@ func TestHandleSLOResponse(t *testing.T) {
 			},
 			expectedStatus: http.StatusBadRequest,
 			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
+				t.Helper()
 				assert.Contains(t, w.Body.String(), "Invalid logout response")
 			},
 		},
@@ -487,6 +491,7 @@ func TestHandleSLOResponse(t *testing.T) {
 			},
 			expectedStatus: http.StatusBadRequest,
 			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
+				t.Helper()
 				assert.Contains(t, w.Body.String(), "Invalid logout response")
 			},
 		},
@@ -507,6 +512,7 @@ func TestHandleSLOResponse(t *testing.T) {
 			},
 			expectedStatus: http.StatusBadRequest,
 			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
+				t.Helper()
 				assert.Contains(t, w.Body.String(), "Invalid logout response")
 			},
 		},
@@ -534,6 +540,7 @@ func TestHandleSLOResponse(t *testing.T) {
 			},
 			expectedStatus: http.StatusFound,
 			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
+				t.Helper()
 				// Should still redirect but with error status
 				location := w.Header().Get("Location")
 				assert.NotEmpty(t, location)

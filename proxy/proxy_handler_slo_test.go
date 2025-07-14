@@ -93,28 +93,28 @@ func TestHandleSLO(t *testing.T) {
 		{
 			name:           "Missing issuer in logout request",
 			method:         http.MethodGet,
-			samlRequest:    createTestLogoutRequest("", "user123", "session456"),
+			samlRequest:    createTestLogoutRequest("", "admin@example.com", "sess_admin_001"),
 			expectedStatus: http.StatusBadRequest,
 			expectedBody:   "Invalid logout request",
 		},
 		{
 			name:           "Unauthorized SP issuer",
 			method:         http.MethodGet,
-			samlRequest:    createTestLogoutRequest("https://unauthorized.example.com", "user123", "session456"),
+			samlRequest:    createTestLogoutRequest("https://unauthorized.example.com", "test.user@domain.com", "sess_test_002"),
 			expectedStatus: http.StatusForbidden,
 			expectedBody:   "Unauthorized service provider",
 		},
 		{
 			name:           "Future issue instant",
 			method:         http.MethodGet,
-			samlRequest:    createTestLogoutRequestWithTime("https://sp.example.com", "user123", "session456", time.Now().Add(10*time.Minute)),
+			samlRequest:    createTestLogoutRequestWithTime("https://sp.example.com", "future.user@example.com", "sess_future_003", time.Now().Add(10*time.Minute)),
 			expectedStatus: http.StatusBadRequest,
 			expectedBody:   "Invalid logout request",
 		},
 		{
 			name:           "Too old issue instant",
 			method:         http.MethodGet,
-			samlRequest:    createTestLogoutRequestWithTime("https://sp.example.com", "user123", "session456", time.Now().Add(-10*time.Minute)),
+			samlRequest:    createTestLogoutRequestWithTime("https://sp.example.com", "old.user@example.com", "sess_old_004", time.Now().Add(-10*time.Minute)),
 			expectedStatus: http.StatusBadRequest,
 			expectedBody:   "Invalid logout request",
 		},
@@ -197,12 +197,12 @@ func TestParseLogoutRequest(t *testing.T) {
 		},
 		{
 			name:          "Missing issuer",
-			samlRequest:   createTestLogoutRequest("", "user123", "session456"),
+			samlRequest:   createTestLogoutRequest("", "missing.issuer@example.com", "sess_missing_005"),
 			expectedError: "logout request missing issuer",
 		},
 		{
 			name:           "Valid logout request",
-			samlRequest:    createTestLogoutRequest("https://sp.example.com", "user123", "session456"),
+			samlRequest:    createTestLogoutRequest("https://sp.example.com", "valid.user@sp.example.com", "sess_valid_006"),
 			expectedIssuer: "https://sp.example.com",
 		},
 		{
@@ -260,7 +260,7 @@ func TestDecodeDeflatedRequest(t *testing.T) {
 				require.Error(t, err)
 				assert.Nil(t, result)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, result)
 			}
 		})
@@ -376,10 +376,10 @@ func TestValidateIssueInstant(t *testing.T) {
 			err := validateIssueInstant(tt.issueInstant)
 
 			if tt.expectedError != "" {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedError)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}

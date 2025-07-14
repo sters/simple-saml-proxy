@@ -216,7 +216,7 @@ func TestDecodeDeflatedSAMLRequest_LargeData(t *testing.T) {
 
 	// Try to decompress - should read up to the limit
 	result, err := decodeDeflatedSAMLRequest(compressed.Bytes())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	// Result should be truncated to 10MB
 	assert.LessOrEqual(t, len(result), 10*1024*1024)
 }
@@ -251,6 +251,7 @@ func TestRespondWithSAMLError(t *testing.T) {
 			statusCode:    "RequestDenied",
 			statusMessage: "Unauthorized service provider",
 			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
+				t.Helper()
 				assert.Equal(t, http.StatusForbidden, w.Code)
 				body := w.Body.String()
 				assert.Contains(t, body, "Access Denied")
@@ -266,6 +267,7 @@ func TestRespondWithSAMLError(t *testing.T) {
 			statusCode:    "RequestDenied",
 			statusMessage: "Access denied",
 			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
+				t.Helper()
 				assert.Equal(t, http.StatusForbidden, w.Code)
 				body := w.Body.String()
 				// Check that special characters are HTML-escaped
@@ -278,6 +280,7 @@ func TestRespondWithSAMLError(t *testing.T) {
 			statusCode:    "RequestDenied",
 			statusMessage: "Invalid request",
 			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
+				t.Helper()
 				assert.Equal(t, http.StatusForbidden, w.Code)
 				body := w.Body.String()
 				// The HTML should be escaped

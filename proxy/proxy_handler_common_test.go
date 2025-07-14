@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var errSimulatedReadError = errors.New("simulated read error")
+
 func TestRandomBytes(t *testing.T) {
 	// Test that randomBytes returns the requested number of bytes
 	result := randomBytes(10)
@@ -57,7 +59,7 @@ func TestRandomBytes_Error(t *testing.T) {
 type errorReader struct{}
 
 func (e *errorReader) Read([]byte) (int, error) {
-	return 0, errors.New("simulated read error")
+	return 0, errSimulatedReadError
 }
 
 func TestDeflateCompress(t *testing.T) {
