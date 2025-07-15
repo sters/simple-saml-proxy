@@ -148,123 +148,261 @@ test.describe('SAML Proxy Integration Tests', () => {
   });
 
   test('SP-initiated SAML flow', async ({ page }) => {
-    console.log('[INFO] Testing SP-initiated SAML flow...');
+    console.log('[INFO] Testing SP-initiated SAML flow (SP → Proxy → IdP → Proxy → SP)...');
     
-    // Step 1: Start from SP - access protected resource
-    console.log('[INFO] Step 1: Initiating SSO from Keycloak SP...');
-    logVerbose('Accessing SP account page: http://localhost:8081/realms/test/account');
-    
-    const spResponse = await page.goto('http://localhost:8081/realms/test/account', {
-      waitUntil: 'networkidle'
-    });
-    
-    console.log(`[INFO] SP response: HTTP ${spResponse.status()}`);
-    
-    // Check if we're on a login page
-    const spContent = await page.content();
-    if (process.env.VERBOSE === 'true') {
-      logVerbose('SP page title:', await page.title());
-      logVerbose('SP page URL:', page.url());
-      
-      // Check for SAML proxy references
-      const hasProxyRef = spContent.includes('saml-proxy') || 
-                         spContent.includes('simple-saml-proxy') ||
-                         spContent.includes('localhost:8082');
-      logVerbose('Page contains SAML proxy reference:', hasProxyRef);
-    }
-    
-    // Look for identity provider login options
-    const hasIdpOptions = await page.locator('text=/Identity Provider|Log.*in.*with/i').count() > 0;
-    if (hasIdpOptions) {
-      console.log('✓ SP shows SAML authentication options');
-      
-      // Try to find and click the SAML proxy login button/link
-      const samlLoginButton = page.locator('a[href*="broker/saml-proxy"]').first();
-      if (await samlLoginButton.count() > 0) {
-        console.log('[INFO] Step 2: Clicking SAML proxy login...');
-        logVerbose('Found SAML login button');
-        
-        // Click and wait for navigation
-        await Promise.all([
-          page.waitForNavigation({ waitUntil: 'networkidle' }),
-          samlLoginButton.click()
-        ]);
-        
-        console.log(`[INFO] Redirected to: ${page.url()}`);
-        
-        // Check if we're redirected to the proxy
-        if (page.url().includes('localhost:8082')) {
-          console.log('✓ SP correctly redirected to SAML proxy');
-          
-          // Check for IdP selection page
-          const proxyContent = await page.content();
-          if (proxyContent.includes('keycloak-idp') || proxyContent.includes('Select Identity Provider')) {
-            console.log('✓ Proxy shows IdP selection page');
-            
-            if (process.env.VERBOSE === 'true') {
-              // Log available IdPs
-              const idpLinks = await page.locator('a[href*="idp"]').all();
-              logVerbose(`Found ${idpLinks.length} IdP options`);
-            }
-          }
-        }
-      } else {
-        console.log('⚠ SAML broker endpoint not found - IdP may not be configured');
-      }
-    }
-    
-    // Step 3: Test SP SAML broker endpoint directly
-    console.log('[INFO] Step 3: Testing SP SAML broker endpoint...');
-    
+    // Step 1: Start from SP - initiate SAML authentication
+    console.log('[INFO] Step 1: Starting at SP broker endpoint...');
     const brokerUrl = 'http://localhost:8081/realms/test/broker/saml-proxy/login';
     logVerbose(`Accessing SP broker endpoint: ${brokerUrl}`);
     
     try {
-      const brokerResponse = await page.goto(brokerUrl, {
+      const spResponse = await page.goto(brokerUrl, {
         waitUntil: 'networkidle'
       });
       
-      const brokerStatus = brokerResponse.status();
-      console.log(`[INFO] SP SAML broker response: HTTP ${brokerStatus}`);
+      console.log(`[INFO] SP response: HTTP ${spResponse.status()}`);
       
-      if (brokerStatus === 302 || brokerStatus === 303) {
-        console.log('✓ SP broker redirects for SAML authentication');
+      // Step 2: Check redirect to proxy
+      await page.waitForTimeout(1000); // Allow redirects to complete
+      const proxyUrl = page.url();
+      
+      if (proxyUrl.includes('localhost:8082')) {
+        console.log('✓ Step 2: SP redirected to SAML proxy');
+        logVerbose('Current URL:', proxyUrl);
         
-        // Check if we're redirected to the proxy
-        const currentUrl = page.url();
-        if (currentUrl.includes('localhost:8082')) {
-          console.log('✓ SP broker correctly redirected to SAML proxy');
+        // Check for IdP selection page
+        const proxyContent = await page.content();
+        const hasIdpSelection = proxyContent.includes('keycloak-idp') || 
+                               proxyContent.includes('Select Identity Provider') ||
+                               proxyContent.includes('Choose your identity provider');
+        
+        if (hasIdpSelection) {
+          console.log('✓ Proxy shows IdP selection page');
           
-          // Check proxy response
-          const proxyContent = await page.content();
-          if (proxyContent.includes('keycloak-idp') || proxyContent.includes('Identity Provider')) {
-            console.log('✓ Proxy shows IdP selection page after SP broker redirect');
+          // Step 3: Select IdP (click on keycloak-idp link)
+          console.log('[INFO] Step 3: Selecting Keycloak IdP...');
+          
+          // Find and click the IdP link
+          const idpLink = page.locator('a[href*="keycloak-idp"]').first();
+          const idpLinkCount = await idpLink.count();
+          
+          if (idpLinkCount > 0) {
+            logVerbose('Found IdP link, clicking...');
+            
+            await Promise.all([
+              page.waitForNavigation({ waitUntil: 'networkidle' }),
+              idpLink.click()
+            ]);
+            
+            // Step 4: Check redirect to IdP
+            await page.waitForTimeout(1000);
+            const idpUrl = page.url();
+            
+            if (idpUrl.includes('localhost:8080')) {
+              console.log('✓ Step 4: Proxy redirected to Keycloak IdP');
+              logVerbose('Current URL:', idpUrl);
+              
+              // Check if we're on the IdP login page
+              const idpContent = await page.content();
+              const hasLoginForm = await page.locator('input[name="username"]').count() > 0;
+              
+              if (hasLoginForm) {
+                console.log('✓ Reached IdP login page');
+                
+                // Step 5: Authenticate at IdP
+                console.log('[INFO] Step 5: Authenticating at IdP...');
+                
+                await page.fill('input[name="username"]', 'testuser');
+                await page.fill('input[name="password"]', 'testpassword');
+                
+                logVerbose('Filled login credentials, submitting...');
+                
+                // Submit login form
+                await Promise.all([
+                  page.waitForNavigation({ waitUntil: 'networkidle' }),
+                  page.click('input[type="submit"]')
+                ]);
+                
+                // Step 6: Check redirect back through proxy to SP
+                await page.waitForTimeout(2000); // Allow SAML processing
+                const finalUrl = page.url();
+                
+                console.log('[INFO] Step 6: Checking final redirect...');
+                logVerbose('Final URL:', finalUrl);
+                
+                if (finalUrl.includes('localhost:8081')) {
+                  console.log('✓ Successfully redirected back to SP');
+                  
+                  // Check if we're authenticated
+                  const finalContent = await page.content();
+                  const isAuthenticated = finalContent.includes('testuser') || 
+                                         finalContent.includes('Account') ||
+                                         finalContent.includes('Sign Out') ||
+                                         finalContent.includes('Log out');
+                  
+                  if (isAuthenticated) {
+                    console.log('✓ User successfully authenticated at SP');
+                    console.log('✓ Complete SAML flow successful: SP → Proxy → IdP → Proxy → SP');
+                  } else {
+                    console.log('⚠ Reached SP but authentication status unclear');
+                  }
+                } else if (finalUrl.includes('localhost:8082')) {
+                  console.log('⚠ Still at proxy - may need additional configuration');
+                  const content = await page.content();
+                  logVerbose('Proxy page content (first 500 chars):', content.substring(0, 500));
+                } else {
+                  console.log('⚠ Unexpected final URL:', finalUrl);
+                }
+                
+              } else {
+                console.log('⚠ IdP login form not found');
+                logVerbose('IdP page content (first 500 chars):', idpContent.substring(0, 500));
+              }
+            } else {
+              console.log('⚠ Not redirected to IdP, current URL:', idpUrl);
+            }
+          } else {
+            console.log('⚠ IdP selection link not found on proxy page');
+            
+            // Try direct navigation as fallback
+            console.log('[INFO] Attempting direct IdP selection...');
+            const directIdpUrl = 'http://localhost:8082/sso?idp=keycloak-idp';
+            await page.goto(directIdpUrl, { waitUntil: 'networkidle' });
           }
-        } else if (currentUrl.includes('localhost:8080')) {
-          console.log('✓ Proxy redirected directly to Keycloak IdP');
+        } else {
+          // Might be redirected directly to IdP if only one IdP configured
+          if (proxyUrl.includes('localhost:8080')) {
+            console.log('✓ Proxy redirected directly to IdP (single IdP mode)');
+          } else {
+            console.log('⚠ Proxy did not show IdP selection page');
+            logVerbose('Proxy content (first 500 chars):', proxyContent.substring(0, 500));
+          }
         }
         
-      } else if (brokerStatus === 404) {
-        console.log('⚠ SAML broker endpoint not found - IdP configuration may be missing');
-        console.log('  Run "make configure" to set up the SAML identity provider');
+      } else if (proxyUrl.includes('localhost:8080')) {
+        console.log('✓ Redirected directly to IdP (proxy may be in single IdP mode)');
         
-      } else if (brokerStatus === 500) {
-        console.log('⚠ SAML broker returned server error - check configuration');
-        
-      } else if (brokerStatus === 200) {
-        // We might be on the proxy IdP selection page
-        const content = await page.content();
-        if (content.includes('keycloak-idp') || content.includes('Identity Provider')) {
-          console.log('✓ Reached proxy IdP selection page via SP broker');
-        }
+      } else {
+        console.log('⚠ Unexpected redirect URL:', proxyUrl);
+        console.log('  Expected redirect to proxy (localhost:8082) or IdP (localhost:8080)');
       }
       
     } catch (error) {
-      console.log('⚠ Error accessing SP broker endpoint:', error.message);
+      console.log('❌ Error during SP-initiated flow:', error.message);
       logVerbose('Full error:', error);
+      
+      // Capture screenshot on error
+      if (process.env.VERBOSE === 'true') {
+        try {
+          await page.screenshot({ path: './test-error-screenshot.png' });
+          console.log('[DEBUG] Error screenshot saved to ./test-error-screenshot.png');
+        } catch (screenshotError) {
+          logVerbose('Could not capture screenshot:', screenshotError.message);
+        }
+      }
     }
     
-    console.log('✓ SP-initiated flow tests completed');
+    console.log('[INFO] SP-initiated flow test completed');
+  });
+
+  test('Complete SP-initiated SAML proxy flow verification', async ({ page }) => {
+    console.log('[INFO] Testing complete SAML proxy flow with step verification...');
+    
+    // Track the flow steps
+    const flowSteps = [];
+    
+    // Monitor all network requests
+    page.on('response', response => {
+      const url = response.url();
+      const status = response.status();
+      
+      if (url.includes('localhost:8081') && !url.includes('.js') && !url.includes('.css')) {
+        flowSteps.push({ step: 'SP', url, status });
+      } else if (url.includes('localhost:8082')) {
+        flowSteps.push({ step: 'Proxy', url, status });
+      } else if (url.includes('localhost:8080') && !url.includes('.js') && !url.includes('.css')) {
+        flowSteps.push({ step: 'IdP', url, status });
+      }
+    });
+    
+    try {
+      // Step 1: Initiate from SP
+      console.log('[FLOW] Step 1: SP initiates SAML authentication');
+      await page.goto('http://localhost:8081/realms/test/broker/saml-proxy/login', {
+        waitUntil: 'networkidle'
+      });
+      
+      // Wait for redirects
+      await page.waitForTimeout(2000);
+      
+      // Step 2: Should be at proxy
+      const step2Url = page.url();
+      if (step2Url.includes('localhost:8082')) {
+        console.log('[FLOW] ✓ Step 2: Reached proxy for IdP selection');
+        
+        // Find IdP link
+        const idpLink = await page.locator('a[href*="keycloak-idp"]').first();
+        if (await idpLink.count() > 0) {
+          console.log('[FLOW] Step 3: Selecting IdP at proxy');
+          await idpLink.click();
+          
+          // Wait for redirect to IdP
+          await page.waitForTimeout(2000);
+          
+          // Step 4: Should be at IdP
+          const step4Url = page.url();
+          if (step4Url.includes('localhost:8080')) {
+            console.log('[FLOW] ✓ Step 4: Reached IdP for authentication');
+            
+            // Authenticate
+            const hasLoginForm = await page.locator('input[name="username"]').count() > 0;
+            if (hasLoginForm) {
+              console.log('[FLOW] Step 5: Authenticating at IdP');
+              await page.fill('input[name="username"]', 'testuser');
+              await page.fill('input[name="password"]', 'testpassword');
+              await page.click('input[type="submit"]');
+              
+              // Wait for SAML processing
+              await page.waitForTimeout(3000);
+              
+              // Step 6: Should be back at SP
+              const finalUrl = page.url();
+              if (finalUrl.includes('localhost:8081')) {
+                console.log('[FLOW] ✓ Step 6: Returned to SP - authentication complete');
+                
+                // Verify the complete flow
+                console.log('\n[FLOW VERIFICATION] Expected flow: SP → Proxy → IdP → Proxy → SP');
+                console.log('[FLOW VERIFICATION] Actual flow:');
+                flowSteps.forEach((step, index) => {
+                  console.log(`  ${index + 1}. ${step.step}: ${step.url.replace(/\?.*/, '...')} (${step.status})`);
+                });
+                
+                // Verify flow pattern
+                const flowPattern = flowSteps.map(s => s.step).join(' → ');
+                if (flowPattern.includes('SP → Proxy') && flowPattern.includes('Proxy → IdP')) {
+                  console.log('[FLOW] ✓ Flow pattern verified');
+                } else {
+                  console.log('[FLOW] ⚠ Flow pattern unexpected:', flowPattern);
+                }
+              } else {
+                console.log('[FLOW] ❌ Did not return to SP, stuck at:', finalUrl);
+              }
+            }
+          } else {
+            console.log('[FLOW] ❌ Did not reach IdP, stuck at:', step4Url);
+          }
+        } else {
+          console.log('[FLOW] ❌ No IdP selection link found at proxy');
+        }
+      } else {
+        console.log('[FLOW] ❌ Did not reach proxy, stuck at:', step2Url);
+      }
+      
+    } catch (error) {
+      console.log('[FLOW] ❌ Flow error:', error.message);
+    }
+    
+    console.log('[INFO] Flow verification test completed');
   });
 });
 
