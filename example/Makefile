@@ -1,76 +1,79 @@
-.PHONY: help up down restart logs certs clean build
+# Integration Testing Makefile for Simple SAML Proxy
 
-# Default target
-help:
-	@echo "Available targets:"
-	@echo "  make certs    - Generate self-signed certificates"
-	@echo "  make up       - Start all services with docker compose"
-	@echo "  make down     - Stop all services"
-	@echo "  make restart  - Restart all services"
-	@echo "  make logs     - Show logs from all services"
-	@echo "  make clean    - Clean up certificates and containers"
-	@echo "  make build    - Build and start services"
+.PHONY: help setup start stop clean test test-basic test-e2e logs status
 
-# Generate certificates
-certs:
-	@echo "Generating certificates..."
-	@cd docker/certs && ./generate-certs.sh
-	@echo "Certificates generated successfully!"
+help: ## Show this help message
+	@echo "Available commands:"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-# Start services
-up: certs
-	@echo "Starting services..."
-	docker compose up --build --force-recreate --remove-orphans
-	@echo ""
-	@echo "Services are running:"
-	@echo "  - Service Provider: http://localhost:8001/simplesaml/"
-	@echo "  - SAML Proxy:       http://localhost:8080/"
-	@echo "  - Identity Provider: http://localhost:8000/simplesaml/"
-	@echo ""
-	@echo "Admin password for SimpleSAMLphp: admin123"
-	@echo "Test users: user1/password, user2/password"
+setup: ## Generate certificates and prepare environment
+	@echo "Setting up integration testing environment..."
+	@./certs/generate-certs.sh
+	@echo "Setup complete!"
 
-# Stop services
-down:
-	@echo "Stopping services..."
-	docker compose down
+start: ## Start all services (Keycloak IdP, SP, and SAML Proxy)
+	@echo "Starting integration testing environment..."
+	@docker-compose up -d
+	@echo "Services starting... Use 'make logs' to see output"
 
-# Restart services
-restart: down up
+configure: ## Configure Keycloak SP with SAML Identity Provider
+	@echo "Configuring Keycloak SP..."
+	@./scripts/configure-keycloak.sh
 
-# Show logs
-logs:
-	docker compose logs -f
+stop: ## Stop all services
+	@echo "Stopping integration testing environment..."
+	@docker-compose down
 
-# Build and start
-build: certs
-	@echo "Building and starting services..."
-	docker compose up -d --build
+clean: ## Stop services and remove volumes
+	@echo "Cleaning up integration testing environment..."
+	@docker-compose down -v --remove-orphans
+	@docker system prune -f
 
-# Clean up
-clean:
-	@echo "Cleaning up..."
-	docker compose down -v
-	rm -f docker/certs/*.crt docker/certs/*.key docker/certs/*.pem
-	@echo "Cleanup complete!"
+test: setup start configure test-e2e ## Run full integration test suite
 
-# Service-specific targets
-.PHONY: logs-proxy logs-idp logs-sp status
+test-e2e-setup: ## Install Playwright dependencies
+	@echo "Setting up Playwright tests..."
+	@cd tests && npm install && npx playwright install
 
-logs-proxy:
-	docker compose logs -f simple-saml-proxy
+test-e2e: test-e2e-setup ## Run end-to-end tests with Playwright
+	@echo "Running end-to-end tests..."
+	@cd tests && npm test
 
-logs-idp:
-	docker compose logs -f test-idp
+test-e2e-verbose: test-e2e-setup ## Run end-to-end tests with verbose output
+	@echo "Running end-to-end tests (verbose mode)..."
+	@cd tests && npm run test:verbose
 
-logs-sp:
-	docker compose logs -f test-sp
+test-e2e-ui: test-e2e-setup ## Run end-to-end tests with Playwright UI
+	@echo "Running end-to-end tests with UI..."
+	@cd tests && npm run test:ui
 
-# Check service status
-status:
-	@docker compose ps
-	@echo ""
-	@echo "Testing service endpoints:"
-	@curl -s -o /dev/null -w "IdP: %{http_code}\n" http://localhost:8000/simplesaml/ || echo "IdP: Failed"
-	@curl -s -o /dev/null -w "SP: %{http_code}\n" http://localhost:8001/simplesaml/ || echo "SP: Failed"
-	@curl -s -o /dev/null -w "Proxy: %{http_code}\n" http://localhost:8080/metadata || echo "Proxy: Failed"
+logs: ## Show logs from all services
+	@docker-compose logs -f
+
+status: ## Show status of all services
+	@docker-compose ps
+
+rebuild: ## Rebuild and restart all services
+	@echo "Rebuilding services..."
+	@docker-compose down
+	@docker-compose build --no-cache
+	@docker-compose up -d
+
+# Service-specific commands
+logs-proxy: ## Show logs from SAML proxy only
+	@docker-compose logs -f simple-saml-proxy
+
+logs-idp: ## Show logs from Keycloak IdP only
+	@docker-compose logs -f keycloak-idp
+
+logs-sp: ## Show logs from Keycloak SP only
+	@docker-compose logs -f keycloak-sp
+
+shell-proxy: ## Get shell access to SAML proxy container
+	@docker-compose exec simple-saml-proxy sh
+
+shell-idp: ## Get shell access to Keycloak IdP container
+	@docker-compose exec keycloak-idp bash
+
+shell-sp: ## Get shell access to Keycloak SP container
+	@docker-compose exec keycloak-sp bash

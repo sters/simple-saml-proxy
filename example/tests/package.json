@@ -1,0 +1,21 @@
+{
+  "name": "simple-saml-proxy-e2e-tests",
+  "version": "1.0.0",
+  "description": "End-to-end tests for Simple SAML Proxy",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:verbose": "VERBOSE=true playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "install-deps": "npm install && npx playwright install",
+    "postinstall": "npx playwright install"
+  },
+  "keywords": ["saml", "proxy", "testing", "e2e"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
+  }
+}

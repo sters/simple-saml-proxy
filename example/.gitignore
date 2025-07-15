@@ -1,7 +1,92 @@
-# Generated certificates
-docker/certs/*.crt
-docker/certs/*.key
-docker/certs/*.pem
+# Node.js dependencies
+tests/node_modules/
+tests/package-lock.json
+tests/yarn.lock
+
+# Playwright test artifacts
+tests/test-results/
+tests/playwright-report/
+tests/playwright/.cache/
+tests/.playwright/
+tests/*.har
+tests/videos/
+tests/screenshots/
+tests/traces/
+
+# Test output files
+*.log
+*.tmp
+tmp/
 
 # Docker volumes
-docker/volumes/
+keycloak-idp-data/
+keycloak-sp-data/
+
+certs/*.crt
+certs/*.key
+certs/*.pem
+
+# macOS
+.DS_Store
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+*.bak
+*.orig
+*.rej
+
+# Coverage reports
+coverage/
+.nyc_output/
+
+# Debug files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test runner temporary files
+test-runner-data/
+
+# Cookie jars and session files from curl tests
+cookies.txt
+*.cookie
+
+# SAML flow captures
+saml-captures/
+*.saml
+*.xml.tmp
+
+# Docker override files (for local development)
+docker-compose.override.yml
+
+# Binary files
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Archive files
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Logs directory
+logs/
+
+# Temporary test data
+test-data/
+
+# Session files
+*.session

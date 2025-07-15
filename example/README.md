@@ -1,178 +1,206 @@
-# Simple SAML Proxy Docker Compose Example
+# Simple SAML Proxy - Integration Testing
 
-This example demonstrates how to run the simple-saml-proxy with Docker Compose, connecting a SAML Service Provider (SP) to a SAML Identity Provider (IdP) through the proxy.
+This directory contains the integration testing setup for the Simple SAML Proxy project, implementing the solution designed in [Issue #26](https://github.com/sters/simple-saml-proxy/issues/26).
 
 ## Architecture
 
-```
-[Test SP] <--SAML--> [Simple SAML Proxy] <--SAML--> [Test IdP]
-(port 8001)          (port 8080)                     (port 8000)
-```
+The integration testing environment uses a **Keycloak + Keycloak** setup:
 
-- **Test SP**: A SimpleSAMLphp instance configured as a Service Provider
-- **Simple SAML Proxy**: Acts as an IdP to the SP and as an SP to the IdP
-- **Test IdP**: A SimpleSAMLphp instance configured as an Identity Provider
+- **Keycloak IdP** (port 8080): Acts as the Identity Provider with test users
+- **Keycloak SP** (port 8081): Acts as the Service Provider consuming authentication
+- **Simple SAML Proxy** (port 8082): The proxy being tested, bridges IdP and SP
 
 ## Quick Start
 
-### Using Make (Recommended)
+### Prerequisites
+
+- Docker and Docker Compose
+- Make (optional, for easier commands)
+
+### Setup and Run
 
 ```bash
-make up        # Generate certificates and start all services
-make logs      # View logs from all services
-make down      # Stop all services
-make help      # Show all available commands
+# Generate certificates and start all services
+make dev-setup
+
+# Or manually:
+make setup      # Generate certificates
+make start      # Start all services
+make configure  # Configure Keycloak SP with SAML Identity Provider
+make test       # Run integration tests
 ```
 
-### Manual Setup
+### Access Points
 
-1. **Generate certificates** (required for SAML):
-   ```bash
-   cd docker/certs
-   ./generate-certs.sh
-   cd ../..
-   ```
+- **Keycloak IdP Admin**: http://localhost:8080/admin (admin/admin)
+- **Keycloak SP Admin**: http://localhost:8081/admin (admin/admin)
+- **SAML Proxy**: http://localhost:8082
+- **Test User**: testuser/testpassword
 
-2. **Start all services**:
-   ```bash
-   docker-compose up --build
-   ```
+## Testing
 
-3. **Access the services**:
-   - Service Provider: http://localhost:8001/simplesaml/
-   - SAML Proxy: http://localhost:8080/
-   - Identity Provider: http://localhost:8000/simplesaml/
+### End-to-End Tests (Playwright)
 
-## Testing the SAML Flow
+```bash
+# Run E2E tests
+make test-e2e
 
-### SP-Initiated SSO
+# Run with verbose output
+make test-e2e-verbose
 
-1. Navigate to the SP admin interface: http://localhost:8001/simplesaml/
-2. Log in with admin password: `admin123`
-3. Go to "Authentication" → "Test configured authentication sources"
-4. Select "default-sp"
-5. You'll be redirected to the Simple SAML Proxy
-6. Select "Test Identity Provider" from the IdP selection page
-7. Log in with test credentials:
-   - Username: `user1`
-   - Password: `password`
-8. You'll be redirected back to the SP with the authenticated user information
+# Run with Playwright UI (interactive)
+make test-e2e-ui
 
-### Test Users
+# Or manually:
+cd tests
+npm install
 
-The IdP is configured with two test users:
-- `user1` / `password` - Employee with email user1@example.com
-- `user2` / `password` - Student with email user2@example.com
+# Different test modes
+npm run test                  # All tests
+npm run test:verbose         # All tests with verbose output
+npm run test:headed         # Run in headed browser
+npm run test:ui            # Run with Playwright UI
+npm run test:debug         # Run in debug mode
+```
 
-## Configuration Details
+### Verbose Mode Features
 
-### Simple SAML Proxy
+When running tests in verbose mode, you get:
 
-The proxy is configured through environment variables in `docker-compose.yml`:
+- **Detailed HTTP traffic**: All requests/responses with headers and status codes
+- **SAML message inspection**: Base64 encoded/decoded SAML requests
+- **Step-by-step logging**: Each action in the flow is logged
+- **Response content**: First N characters of responses for debugging
+- **Network timing**: Time taken for each request
+- **Browser console logs**: JavaScript errors and console messages
+- **Screenshots/videos**: Automatic capture in verbose mode (Playwright)
+- **HAR recording**: Full network traffic recording (Playwright)
 
-- **Entity ID**: `http://simple-saml-proxy:8080`
-- **SSO URL**: `http://simple-saml-proxy:8080/sso`
-- **ACS URL**: `http://simple-saml-proxy:8080/acs`
-- **Metadata URL**: `http://simple-saml-proxy:8080/metadata`
-
-### Identity Provider Configuration
-
-The proxy is configured to connect to one IdP:
-- **ID**: `test-idp`
-- **Name**: Test Identity Provider
-- **SSO URL**: `http://test-idp:8000/simplesaml/saml2/idp/SSOService.php`
-- **Metadata URL**: `http://test-idp:8000/simplesaml/saml2/idp/metadata.php`
-
-### Allowed Service Providers
-
-The proxy is configured to allow one SP:
-- **Entity ID**: `http://test-sp:8001`
-- **Name**: Test Service Provider
-- **ACS URL**: `http://test-sp:8001/simplesaml/module.php/saml/sp/saml2-acs.php/default-sp`
-
-### Metadata Retry Configuration
-
-The proxy includes retry logic for fetching metadata from IdPs and SPs:
-- **Max Retries**: 10 attempts
-- **Initial Delay**: 2 seconds
-- **Max Delay**: 30 seconds
-
-This ensures reliable metadata fetching even when services are still starting up.
-
-## Directory Structure
+## Project Structure
 
 ```
 example/
-├── docker-compose.yml      # Docker Compose configuration
-├── Dockerfile             # Dockerfile for simple-saml-proxy
-├── README.md             # This file
-└── docker/
-    ├── certs/            # SAML certificates
-    │   ├── generate-certs.sh
-    │   ├── proxy.crt     # (generated)
-    │   ├── proxy.key     # (generated)
-    │   ├── idp.crt       # (generated)
-    │   ├── idp.key       # (generated)
-    │   ├── sp.crt        # (generated)
-    │   └── sp.key        # (generated)
-    ├── idp/              # IdP configuration
-    │   ├── authsources.php
-    │   └── saml20-sp-hosted.php
-    └── sp/               # SP configuration
-        ├── authsources.php
-        └── saml20-idp-hosted.php
+├── docker-compose.yml          # Main orchestration file
+├── Dockerfile                  # Simple SAML Proxy container
+├── Makefile                    # Automation commands
+├── README.md                   # This file
+├── certs/                      # Test certificates
+│   ├── generate-certs.sh       # Certificate generation
+│   ├── proxy.crt/key          # Proxy certificates
+│   ├── keycloak-idp.crt/key   # IdP certificates
+│   └── keycloak-sp.crt/key    # SP certificates
+├── keycloak-idp/              # Keycloak IdP configuration
+│   └── test-realm.json        # Test realm with users
+├── keycloak-sp/               # Keycloak SP configuration
+│   └── test-realm.json        # Test realm with IdP config
+├── scripts/                   # Configuration scripts
+│   └── configure-keycloak.sh  # Post-startup Keycloak configuration
+└── tests/                     # Playwright E2E tests
+    ├── package.json
+    ├── playwright.config.js
+    └── tests/
+        └── saml-flow.spec.js          # Comprehensive SAML flow tests
 ```
 
-## Adding More IdPs or SPs
+## Configuration
 
-### To add another IdP:
+### Environment Variables
 
-1. Add IdP configuration to the proxy's environment variables:
-   ```yaml
-   - IDP_1_ID=another-idp
-   - IDP_1_NAME=Another Identity Provider
-   - IDP_1_SSO_URL=http://another-idp:8002/sso
-   - IDP_1_METADATA_URL=http://another-idp:8002/metadata
-   ```
+The Simple SAML Proxy is configured via environment variables in `docker-compose.yml`:
 
-2. Add the IdP service to `docker-compose.yml`
+```yaml
+# Proxy configuration
+PROXY_ENTITY_ID: "http://localhost:8082/metadata"
+PROXY_ACS_URL: "http://localhost:8082/acs"
+PROXY_SSO_URL: "http://localhost:8082/sso"
 
-### To add another allowed SP:
+# IdP configuration
+IDP_0_ID: "keycloak-idp"
+IDP_0_METADATA_URL: "http://keycloak-idp:8080/realms/test/protocol/saml/descriptor"
 
-1. Add SP configuration to the proxy's environment variables:
-   ```yaml
-   - PROXY_ALLOWED_SP_1_ENTITY_ID=http://another-sp:8003
-   - PROXY_ALLOWED_SP_1_NAME=Another Service Provider
-   - PROXY_ALLOWED_SP_1_ACS_URL=http://another-sp:8003/acs
-   ```
+# SP configuration
+PROXY_ALLOWED_SP_0_ENTITY_ID: "http://keycloak-sp:8080/realms/test"
+PROXY_ALLOWED_SP_0_ACS_URL: "http://keycloak-sp:8080/realms/test/broker/saml/endpoint"
+```
 
-2. Add the SP service to `docker-compose.yml`
+### Keycloak Configuration
+
+- **IdP Realm**: Contains test users and SAML client configuration
+- **SP Realm**: Contains SAML identity provider configuration pointing to the proxy
+
+## Development Workflow
+
+### Common Commands
+
+```bash
+# Start development environment
+make dev-setup
+
+# View logs
+make logs           # All services
+make logs-proxy     # Proxy only
+make logs-idp       # IdP only
+make logs-sp        # SP only
+
+# Get shell access
+make shell-proxy    # Proxy container
+make shell-idp      # IdP container
+make shell-sp       # SP container
+
+# Clean up
+make clean          # Stop and remove volumes
+make stop           # Stop services only
+```
+
+### Testing Workflow
+
+1. **Start Services**: `make start`
+2. **Configure Keycloak**: `make configure`
+3. **Run E2E Tests**: `make test-e2e`
+4. **Check Logs**: `make logs`
+5. **Clean Up**: `make clean`
 
 ## Troubleshooting
 
-### Certificate Issues
-If you encounter certificate validation errors:
-1. Ensure certificates are generated: `ls docker/certs/*.crt`
-2. Regenerate if needed: `cd docker/certs && ./generate-certs.sh`
+### Common Issues
 
-### Connection Issues
-- Check all services are running: `docker compose ps`
-- View logs: `docker compose logs -f [service-name]`
-- Ensure ports 8000, 8001, and 8080 are not in use
-- The IdP service has a health check that ensures it's ready before the proxy starts
-- If you see connection refused errors, increase METADATA_MAX_RETRIES or METADATA_INITIAL_DELAY
+1. **Services not starting**: Check if ports 8080, 8081, 8082 are available
+2. **Certificate errors**: Regenerate certificates with `make setup`
+3. **Network issues**: Ensure Docker daemon is running
+4. **Test failures**: Check service logs with `make logs`
 
-### SAML Errors
-- Check proxy logs: `docker compose logs -f simple-saml-proxy`
-- Verify metadata is accessible:
-  - Proxy: http://localhost:8080/metadata
-  - IdP: http://localhost:8000/simplesaml/saml2/idp/metadata.php
+### Debugging
 
-## Security Note
+```bash
+# Check service status
+make status
 
-This example uses self-signed certificates and simple passwords for demonstration purposes only. In production:
-- Use properly signed certificates
-- Configure strong passwords
-- Use HTTPS for all endpoints
-- Implement proper session management
-- Review and harden all security settings
+# Follow logs in real-time
+make logs
+
+# Access container directly
+make shell-proxy
+```
+
+## Implementation Notes
+
+This setup was designed based on the requirements and discussion in [Issue #26](https://github.com/sters/simple-saml-proxy/issues/26):
+
+- **Free OSS Solution**: Uses Keycloak (Apache 2.0 license)
+- **Production-Ready**: Keycloak provides enterprise-grade SAML support
+- **Docker-Based**: Easy local development and CI/CD integration
+- **Consistent Technology**: Same technology stack for both IdP and SP
+- **Extensible**: Easy to add more test scenarios and configurations
+
+## Contributing
+
+When adding new tests:
+
+1. Add E2E tests to `tests/tests/`
+2. Use verbose mode for debugging: `VERBOSE=true npm test`
+3. Update Makefile if needed
+4. Update this README with new instructions
+
+## License
+
+This testing setup follows the same license as the main project.

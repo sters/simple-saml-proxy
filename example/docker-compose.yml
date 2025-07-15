@@ -1,75 +1,143 @@
 version: '3.8'
 
 services:
+  # Keycloak as Identity Provider
+  keycloak-idp:
+    image: quay.io/keycloak/keycloak:23.0
+    container_name: keycloak-idp
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: dev-file
+      KC_HOSTNAME_STRICT: false
+      KC_HOSTNAME_STRICT_HTTPS: false
+      KC_HTTP_ENABLED: true
+      KC_HOSTNAME_STRICT_BACKCHANNEL: false
+      KC_SPI_CONNECTIONS_HTTP_CLIENT_DEFAULT_DISABLE_TRUST_MANAGER: true
+      KC_SPI_TRUSTSTORE_FILE_FILE: ""
+      KC_SPI_TRUSTSTORE_FILE_PASSWORD: ""
+      KC_HOSTNAME_URL: "http://localhost:8080"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./keycloak-idp:/opt/keycloak/data/import
+    command:
+      - start-dev
+      - --import-realm
+      - --hostname-strict=false
+      - --hostname-strict-https=false
+    networks:
+      - saml-network
+    healthcheck:
+      test: ["CMD", "/opt/keycloak/bin/kc.sh", "show-config", "--all"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # Keycloak as Service Provider  
+  keycloak-sp:
+    image: quay.io/keycloak/keycloak:23.0
+    container_name: keycloak-sp
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: dev-file
+      KC_HOSTNAME_STRICT: false
+      KC_HOSTNAME_STRICT_HTTPS: false
+      KC_HTTP_ENABLED: true
+      KC_HOSTNAME_STRICT_BACKCHANNEL: false
+      KC_SPI_CONNECTIONS_HTTP_CLIENT_DEFAULT_DISABLE_TRUST_MANAGER: true
+      KC_SPI_TRUSTSTORE_FILE_FILE: ""
+      KC_SPI_TRUSTSTORE_FILE_PASSWORD: ""
+      KC_HOSTNAME_URL: "http://localhost:8081"
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./keycloak-sp:/opt/keycloak/data/import
+    command:
+      - start-dev
+      - --import-realm
+      - --hostname-strict=false
+      - --hostname-strict-https=false
+    networks:
+      - saml-network
+    healthcheck:
+      test: ["CMD", "/opt/keycloak/bin/kc.sh", "show-config", "--all"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
   # Simple SAML Proxy
   simple-saml-proxy:
     build:
       context: ..
-      dockerfile: example/Dockerfile
+      dockerfile: Dockerfile
     container_name: simple-saml-proxy
-    ports:
-      - "8080:8080"
     environment:
-      - SERVER_LISTEN_ADDRESS=:8080
-      - PROXY_ENTITY_ID=http://simple-saml-proxy:8080
-      - PROXY_SSO_URL=http://simple-saml-proxy:8080/sso
-      - PROXY_ACS_URL=http://simple-saml-proxy:8080/acs
-      - PROXY_METADATA_URL=http://simple-saml-proxy:8080/metadata
-      - PROXY_PRIVATE_KEY_PATH=/certs/proxy.key
-      - PROXY_CERTIFICATE_PATH=/certs/proxy.crt
-      # IdP configuration
-      - IDP_0_ID=test-idp
-      - IDP_0_NAME=Test Identity Provider
-      - IDP_0_SSO_URL=http://test-idp:8080/simplesaml/saml2/idp/SSOService.php
-      - IDP_0_METADATA_URL=http://test-idp:8080/simplesaml/saml2/idp/metadata.php
-      # Allowed SP configuration
-      - PROXY_ALLOWED_SP_0_ENTITY_ID=http://test-sp/shibboleth
-      - PROXY_ALLOWED_SP_0_NAME=Test Service Provider
-      - PROXY_ALLOWED_SP_0_ACS_URL=http://test-sp/Shibboleth.sso/SAML2/POST
+      # Proxy configuration
+      PROXY_ENTITY_ID: "http://localhost:8082/metadata"
+      PROXY_ACS_URL: "http://localhost:8082/acs"
+      PROXY_SSO_URL: "http://localhost:8082/sso"
+      PROXY_SLO_URL: "http://localhost:8082/slo"
+      PROXY_PRIVATE_KEY_PATH: "/certs/proxy.key"
+      PROXY_CERTIFICATE_PATH: "/certs/proxy.crt"
+      
+      # Identity Provider configuration (Keycloak IdP)
+      IDP_0_ID: "keycloak-idp"
+      IDP_0_NAME: "Keycloak IdP"
+      IDP_0_METADATA_URL: "http://keycloak-idp:8080/realms/test/protocol/saml/descriptor"
+      IDP_0_SSO_URL: "http://keycloak-idp:8080/realms/test/protocol/saml"
+      
+      # Allowed Service Providers (Keycloak SP)
+      PROXY_ALLOWED_SP_0_ENTITY_ID: "http://keycloak-sp:8080/realms/test"
+      PROXY_ALLOWED_SP_0_ACS_URL: "http://keycloak-sp:8080/realms/test/broker/saml/endpoint"
+      
+      # Server configuration
+      SERVER_LISTEN_ADDRESS: ":8080"
+      
       # Metadata retry configuration
-      - METADATA_MAX_RETRIES=10
-      - METADATA_INITIAL_DELAY=2s
-      - METADATA_MAX_DELAY=30s
-    volumes:
-      - ./docker/certs:/certs:ro
-    networks:
-      - saml-network
-
-  # Test Identity Provider (kristophjunge/test-saml-idp)
-  test-idp:
-    image: kristophjunge/test-saml-idp:latest
-    container_name: test-idp
+      METADATA_MAX_RETRIES: 10
+      METADATA_INITIAL_DELAY: 2s
+      METADATA_MAX_DELAY: 30s
     ports:
-      - "8000:8080"
-    environment:
-      - SIMPLESAMLPHP_SP_ENTITY_ID=http://simple-saml-proxy:8080
-      - SIMPLESAMLPHP_SP_ASSERTION_CONSUMER_SERVICE=http://simple-saml-proxy:8080/acs
+      - "8082:8080"
+    volumes:
+      - ./certs:/certs:ro
     networks:
       - saml-network
+    depends_on:
+      - keycloak-idp
+      - keycloak-sp
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/simplesaml/saml2/idp/metadata.php"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/metadata"]
       interval: 5s
       timeout: 3s
-      retries: 10
-      start_period: 30s
+      retries: 3
+      start_period: 10s
 
-  # Test Service Provider (szabogyula/saml-sp)
-  test-sp:
-    image: szabogyula/saml-sp:latest
-    container_name: test-sp
-    ports:
-      - "8001:80"
-    environment:
-      - VIRTUAL_HOST=test-sp
-      - ENTITY_ID=http://test-sp/shibboleth
-      - IDP_ENTITY_ID=http://simple-saml-proxy:8080
-      - SUPPORT_CONTACT=test@example.com
-      - ALIAS_SECURE=/secure
-      - XML_METADATA_PROVIDER=http://simple-saml-proxy:8080/metadata
-      - NOSSL=true
+  # Test runner for integration tests
+  test-runner:
+    image: node:18-alpine
+    container_name: test-runner
+    working_dir: /tests
+    volumes:
+      - ./tests:/tests
+      - ./scripts:/scripts
     networks:
       - saml-network
+    depends_on:
+      simple-saml-proxy:
+        condition: service_healthy
+    profiles:
+      - testing
+    command: sh -c "sleep infinity"
 
 networks:
   saml-network:
     driver: bridge
+
+volumes:
+  keycloak-idp-data:
+  keycloak-sp-data:
