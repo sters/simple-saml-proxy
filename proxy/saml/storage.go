@@ -182,6 +182,12 @@ func (s *Storage) CreateAuthRequest(_ context.Context, authnRequest *samlp.Authn
 
 	s.authRequestsLock.Lock()
 	s.authRequests[id] = authRequest
+	// Also store by ACS URL for zitadel/saml library compatibility
+	acsURL := s.config.Proxy.AcsURL
+	if acsURL != "" {
+		s.authRequests[acsURL] = authRequest
+		slog.Info("Stored auth request by ACS URL", slog.String("url", acsURL), slog.String("id", id))
+	}
 	s.authRequestsLock.Unlock()
 
 	s.entityIDByAppIDLock.Lock()
@@ -198,7 +204,16 @@ func (s *Storage) AuthRequestByID(_ context.Context, id string) (models.AuthRequ
 	s.authRequestsLock.RUnlock()
 
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrAuthRequestNotFound, id)
+		// If not found by ID, try to find by URL (for zitadel/saml library compatibility)
+		slog.Info("Auth request not found by ID, trying by URL", slog.String("id", id))
+		s.authRequestsLock.RLock()
+		authRequest, ok = s.authRequests[id] // id might be a URL
+		s.authRequestsLock.RUnlock()
+		
+		if !ok {
+			return nil, fmt.Errorf("%w: %s", ErrAuthRequestNotFound, id)
+		}
+		slog.Info("Found auth request by URL", slog.String("url", id))
 	}
 
 	return authRequest, nil

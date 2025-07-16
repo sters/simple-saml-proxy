@@ -44,9 +44,10 @@ func CreateProxyIDP(cfg config.Config) (*IDP, error) {
 	// Create metadata endpoint
 	metadataEndpoint := provider.NewEndpoint(provider.DefaultMetadataEndpoint)
 
-	// Create endpoints
-	ssoEndpoint := provider.NewEndpoint("/sso")
-	callbackEndpoint := provider.NewEndpoint("/callback")
+	// Create endpoints relative to the metadata base path
+	// These will be accessible at /metadata/sso, /metadata/acs, etc.
+	ssoEndpoint := provider.NewEndpoint("/metadata/sso")
+	callbackEndpoint := provider.NewEndpoint("/acs")
 
 	// Create IDP config
 	idpConfig := &provider.IdentityProviderConfig{
@@ -68,7 +69,7 @@ func CreateProxyIDP(cfg config.Config) (*IDP, error) {
 		Organisation: &provider.Organisation{
 			Name:        "SAML Proxy",
 			DisplayName: "SAML Proxy",
-			URL:         cfg.Proxy.EntityID,
+			URL:         cfg.Proxy.EntityID + "/metadata",
 		},
 	}
 

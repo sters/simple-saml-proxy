@@ -42,26 +42,31 @@ make test       # Run integration tests
 ### End-to-End Tests (Playwright)
 
 ```bash
-# Run E2E tests
+# Run all tests
 make test-e2e
 
-# Run with verbose output
-make test-e2e-verbose
-
-# Run with Playwright UI (interactive)
-make test-e2e-ui
-
-# Or manually:
+# Run specific test suites
 cd tests
-npm install
+npm run test:flow           # Run simplified SAML flow tests
+npm run test:proxy          # Run detailed proxy flow tests
 
-# Different test modes
-npm run test                  # All tests
-npm run test:verbose         # All tests with verbose output
+# Run with different modes
+npm run test:verbose        # Verbose output
 npm run test:headed         # Run in headed browser
 npm run test:ui            # Run with Playwright UI
 npm run test:debug         # Run in debug mode
 ```
+
+### SAML Proxy Flow Testing
+
+The tests validate the complete SAML proxy flow:
+```
+SP →[SAML AuthnRequest]→ Proxy →[New SAML AuthnRequest]→ IdP →[SAML Response]→ Proxy →[New SAML Response]→ SP
+```
+
+Key test files:
+- `tests/saml-flow.spec.js` - Simplified flow tests
+- `tests/saml-proxy-flow.spec.js` - Detailed proxy flow validation
 
 ### Verbose Mode Features
 

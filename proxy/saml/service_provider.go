@@ -131,6 +131,7 @@ func CreateServiceProviders(ctx context.Context, cfg config.Config) (*ServicePro
 		}
 
 		sp, err := samlsp.New(samlsp.Options{
+			EntityID:          cfg.Proxy.EntityID,
 			URL:               *rootURL,
 			Key:               privateKey,
 			Certificate:       keyPair.Leaf,
@@ -140,6 +141,22 @@ func CreateServiceProviders(ctx context.Context, cfg config.Config) (*ServicePro
 		if err != nil {
 			return nil, fmt.Errorf("failed to create SAML SP for IDP %s: %w", idpConfig.ID, err)
 		}
+
+		// Override the default URLs to use our metadata paths
+		// Also explicitly set the EntityID to prevent default suffix
+		sp.ServiceProvider.EntityID = cfg.Proxy.EntityID
+
+		metadataURL := *rootURL
+		metadataURL.Path = "/metadata"
+		sp.ServiceProvider.MetadataURL = metadataURL
+
+		acsURL := *rootURL
+		acsURL.Path = "/metadata/acs"
+		sp.ServiceProvider.AcsURL = acsURL
+
+		sloURL := *rootURL
+		sloURL.Path = "/metadata/SLO"
+		sp.ServiceProvider.SloURL = sloURL
 
 		provider := &ServiceProvider{
 			ID:         idpConfig.ID,

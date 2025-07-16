@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	crewjamsaml "github.com/crewjam/saml"
 	"github.com/sters/simple-saml-proxy/proxy/saml"
 )
 
@@ -69,11 +70,29 @@ func handleIDPSelected(idp *saml.IDP, providers *saml.ServiceProviders) http.Han
 		} else {
 			relayState = base64.RawURLEncoding.EncodeToString(randomBytes(relayStateLength))
 		}
-		redirectURL, err := provider.Middleware.ServiceProvider.MakeRedirectAuthenticationRequest(relayState)
+		
+		// Create the authentication request manually to fix entity ID issue
+		idpSSOURL := provider.Middleware.ServiceProvider.GetSSOBindingLocation(crewjamsaml.HTTPRedirectBinding)
+		authReq, err := provider.Middleware.ServiceProvider.MakeAuthenticationRequest(idpSSOURL, crewjamsaml.HTTPRedirectBinding, crewjamsaml.HTTPPostBinding)
+		if err != nil {
+			slog.Error("Failed to create auth request", slog.String("error", err.Error()))
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		
+		// Override the issuer to use the correct entity ID (without /saml/metadata suffix)
+		slog.Info("Original issuer", slog.String("issuer", authReq.Issuer.Value))
+		authReq.Issuer.Value = idp.EntityID
+		slog.Info("Updated issuer", slog.String("issuer", authReq.Issuer.Value))
+		
+		// Also update the ACS URL to use the metadata path
+		provider.Middleware.ServiceProvider.AcsURL.Path = "/metadata/acs"
+		
+		// Create redirect URL with the modified auth request
+		redirectURL, err := authReq.Redirect(relayState, &provider.Middleware.ServiceProvider)
 		if err != nil {
 			slog.Error("Failed to create redirect URL", slog.String("error", err.Error()))
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
-
 			return
 		}
 

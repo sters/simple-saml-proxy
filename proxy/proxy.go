@@ -21,13 +21,44 @@ func SetupHTTPHandlers(idp *saml.IDP, providers *saml.ServiceProviders, _ config
 
 	// Basic endpoints
 	mux.HandleFunc("/ping", handlePing)
+	
+	// SAML proxy endpoints - register these FIRST so they take precedence
+	mux.HandleFunc("/saml/acs", handleSAMLACS(idp, providers))
+	// For /acs, only handle if it's a SAML response (no id parameter)
+	// If it has an id parameter, let the IDP handler process it with response fixing
+	mux.HandleFunc("/acs", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("id") != "" {
+			// This is a callback from our own handler, let the IDP handler process it
+			// Wrap with interceptor to fix SAML response
+			interceptor := newSAMLResponseInterceptor(idp.IDP.HttpHandler())
+			interceptor.ServeHTTP(w, r)
+		} else {
+			// This is a SAML response from the real IdP
+			handleSAMLACS(idp, providers)(w, r)
+		}
+	})
+	// Also handle /metadata/acs for backward compatibility
+	mux.HandleFunc("/metadata/acs", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("id") != "" {
+			// This is a callback from our own handler, let the IDP handler process it
+			// Wrap with interceptor to fix SAML response
+			interceptor := newSAMLResponseInterceptor(idp.IDP.HttpHandler())
+			interceptor.ServeHTTP(w, r)
+		} else {
+			// This is a SAML response from the real IdP
+			handleSAMLACS(idp, providers)(w, r)
+		}
+	})
+	mux.HandleFunc("/idp-initiated", handleIDPInitiated)
+	
+	// Handle all /metadata/* routes through the IDP handler
+	// This includes /metadata, /metadata/sso, etc. (but NOT /metadata/acs since it's registered above)
+	mux.Handle("/metadata/", idp.IDP.HttpHandler())
 	mux.Handle("/metadata", idp.IDP.HttpHandler())
+	
+	// Legacy routes for backward compatibility
 	mux.Handle("/sso", handleSSO(idp))
 	mux.Handle("/callback", idp.IDP.HttpHandler())
-
-	// SAML proxy endpoints
-	mux.HandleFunc("/saml/acs", handleSAMLACS(idp, providers))
-	mux.HandleFunc("/idp-initiated", handleIDPInitiated)
 
 	// Single Logout endpoints
 	mux.HandleFunc("/slo", handleSLO(idp, providers))

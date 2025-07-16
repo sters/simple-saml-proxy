@@ -1,10 +1,13 @@
 {
-  "realm": "test",
+  "realm": "sp-realm",
   "enabled": true,
   "displayName": "Test SP Realm",
   "accessTokenLifespan": 3600,
   "ssoSessionIdleTimeout": 1800,
   "ssoSessionMaxLifespan": 36000,
+  "attributes": {
+    "saml.issuer": "http://localhost:8081/realms/sp-realm"
+  },
   "users": [
     {
       "username": "admin",
@@ -19,19 +22,37 @@
       ]
     }
   ],
-  "clients": [
+  "clients": [],
+  "identityProviders": [
     {
-      "clientId": "test-app",
-      "name": "Test Application",
+      "alias": "saml-proxy",
+      "displayName": "SAML Proxy",
+      "providerId": "saml",
       "enabled": true,
-      "protocol": "openid-connect",
-      "publicClient": true,
-      "redirectUris": [
-        "http://localhost:3000/*"
-      ],
-      "webOrigins": [
-        "http://localhost:3000"
-      ]
+      "trustEmail": true,
+      "storeToken": false,
+      "authenticateByDefault": false,
+      "linkOnly": false,
+      "firstBrokerLoginFlowAlias": "first broker login",
+      "config": {
+        "hideOnLoginPage": "false",
+        "validateSignature": "false",
+        "postBindingResponse": "true",
+        "postBindingAuthnRequest": "true",
+        "postBindingLogout": "true",
+        "wantAuthnRequestsSigned": "false",
+        "wantAssertionsSigned": "false",
+        "wantAssertionsEncrypted": "false",
+        "forceAuthn": "false",
+        "signatureAlgorithm": "RSA_SHA256",
+        "nameIDPolicyFormat": "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent",
+        "principalType": "SUBJECT",
+        "allowCreate": "true",
+        "entityId": "http://localhost:8082",
+        "singleSignOnServiceUrl": "http://localhost:8082/metadata/sso",
+        "singleLogoutServiceUrl": "http://localhost:8082/metadata/SLO",
+        "backchannelSupported": "false"
+      }
     }
   ]
 }
