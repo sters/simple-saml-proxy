@@ -37,17 +37,19 @@ func handleSAMLACS(idp *saml.IDP, providers *saml.ServiceProviders) http.Handler
 				slog.String("id", authRequestID),
 				slog.String("error", err.Error()),
 			)
-			
+
 			// Create a minimal auth request for the callback
 			authRequest = &saml.AuthRequest{
-				ID:        authRequestID,
-				UserID:    "unknown", // Will be updated with actual user info
-				IsDone:    false,
+				ID:     authRequestID,
+				UserID: "unknown", // Will be updated with actual user info
+				IsDone: false,
 			}
-			
+
 			// Store it in the storage for the callback to find
 			storage := idp.GetStorage()
-			storage.AddAuthRequestForTesting(authRequest.(*saml.AuthRequest))
+			if ar, ok := authRequest.(*saml.AuthRequest); ok {
+				storage.AddAuthRequestForTesting(ar)
+			}
 		}
 
 		if ar, ok := authRequest.(*saml.AuthRequest); ok {
@@ -96,7 +98,7 @@ func handleSAMLACS(idp *saml.IDP, providers *saml.ServiceProviders) http.Handler
 		for i, tr := range trackedRequests {
 			possibleRequestIDs[i] = tr.SAMLRequestID
 		}
-		
+
 		// If no tracked requests, allow any request ID (for manual auth request creation)
 		if len(possibleRequestIDs) == 0 {
 			slog.Info("No tracked requests found, allowing any request ID")
@@ -132,7 +134,7 @@ func handleSAMLACS(idp *saml.IDP, providers *saml.ServiceProviders) http.Handler
 		}
 
 		callbackURL := idp.IDP.AuthCallbackURL()(r.Context(), authRequestID)
-		slog.Info("Redirecting to callback URL", 
+		slog.Info("Redirecting to callback URL",
 			slog.String("url", callbackURL),
 			slog.String("authRequestID", authRequestID),
 		)
