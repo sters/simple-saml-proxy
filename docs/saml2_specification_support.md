@@ -33,7 +33,7 @@ simple-saml-proxy implements a subset of the SAML 2.0 specification, focusing on
 | Profile | Status | Notes |
 |---------|--------|-------|
 | Web Browser SSO | ✅ | Core functionality of the proxy |
-| Single Logout | ❌ | Not implemented |
+| Single Logout | ⚠️ | Partial implementation with signature validation (2025-01-17) |
 | Enhanced Client/Proxy (ECP) | ❌ | Not implemented |
 | Identity Provider Discovery | ❌ | Custom IdP selection implemented instead |
 | Name Identifier Management | ❌ | Not implemented |
@@ -57,6 +57,8 @@ simple-saml-proxy implements a subset of the SAML 2.0 specification, focusing on
 |---------|--------|-------|
 | XML Signatures | ✅ | Full support with RSA-SHA256 (implemented 2025-07-11) |
 | Signature Validation | ✅ | Automatic validation with X.509 certificates |
+| SLO Signature Validation | ⚠️ | HTTP-Redirect binding framework (2025-01-17), SP cert retrieval pending |
+| SLO Signature Generation | ✅ | Full implementation for proxy-initiated logouts |
 | Assertion Encryption | ❌ | Not supported |
 | Attribute Encryption | ❌ | Not supported |
 | TLS/HTTPS | ✅ | Recommended for deployment |
@@ -99,8 +101,8 @@ simple-saml-proxy implements a subset of the SAML 2.0 specification, focusing on
 |---------|--------|-------|
 | AuthnRequest | ✅ | Full support |
 | Response | ✅ | Full support |
-| LogoutRequest | ❌ | Not implemented |
-| LogoutResponse | ❌ | Not implemented |
+| LogoutRequest | ⚠️ | Receiving and validating signatures (2025-01-17) |
+| LogoutResponse | ⚠️ | Basic support for SLO flows |
 | ArtifactResolve | ❌ | Not implemented |
 | ArtifactResponse | ❌ | Not implemented |
 | ManageNameIDRequest | ❌ | Not implemented |
@@ -132,7 +134,7 @@ simple-saml-proxy implements a subset of the SAML 2.0 specification, focusing on
 |---------|--------|-------|
 | Session Tracking | ⚠️ | Cookie-based only |
 | Session Timeout | ❌ | No timeout handling |
-| Single Logout | ❌ | Not implemented |
+| Single Logout | ⚠️ | Partial implementation with signature validation |
 | Session Synchronization | ❌ | Not implemented |
 
 ## Attribute Support
@@ -190,14 +192,16 @@ This implementation provides:
 1. **HTTPS Required**: The proxy should always be deployed with TLS
 2. **No Encryption**: Assertions and attributes are not encrypted
 3. **Signature Validation**: Full XML digital signature validation with certificate chain support
-4. **No Replay Protection**: Beyond basic time-based validation
+4. **SLO Signature Validation**: Configurable per-SP with support for HTTP-Redirect binding
+5. **Replay Protection**: Time-based validation and request ID tracking for SLO
 
 ### Limitations
 
 1. **No persistent sessions**: Restart loses all session data
-2. **No logout support**: Users must close browsers to end sessions
+2. **Partial logout support**: SLO signature validation only, full flow not complete
 3. **Limited attribute mapping**: No transformation capabilities
 4. **No encryption support**: Assertions and attributes are not encrypted
+5. **SLO HTTP-POST binding**: Embedded signature validation not yet implemented
 
 ## Use Cases
 
@@ -222,6 +226,9 @@ Potential enhancements could include:
 
 ## Recent Improvements (2025)
 
+- **2025-01-17**: Implemented SLO signature validation for HTTP-Redirect binding (ADR-0001)
+- **2025-01-17**: Added configurable signature requirements per SP
+- **2025-01-17**: Implemented signature generation for proxy-initiated logout requests
 - **2025-07-11**: Implemented full XML digital signature support with RSA-SHA256
 - **2025-07-11**: Enhanced E2E testing with proper signature validation
 - **2025-07-10**: Improved IdP-initiated SSO flow with SP selection

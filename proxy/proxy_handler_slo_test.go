@@ -47,6 +47,7 @@ func TestHandleSLO(t *testing.T) {
 			EntityID: "https://sp.example.com",
 		},
 	}
+	cfg.Proxy.RequireSignedLogoutRequests = false
 
 	// Create service providers
 	ctx := t.Context()
@@ -58,7 +59,7 @@ func TestHandleSLO(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create handler
-	handler := handleSLO(idp, sps)
+	handler := handleSLO(idp, sps, cfg)
 
 	tests := []struct {
 		name           string
@@ -447,4 +448,163 @@ func compressData(data []byte) []byte {
 	_ = writer.Close()
 
 	return []byte(buf.String())
+}
+
+func TestValidateLogoutRequestSignature(t *testing.T) {
+	tests := []struct {
+		name             string
+		logoutRequest    *crewjamsaml.LogoutRequest
+		rawQuery         string
+		requireSignature bool
+		expectedError    string
+	}{
+		{
+			name: "No signature required and none present",
+			logoutRequest: &crewjamsaml.LogoutRequest{
+				ID:           "test_123",
+				IssueInstant: time.Now(),
+			},
+			rawQuery:         "",
+			requireSignature: false,
+			expectedError:    "",
+		},
+		{
+			name: "Signature required but not present",
+			logoutRequest: &crewjamsaml.LogoutRequest{
+				ID:           "test_456",
+				IssueInstant: time.Now(),
+			},
+			rawQuery:         "",
+			requireSignature: true,
+			expectedError:    "logout request signature is required but not present",
+		},
+		{
+			name: "HTTP-Redirect signature present",
+			logoutRequest: &crewjamsaml.LogoutRequest{
+				ID:           "test_789",
+				IssueInstant: time.Now(),
+			},
+			rawQuery:         "SAMLRequest=test&Signature=test&SigAlg=http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+			requireSignature: false,
+			expectedError:    "", // Validation will pass (logged but not enforced in current implementation)
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateLogoutRequestSignature(
+				tt.logoutRequest,
+				nil, // SP providers not needed for basic tests
+				"https://sp.example.com",
+				tt.rawQuery,
+				tt.requireSignature,
+			)
+
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestDetermineSignatureRequirement(t *testing.T) {
+	tests := []struct {
+		name       string
+		cfg        config.Config
+		spEntityID string
+		expected   bool
+	}{
+		{
+			name: "SP-specific requirement true overrides global false",
+			cfg: config.Config{
+				Proxy: struct {
+					EntityID                    string            `env:"ENTITY_ID"                      envDefault:"http://localhost:8080"`
+					AcsURL                      string            `env:"ACS_URL"                        envDefault:"http://localhost:8080/sso/acs"`
+					MetadataURL                 string            `env:"METADATA_URL"                   envDefault:"http://localhost:8080/metadata"`
+					SLOURL                      string            `env:"SLO_URL"                        envDefault:"http://localhost:8080/slo"`
+					SLSURL                      string            `env:"SLS_URL"                        envDefault:"http://localhost:8080/sls"`
+					PrivateKeyPath              string            `env:"PRIVATE_KEY_PATH,required"`
+					CertificatePath             string            `env:"CERTIFICATE_PATH,required"`
+					RequireSignedLogoutRequests bool              `env:"REQUIRE_SIGNED_LOGOUT_REQUESTS" envDefault:"false"`
+					AllowedSP                   []config.SPConfig `envPrefix:"ALLOWED_SP_"`
+				}{
+					RequireSignedLogoutRequests: false,
+					AllowedSP: []config.SPConfig{
+						{
+							EntityID:                    "https://sp1.example.com",
+							RequireSignedLogoutRequests: true,
+						},
+						{
+							EntityID:                    "https://sp2.example.com",
+							RequireSignedLogoutRequests: false,
+						},
+					},
+				},
+			},
+			spEntityID: "https://sp1.example.com",
+			expected:   true,
+		},
+		{
+			name: "SP-specific requirement false overrides global true",
+			cfg: config.Config{
+				Proxy: struct {
+					EntityID                    string            `env:"ENTITY_ID"                      envDefault:"http://localhost:8080"`
+					AcsURL                      string            `env:"ACS_URL"                        envDefault:"http://localhost:8080/sso/acs"`
+					MetadataURL                 string            `env:"METADATA_URL"                   envDefault:"http://localhost:8080/metadata"`
+					SLOURL                      string            `env:"SLO_URL"                        envDefault:"http://localhost:8080/slo"`
+					SLSURL                      string            `env:"SLS_URL"                        envDefault:"http://localhost:8080/sls"`
+					PrivateKeyPath              string            `env:"PRIVATE_KEY_PATH,required"`
+					CertificatePath             string            `env:"CERTIFICATE_PATH,required"`
+					RequireSignedLogoutRequests bool              `env:"REQUIRE_SIGNED_LOGOUT_REQUESTS" envDefault:"false"`
+					AllowedSP                   []config.SPConfig `envPrefix:"ALLOWED_SP_"`
+				}{
+					RequireSignedLogoutRequests: true,
+					AllowedSP: []config.SPConfig{
+						{
+							EntityID:                    "https://sp1.example.com",
+							RequireSignedLogoutRequests: false,
+						},
+					},
+				},
+			},
+			spEntityID: "https://sp1.example.com",
+			expected:   false,
+		},
+		{
+			name: "Fall back to global setting when SP not found",
+			cfg: config.Config{
+				Proxy: struct {
+					EntityID                    string            `env:"ENTITY_ID"                      envDefault:"http://localhost:8080"`
+					AcsURL                      string            `env:"ACS_URL"                        envDefault:"http://localhost:8080/sso/acs"`
+					MetadataURL                 string            `env:"METADATA_URL"                   envDefault:"http://localhost:8080/metadata"`
+					SLOURL                      string            `env:"SLO_URL"                        envDefault:"http://localhost:8080/slo"`
+					SLSURL                      string            `env:"SLS_URL"                        envDefault:"http://localhost:8080/sls"`
+					PrivateKeyPath              string            `env:"PRIVATE_KEY_PATH,required"`
+					CertificatePath             string            `env:"CERTIFICATE_PATH,required"`
+					RequireSignedLogoutRequests bool              `env:"REQUIRE_SIGNED_LOGOUT_REQUESTS" envDefault:"false"`
+					AllowedSP                   []config.SPConfig `envPrefix:"ALLOWED_SP_"`
+				}{
+					RequireSignedLogoutRequests: true,
+					AllowedSP: []config.SPConfig{
+						{
+							EntityID:                    "https://sp1.example.com",
+							RequireSignedLogoutRequests: false,
+						},
+					},
+				},
+			},
+			spEntityID: "https://unknown.example.com",
+			expected:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := determineSignatureRequirement(tt.cfg, tt.spEntityID)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }
