@@ -82,7 +82,7 @@ func handleLogoutIDPSelected(idp *saml.IDP, providers *saml.ServiceProviders) ht
 			IssueInstant: time.Now(),
 			Version:      "2.0",
 			Issuer: &crewjamsaml.Issuer{
-				Value: idp.IDP.GetEntityID(r.Context()),
+				Value: idp.EntityID,
 			},
 			NameID: &crewjamsaml.NameID{
 				// This would normally come from the original logout request or session
@@ -106,7 +106,10 @@ func handleLogoutIDPSelected(idp *saml.IDP, providers *saml.ServiceProviders) ht
 		logoutRequest.Destination = sloService.Location
 
 		// Build the logout URL
-		// TODO: Pass proxy's private key and certificate for signing when available
+		// Check if we need to sign the logout request
+		// Note: For now, we'll always use unsigned logout requests for proxy-initiated logouts
+		// The configuration RequireSignedLogoutRequests is for incoming requests, not outgoing
+		// If we want to sign outgoing requests, we would need to check the target IdP's requirements
 		logoutURL, err := buildLogoutURL(logoutRequest, sloService.Location, logoutCtx.ID)
 		if err != nil {
 			slog.Error("Failed to build logout URL", slog.String("error", err.Error()))
@@ -131,7 +134,7 @@ func handleLogoutIDPSelected(idp *saml.IDP, providers *saml.ServiceProviders) ht
 	}
 }
 
-// TODO: Add signature support when proxy private key is available.
+// buildLogoutURL creates the logout URL with encoded SAML request.
 func buildLogoutURL(logoutRequest *crewjamsaml.LogoutRequest, destination string, relayState string) (string, error) {
 	// Marshal the logout request
 	doc := etree.NewDocument()
@@ -161,13 +164,6 @@ func buildLogoutURL(logoutRequest *crewjamsaml.LogoutRequest, destination string
 	if relayState != "" {
 		query.Set("RelayState", relayState)
 	}
-
-	// TODO: Add signature when configuration requires it
-	// This would involve:
-	// 1. Add SigAlg parameter (e.g., http://www.w3.org/2001/04/xmldsig-more#rsa-sha256)
-	// 2. Create signature data string according to SAML spec
-	// 3. Sign the data using proxy's private key
-	// 4. Base64 encode the signature and add as Signature parameter
 
 	logoutURL.RawQuery = query.Encode()
 

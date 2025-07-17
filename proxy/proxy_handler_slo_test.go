@@ -494,7 +494,7 @@ func TestValidateLogoutRequestSignature(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validateLogoutRequestSignature(
 				tt.logoutRequest,
-				nil, // SP providers not needed for basic tests
+				nil, // IDP not needed for basic tests
 				"https://sp.example.com",
 				tt.rawQuery,
 				tt.requireSignature,
