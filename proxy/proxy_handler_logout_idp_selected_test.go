@@ -115,6 +115,7 @@ func TestHandleLogoutIDPSelected(t *testing.T) {
 			wantStatus:   http.StatusFound,
 			wantRedirect: true,
 			checkRedirectFn: func(t *testing.T, location string) {
+				t.Helper()
 				assert.Contains(t, location, "https://idp1.example.com/slo")
 				assert.Contains(t, location, "SAMLRequest=")
 
@@ -282,6 +283,7 @@ func TestBuildLogoutURL(t *testing.T) {
 			relayState:  "",
 			wantErr:     false,
 			checkFn: func(t *testing.T, urlStr string) {
+				t.Helper()
 				u, err := url.Parse(urlStr)
 				require.NoError(t, err)
 				assert.Equal(t, "https://idp.example.com/slo", u.Scheme+"://"+u.Host+u.Path)
@@ -295,6 +297,7 @@ func TestBuildLogoutURL(t *testing.T) {
 			relayState:  "test-relay-state",
 			wantErr:     false,
 			checkFn: func(t *testing.T, urlStr string) {
+				t.Helper()
 				u, err := url.Parse(urlStr)
 				require.NoError(t, err)
 				assert.Equal(t, "https://idp.example.com/slo", u.Scheme+"://"+u.Host+u.Path)
@@ -365,6 +368,7 @@ func TestBuildSignedLogoutURLWithCertificate(t *testing.T) {
 			relayState: "test-relay",
 			sigAlg:     "",
 			checkFn: func(t *testing.T, urlStr string) {
+				t.Helper()
 				u, err := url.Parse(urlStr)
 				require.NoError(t, err)
 				assert.Equal(t, "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256", u.Query().Get("SigAlg"))
@@ -376,6 +380,7 @@ func TestBuildSignedLogoutURLWithCertificate(t *testing.T) {
 			relayState: "",
 			sigAlg:     sigAlgSHA1,
 			checkFn: func(t *testing.T, urlStr string) {
+				t.Helper()
 				u, err := url.Parse(urlStr)
 				require.NoError(t, err)
 				assert.Equal(t, sigAlgSHA1, u.Query().Get("SigAlg"))

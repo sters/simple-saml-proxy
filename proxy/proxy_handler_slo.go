@@ -32,6 +32,8 @@ var (
 	errIDPNotAvailable                 = errors.New("IDP not available")
 	errCertNotRSA                      = errors.New("certificate does not contain an RSA public key")
 	errUnsupportedSigAlgorithm         = errors.New("unsupported signature algorithm")
+	errLogoutRequestElementNotFound    = errors.New("failed to get logout request element")
+	errStorageNotAvailable             = errors.New("storage not available")
 )
 
 // handleSLO handles Single Logout requests initiated by Service Providers.
@@ -101,7 +103,7 @@ func handleSLO(idp *saml.IDP, _ *saml.ServiceProviders, cfg config.Config) http.
 
 		// Validate signature if configured
 		requireSignature := determineSignatureRequirement(cfg, logoutRequest.Issuer.Value)
-		if err := validateLogoutRequestSignature(logoutRequest, idp, logoutRequest.Issuer.Value, r.URL.RawQuery, requireSignature); err != nil {
+		if err := validateLogoutRequestSignature(r.Context(), logoutRequest, idp, logoutRequest.Issuer.Value, r.URL.RawQuery, requireSignature); err != nil {
 			slog.Error("Logout request signature validation failed",
 				slog.String("issuer", logoutRequest.Issuer.Value),
 				slog.String("error", err.Error()),
@@ -262,6 +264,7 @@ func validateIssueInstant(issueInstant time.Time) error {
 // For HTTP-Redirect binding, it validates query parameter signatures.
 // For HTTP-POST binding, it validates embedded signatures.
 func validateLogoutRequestSignature(
+	ctx context.Context,
 	logoutRequest *crewjamsaml.LogoutRequest,
 	idp *saml.IDP,
 	spEntityID string,
@@ -280,19 +283,19 @@ func validateLogoutRequestSignature(
 
 	// For HTTP-Redirect binding with query parameters
 	if logoutRequest.Signature == nil && rawQuery != "" {
-		return validateRedirectSignature(rawQuery, idp, spEntityID)
+		return validateRedirectSignature(ctx, rawQuery, idp, spEntityID)
 	}
 
 	// For HTTP-POST binding with embedded signature
 	if logoutRequest.Signature != nil {
-		return validateEmbeddedSignature(logoutRequest, idp, spEntityID)
+		return validateEmbeddedSignature(ctx, logoutRequest, idp, spEntityID)
 	}
 
 	return nil
 }
 
 // validateRedirectSignature validates signatures passed as query parameters in HTTP-Redirect binding.
-func validateRedirectSignature(rawQuery string, idp *saml.IDP, spEntityID string) error {
+func validateRedirectSignature(ctx context.Context, rawQuery string, idp *saml.IDP, spEntityID string) error {
 	// Parse query parameters
 	params, err := url.ParseQuery(rawQuery)
 	if err != nil {
@@ -327,7 +330,7 @@ func validateRedirectSignature(rawQuery string, idp *saml.IDP, spEntityID string
 	}
 
 	// Get SP certificate
-	cert, err := getSPSigningCertificate(idp, spEntityID)
+	cert, err := getSPSigningCertificate(ctx, idp, spEntityID)
 	if err != nil {
 		// Log warning but continue for now (backward compatibility)
 		slog.Warn("Failed to get SP signing certificate",
@@ -350,7 +353,7 @@ func validateRedirectSignature(rawQuery string, idp *saml.IDP, spEntityID string
 }
 
 // validateEmbeddedSignature validates signatures embedded in the logout request (HTTP-POST binding).
-func validateEmbeddedSignature(logoutRequest *crewjamsaml.LogoutRequest, idp *saml.IDP, spEntityID string) error {
+func validateEmbeddedSignature(ctx context.Context, logoutRequest *crewjamsaml.LogoutRequest, idp *saml.IDP, spEntityID string) error {
 	// Check if signature element exists
 	if logoutRequest.Signature == nil {
 		return nil
@@ -359,11 +362,11 @@ func validateEmbeddedSignature(logoutRequest *crewjamsaml.LogoutRequest, idp *sa
 	// Get the logout request as an etree element
 	requestElement := logoutRequest.Element()
 	if requestElement == nil {
-		return errors.New("failed to get logout request element")
+		return errLogoutRequestElementNotFound
 	}
 
 	// Get SP certificate for signature validation
-	cert, err := getSPSigningCertificate(idp, spEntityID)
+	cert, err := getSPSigningCertificate(ctx, idp, spEntityID)
 	if err != nil {
 		// Log warning but continue for backward compatibility
 		slog.Warn("Failed to get SP signing certificate for embedded signature validation",
@@ -386,19 +389,19 @@ func validateEmbeddedSignature(logoutRequest *crewjamsaml.LogoutRequest, idp *sa
 	}
 
 	// Build parent context for proper namespace handling
-	ctx, err := etreeutils.NSBuildParentContext(requestElement)
+	nsCtx, err := etreeutils.NSBuildParentContext(requestElement)
 	if err != nil {
 		return fmt.Errorf("failed to build parent context: %w", err)
 	}
 
 	// Build sub-context for the element
-	ctx, err = ctx.SubContext(requestElement)
+	nsCtx, err = nsCtx.SubContext(requestElement)
 	if err != nil {
 		return fmt.Errorf("failed to build sub-context: %w", err)
 	}
 
 	// Detach the element with proper namespace handling
-	detachedElement, err := etreeutils.NSDetatch(ctx, requestElement)
+	detachedElement, err := etreeutils.NSDetatch(nsCtx, requestElement)
 	if err != nil {
 		return fmt.Errorf("failed to detach element: %w", err)
 	}
@@ -429,19 +432,19 @@ func determineSignatureRequirement(cfg config.Config, spEntityID string) bool {
 }
 
 // getSPSigningCertificate retrieves the signing certificate for a specific SP.
-func getSPSigningCertificate(idp *saml.IDP, spEntityID string) (*x509.Certificate, error) {
+func getSPSigningCertificate(ctx context.Context, idp *saml.IDP, spEntityID string) (*x509.Certificate, error) {
 	if idp == nil {
 		return nil, errIDPNotAvailable
 	}
 
 	storage := idp.GetStorage()
 	if storage == nil {
-		return nil, errors.New("storage not available")
+		return nil, errStorageNotAvailable
 	}
 
 	// Get the certificate from metadata using the cache
 	cache := storage.GetSPCertificateCache()
-	cert, err := saml.GetSPSigningCertificateFromMetadata(context.Background(), storage.GetConfig(), spEntityID, cache)
+	cert, err := saml.GetSPSigningCertificateFromMetadata(ctx, storage.GetConfig(), spEntityID, cache)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get SP signing certificate: %w", err)
 	}

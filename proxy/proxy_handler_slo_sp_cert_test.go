@@ -60,7 +60,7 @@ func TestGetSPSigningCertificateIntegration(t *testing.T) {
 </EntityDescriptor>`, certBase64)
 
 	// Create test server to serve metadata
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/xml")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(metadata))
@@ -113,22 +113,22 @@ func TestGetSPSigningCertificateIntegration(t *testing.T) {
 	}
 
 	// Test successful certificate retrieval
-	cert, err := getSPSigningCertificate(idp, "https://test-sp.example.com")
-	assert.NoError(t, err)
+	cert, err := getSPSigningCertificate(t.Context(), idp, "https://test-sp.example.com")
+	require.NoError(t, err)
 	assert.NotNil(t, cert)
 	assert.Equal(t, "test-sp.example.com", cert.Subject.CommonName)
 
 	// Test cache hit (should be faster)
 	start := time.Now()
-	cert2, err := getSPSigningCertificate(idp, "https://test-sp.example.com")
+	cert2, err := getSPSigningCertificate(t.Context(), idp, "https://test-sp.example.com")
 	elapsed := time.Since(start)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, cert, cert2)
 	assert.Less(t, elapsed, 10*time.Millisecond, "Cache hit should be fast")
 
 	// Test SP not in allowed list
-	_, err = getSPSigningCertificate(idp, "https://unknown-sp.example.com")
-	assert.Error(t, err)
+	_, err = getSPSigningCertificate(t.Context(), idp, "https://unknown-sp.example.com")
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "SP not found in allowed list")
 
 	// Test SP without metadata URL
@@ -139,8 +139,8 @@ func TestGetSPSigningCertificateIntegration(t *testing.T) {
 	require.NoError(t, err)
 	idp.IDPStorage = storage2
 
-	_, err = getSPSigningCertificate(idp, "https://sp-no-metadata.example.com")
-	assert.Error(t, err)
+	_, err = getSPSigningCertificate(t.Context(), idp, "https://sp-no-metadata.example.com")
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no metadata URL configured")
 }
 
@@ -184,7 +184,7 @@ func TestValidateRedirectSignatureWithRealCertificate(t *testing.T) {
 
 	// Test valid signature
 	err = verifyRedirectSignature([]byte(signedData), signature, cert, sigAlg)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test invalid signature (modify one byte)
 	invalidSignature := make([]byte, len(signature))
@@ -192,11 +192,11 @@ func TestValidateRedirectSignatureWithRealCertificate(t *testing.T) {
 	invalidSignature[0] ^= 0xFF
 
 	err = verifyRedirectSignature([]byte(signedData), invalidSignature, cert, sigAlg)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "signature verification failed")
 
 	// Test wrong algorithm
 	err = verifyRedirectSignature([]byte(signedData), signature, cert, "http://www.w3.org/2001/04/xmldsig-more#rsa-sha512")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported signature algorithm")
 }

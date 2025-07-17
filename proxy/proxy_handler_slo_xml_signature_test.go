@@ -28,7 +28,7 @@ func TestValidateEmbeddedSignature(t *testing.T) {
 			},
 		}
 
-		err := validateEmbeddedSignature(logoutRequest, nil, "https://sp.example.com")
+		err := validateEmbeddedSignature(t.Context(), logoutRequest, nil, "https://sp.example.com")
 		require.NoError(t, err) // No signature, no validation needed
 	})
 
@@ -41,7 +41,7 @@ func TestValidateEmbeddedSignature(t *testing.T) {
 		}
 
 		// Without an IDP, it will log a warning and return nil
-		err := validateEmbeddedSignature(logoutRequest, nil, "https://sp.example.com")
+		err := validateEmbeddedSignature(t.Context(), logoutRequest, nil, "https://sp.example.com")
 		require.NoError(t, err) // Currently returns nil when certificate retrieval fails
 	})
 
@@ -51,7 +51,7 @@ func TestValidateEmbeddedSignature(t *testing.T) {
 		logoutRequest := createSignedLogoutRequest(t, spKey, spCert)
 
 		// With nil IDP, getSPSigningCertificate will fail but we'll continue
-		err := validateEmbeddedSignature(logoutRequest, nil, "https://sp.example.com")
+		err := validateEmbeddedSignature(t.Context(), logoutRequest, nil, "https://sp.example.com")
 		require.NoError(t, err) // Should log warning but not error
 	})
 }

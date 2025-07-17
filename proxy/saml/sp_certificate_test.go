@@ -165,12 +165,12 @@ func TestExtractSigningCertificateFromMetadata(t *testing.T) {
 			cert, err := extractSigningCertificateFromMetadata([]byte(tt.metadata))
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				if tt.errContains != "" {
 					assert.Contains(t, err.Error(), tt.errContains)
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, cert)
 				assert.Equal(t, "sp.example.com", cert.Subject.CommonName)
 			}
@@ -215,7 +215,7 @@ func TestGetSPSigningCertificateFromMetadata(t *testing.T) {
 </EntityDescriptor>`, certBase64)
 
 	// Create test server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/xml")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(metadata))
@@ -248,18 +248,18 @@ func TestGetSPSigningCertificateFromMetadata(t *testing.T) {
 
 	// Test successful retrieval
 	cert, err := GetSPSigningCertificateFromMetadata(t.Context(), cfg, "https://sp.example.com", cache)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, cert)
 	assert.Equal(t, "sp.example.com", cert.Subject.CommonName)
 
 	// Test cache hit
 	cert2, err := GetSPSigningCertificateFromMetadata(t.Context(), cfg, "https://sp.example.com", cache)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, cert, cert2)
 
 	// Test SP not in allowed list
 	_, err = GetSPSigningCertificateFromMetadata(t.Context(), cfg, "https://unknown.example.com", cache)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "SP not found in allowed list")
 
 	// Test SP without metadata URL
@@ -269,7 +269,7 @@ func TestGetSPSigningCertificateFromMetadata(t *testing.T) {
 		},
 	}
 	_, err = GetSPSigningCertificateFromMetadata(t.Context(), cfg, "https://sp2.example.com", cache)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no metadata URL configured")
 }
 
@@ -304,7 +304,7 @@ func TestExtractCertificateFromKeyDescriptor(t *testing.T) {
 	}
 
 	cert, err := extractCertificateFromKeyDescriptor(keyDesc)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, cert)
 	assert.Equal(t, "test.example.com", cert.Subject.CommonName)
 
@@ -325,7 +325,7 @@ func TestExtractCertificateFromKeyDescriptor(t *testing.T) {
 	}
 
 	cert2, err := extractCertificateFromKeyDescriptor(keyDescPEM)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, cert2)
 	assert.Equal(t, "test.example.com", cert2.Subject.CommonName)
 }
