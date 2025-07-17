@@ -1,55 +1,52 @@
 version: '3.8'
 
+# YAML anchors for reusable configurations
+x-keycloak-common: &keycloak-common
+  image: quay.io/keycloak/keycloak:23.0
+  environment: &keycloak-env
+    KEYCLOAK_ADMIN: admin
+    KEYCLOAK_ADMIN_PASSWORD: admin
+    KC_DB: dev-file
+    KC_HOSTNAME_STRICT: false
+    KC_HOSTNAME_STRICT_HTTPS: false
+    KC_HTTP_ENABLED: true
+    KC_HOSTNAME_STRICT_BACKCHANNEL: false
+    KC_SPI_CONNECTIONS_HTTP_CLIENT_DEFAULT_DISABLE_TRUST_MANAGER: true
+    KC_SPI_TRUSTSTORE_FILE_FILE: ""
+    KC_SPI_TRUSTSTORE_FILE_PASSWORD: ""
+  command: &keycloak-command
+    - start-dev
+    - --import-realm
+    - --hostname-strict=false
+    - --hostname-strict-https=false
+  networks:
+    - saml-network
+  healthcheck: &keycloak-healthcheck
+    test: ["CMD", "/opt/keycloak/bin/kc.sh", "show-config", "--all"]
+    interval: 5s
+    timeout: 3s
+    retries: 3
+    start_period: 10s
+
 services:
   # Keycloak as Identity Provider
   keycloak-idp:
-    image: quay.io/keycloak/keycloak:23.0
+    <<: *keycloak-common
     container_name: keycloak-idp
     environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-      KC_DB: dev-file
-      KC_HOSTNAME_STRICT: false
-      KC_HOSTNAME_STRICT_HTTPS: false
-      KC_HTTP_ENABLED: true
-      KC_HOSTNAME_STRICT_BACKCHANNEL: false
-      KC_SPI_CONNECTIONS_HTTP_CLIENT_DEFAULT_DISABLE_TRUST_MANAGER: true
-      KC_SPI_TRUSTSTORE_FILE_FILE: ""
-      KC_SPI_TRUSTSTORE_FILE_PASSWORD: ""
+      <<: *keycloak-env
       KC_HOSTNAME_URL: "http://localhost:8080"
     ports:
       - "8080:8080"
     volumes:
       - ./keycloak-idp:/opt/keycloak/data/import
-    command:
-      - start-dev
-      - --import-realm
-      - --hostname-strict=false
-      - --hostname-strict-https=false
-    networks:
-      - saml-network
-    healthcheck:
-      test: ["CMD", "/opt/keycloak/bin/kc.sh", "show-config", "--all"]
-      interval: 5s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
 
   # Keycloak as Service Provider  
   keycloak-sp:
-    image: quay.io/keycloak/keycloak:23.0
+    <<: *keycloak-common
     container_name: keycloak-sp
     environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-      KC_DB: dev-file
-      KC_HOSTNAME_STRICT: false
-      KC_HOSTNAME_STRICT_HTTPS: false
-      KC_HTTP_ENABLED: true
-      KC_HOSTNAME_STRICT_BACKCHANNEL: false
-      KC_SPI_CONNECTIONS_HTTP_CLIENT_DEFAULT_DISABLE_TRUST_MANAGER: true
-      KC_SPI_TRUSTSTORE_FILE_FILE: ""
-      KC_SPI_TRUSTSTORE_FILE_PASSWORD: ""
+      <<: *keycloak-env
       KC_HOSTNAME_URL: "http://localhost:8081"
       KC_HTTP_PORT: 8081
     ports:
@@ -62,14 +59,6 @@ services:
       - --hostname-strict=false
       - --hostname-strict-https=false
       - --http-port=8081
-    networks:
-      - saml-network
-    healthcheck:
-      test: ["CMD", "/opt/keycloak/bin/kc.sh", "show-config", "--all"]
-      interval: 5s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
 
   # Simple SAML Proxy
   simple-saml-proxy:

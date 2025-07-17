@@ -10,7 +10,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
-	"encoding/pem"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -19,8 +18,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"testing"
@@ -29,6 +26,7 @@ import (
 	"github.com/beevik/etree"
 	"github.com/crewjam/saml"
 	dsig "github.com/russellhaering/goxmldsig"
+	proxysaml "github.com/sters/simple-saml-proxy/proxy/saml"
 	"github.com/stretchr/testify/require"
 )
 
@@ -62,55 +60,8 @@ func encodeSAMLRequest(samlRequest string) (string, error) {
 // generateTestCertificate generates a self-signed certificate for testing.
 func generateTestCertificate(t *testing.T) (string, string) {
 	t.Helper()
-	var certPath, keyPath string
-	tempDir := t.TempDir()
 
-	// Generate a private key
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	require.NoError(t, err)
-
-	// Create certificate template
-	template := x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			Organization:  []string{"Test Organization"},
-			Country:       []string{"US"},
-			Province:      []string{""},
-			Locality:      []string{"Test City"},
-			StreetAddress: []string{""},
-			PostalCode:    []string{""},
-		},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-	}
-
-	// Generate certificate
-	certBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
-	require.NoError(t, err)
-
-	// Write certificate to file
-	certPath = filepath.Join(tempDir, "test.crt")
-	certOut, err := os.Create(certPath)
-	require.NoError(t, err)
-	defer certOut.Close()
-
-	err = pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: certBytes})
-	require.NoError(t, err)
-
-	// Write private key to file
-	keyPath = filepath.Join(tempDir, "test.key")
-	keyOut, err := os.Create(keyPath)
-	require.NoError(t, err)
-	defer keyOut.Close()
-
-	privBytes := x509.MarshalPKCS1PrivateKey(privateKey)
-	err = pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: privBytes})
-	require.NoError(t, err)
-
-	return certPath, keyPath
+	return proxysaml.GenerateTestCertificate(t)
 }
 
 // MockSAMLProvider simulates an external SAML Identity Provider.

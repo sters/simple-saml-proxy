@@ -11,7 +11,7 @@
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
     "test:debug": "playwright test --debug",
-    "install-deps": "npm install && npx playwright install",
+    "setup": "npm install && npx playwright install",
     "postinstall": "npx playwright install"
   },
   "keywords": ["saml", "proxy", "testing", "e2e"],

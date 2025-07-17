@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/crewjam/saml"
 	"github.com/google/uuid"
 	"github.com/sters/simple-saml-proxy/config"
 	"github.com/zitadel/saml/pkg/provider/key"
@@ -209,7 +210,7 @@ func (s *Storage) AuthRequestByID(_ context.Context, id string) (models.AuthRequ
 		s.authRequestsLock.RLock()
 		authRequest, ok = s.authRequests[id] // id might be a URL
 		s.authRequestsLock.RUnlock()
-		
+
 		if !ok {
 			return nil, fmt.Errorf("%w: %s", ErrAuthRequestNotFound, id)
 		}
@@ -257,40 +258,8 @@ func (s *Storage) SetUserinfoWithUserID(
 		return nil
 	}
 
-	// Set the NameID as UserID
-	if authRequest.Assertion.Subject.NameID != nil {
-		userinfo.SetUserID(authRequest.Assertion.Subject.NameID.Value)
-		userinfo.SetUsername(authRequest.Assertion.Subject.NameID.Value)
-	}
-
-	// Extract attributes from the assertion
-	for _, attrStatement := range authRequest.Assertion.AttributeStatements {
-		for _, attr := range attrStatement.Attributes {
-			switch attr.Name {
-			case "email", "Email", "mail":
-				if len(attr.Values) > 0 {
-					userinfo.SetEmail(attr.Values[0].Value)
-				}
-			case "name", "Name", "displayName", "DisplayName":
-				if len(attr.Values) > 0 {
-					userinfo.SetFullName(attr.Values[0].Value)
-				}
-			case "givenName", "GivenName", "firstName", "FirstName":
-				if len(attr.Values) > 0 {
-					userinfo.SetGivenName(attr.Values[0].Value)
-				}
-			case "surname", "Surname", "lastName", "LastName", "sn":
-				if len(attr.Values) > 0 {
-					userinfo.SetSurname(attr.Values[0].Value)
-				}
-			default:
-				// For other attributes, we could add custom attribute support here
-				slog.Debug("Unhandled attribute",
-					slog.String("name", attr.Name),
-					slog.Any("values", attr.Values))
-			}
-		}
-	}
+	// Process user attributes from the assertion
+	s.processUserAttributes(userinfo, authRequest.Assertion)
 
 	return nil
 }
@@ -330,14 +299,28 @@ func (s *Storage) SetUserinfoWithLoginName(
 		return nil
 	}
 
-	// Use the same logic as SetUserinfoWithUserID
-	if foundAuthRequest.Assertion.Subject != nil && foundAuthRequest.Assertion.Subject.NameID != nil {
-		userinfo.SetUserID(foundAuthRequest.Assertion.Subject.NameID.Value)
-		userinfo.SetUsername(foundAuthRequest.Assertion.Subject.NameID.Value)
+	// Process user attributes from the assertion
+	s.processUserAttributes(userinfo, foundAuthRequest.Assertion)
+
+	return nil
+}
+
+func (s *Storage) Health(_ context.Context) error {
+	return nil
+}
+
+// Helper methods
+
+// processUserAttributes extracts and sets user attributes from a SAML assertion.
+func (s *Storage) processUserAttributes(userinfo models.AttributeSetter, assertion *saml.Assertion) {
+	// Set the NameID as UserID
+	if assertion.Subject != nil && assertion.Subject.NameID != nil {
+		userinfo.SetUserID(assertion.Subject.NameID.Value)
+		userinfo.SetUsername(assertion.Subject.NameID.Value)
 	}
 
 	// Extract attributes from the assertion
-	for _, attrStatement := range foundAuthRequest.Assertion.AttributeStatements {
+	for _, attrStatement := range assertion.AttributeStatements {
 		for _, attr := range attrStatement.Attributes {
 			switch attr.Name {
 			case "email", "Email", "mail":
@@ -356,18 +339,15 @@ func (s *Storage) SetUserinfoWithLoginName(
 				if len(attr.Values) > 0 {
 					userinfo.SetSurname(attr.Values[0].Value)
 				}
+			default:
+				// For other attributes, we could add custom attribute support here
+				slog.Debug("Unhandled attribute",
+					slog.String("name", attr.Name),
+					slog.Any("values", attr.Values))
 			}
 		}
 	}
-
-	return nil
 }
-
-func (s *Storage) Health(_ context.Context) error {
-	return nil
-}
-
-// Helper methods
 
 func (s *Storage) getCertificateAndKey() (*key.CertificateAndKey, error) {
 	// Extract the certificate and private key from the tls.Certificate

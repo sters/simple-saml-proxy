@@ -10,6 +10,6 @@ func handlePing(w http.ResponseWriter, _ *http.Request) {
 	// Health check endpoint
 	_, err := w.Write([]byte("pong"))
 	if err != nil {
-		slog.Error("Failed to write response", slog.String("error", err.Error()))
+		respondWithInternalServerError(w, slog.String("operation", "write ping response"))
 	}
 }

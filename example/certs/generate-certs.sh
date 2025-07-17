@@ -9,26 +9,22 @@ set -e
 mkdir -p "$(dirname "$0")"
 cd "$(dirname "$0")"
 
-# Generate proxy certificate
-echo "Generating proxy certificate..."
-openssl req -new -x509 -days 365 -nodes \
-    -out proxy.crt \
-    -keyout proxy.key \
-    -subj "/C=US/ST=Test/L=Test/O=Test/CN=simple-saml-proxy"
+# Function to generate a certificate
+generate_cert() {
+    local name=$1
+    local cn=$2
+    
+    echo "Generating $name certificate..."
+    openssl req -new -x509 -days 365 -nodes \
+        -out "$name.crt" \
+        -keyout "$name.key" \
+        -subj "/C=US/ST=Test/L=Test/O=Test/CN=$cn"
+}
 
-# Generate keycloak IdP certificate
-echo "Generating Keycloak IdP certificate..."
-openssl req -new -x509 -days 365 -nodes \
-    -out keycloak-idp.crt \
-    -keyout keycloak-idp.key \
-    -subj "/C=US/ST=Test/L=Test/O=Test/CN=keycloak-idp"
-
-# Generate keycloak SP certificate
-echo "Generating Keycloak SP certificate..."
-openssl req -new -x509 -days 365 -nodes \
-    -out keycloak-sp.crt \
-    -keyout keycloak-sp.key \
-    -subj "/C=US/ST=Test/L=Test/O=Test/CN=keycloak-sp"
+# Generate certificates for all services
+generate_cert "proxy" "simple-saml-proxy"
+generate_cert "keycloak-idp" "keycloak-idp"
+generate_cert "keycloak-sp" "keycloak-sp"
 
 # Set appropriate permissions
 chmod 600 *.key

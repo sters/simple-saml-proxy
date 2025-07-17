@@ -20,9 +20,11 @@ const (
 	defaultMaxDelay     = 30 * time.Second
 )
 
-// FetchMetadataWithRetry attempts to fetch SAML metadata with exponential backoff retry logic.
-func FetchMetadataWithRetry(ctx context.Context, client *http.Client, metadataURL url.URL, cfg config.Config) (*saml.EntityDescriptor, error) {
+// retryWithBackoff executes an operation with exponential backoff retry logic.
+func retryWithBackoff[T any](ctx context.Context, cfg config.Config, urlStr string, operation func() (T, error)) (T, error) {
 	var lastErr error
+	var zero T
+
 	delay := cfg.Metadata.InitialDelay
 	if delay == 0 {
 		delay = defaultInitialDelay
@@ -38,8 +40,8 @@ func FetchMetadataWithRetry(ctx context.Context, client *http.Client, metadataUR
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
-			slog.Info("Retrying metadata fetch",
-				slog.String("url", metadataURL.String()),
+			slog.Info("Retrying operation",
+				slog.String("url", urlStr),
 				slog.Int("attempt", attempt),
 				slog.Duration("delay", delay))
 
@@ -47,93 +49,48 @@ func FetchMetadataWithRetry(ctx context.Context, client *http.Client, metadataUR
 			case <-time.After(delay):
 				// Continue with retry
 			case <-ctx.Done():
-				return nil, fmt.Errorf("context cancelled while retrying metadata fetch: %w", ctx.Err())
+				return zero, fmt.Errorf("context cancelled while retrying metadata read: %w", ctx.Err())
 			}
 		}
 
-		ed, err := samlsp.FetchMetadata(ctx, client, metadataURL)
+		result, err := operation()
 		if err == nil {
 			if attempt > 0 {
-				slog.Info("Successfully fetched metadata after retry",
-					slog.String("url", metadataURL.String()),
+				slog.Info("Successfully completed operation after retry",
+					slog.String("url", urlStr),
 					slog.Int("attempts", attempt+1))
 			}
 
-			return ed, nil
+			return result, nil
 		}
 
 		lastErr = err
-		slog.Warn("Failed to fetch metadata",
-			slog.String("url", metadataURL.String()),
+		slog.Warn("Operation failed",
+			slog.String("url", urlStr),
 			slog.Int("attempt", attempt+1),
 			slog.Int("max_attempts", maxRetries+1),
 			slog.Any("error", err))
 
-		// Exponential backoff with jitter
+		// Exponential backoff
 		delay *= 2
 		if delay > maxDelay {
 			delay = maxDelay
 		}
 	}
 
-	return nil, fmt.Errorf("failed to fetch metadata after %d attempts: %w", maxRetries+1, lastErr)
+	return zero, fmt.Errorf("failed to read metadata after %d attempts: %w", maxRetries+1, lastErr)
+}
+
+// FetchMetadataWithRetry attempts to fetch SAML metadata with exponential backoff retry logic.
+func FetchMetadataWithRetry(ctx context.Context, client *http.Client, metadataURL url.URL, cfg config.Config) (*saml.EntityDescriptor, error) {
+	return retryWithBackoff(ctx, cfg, metadataURL.String(), func() (*saml.EntityDescriptor, error) {
+		return samlsp.FetchMetadata(ctx, client, metadataURL)
+	})
 }
 
 // ReadMetadataFromURLWithRetry attempts to read SAML metadata from URL with exponential backoff retry logic.
 func ReadMetadataFromURLWithRetry(ctx context.Context, client *http.Client, metadataURL string, cfg config.Config) ([]byte, error) {
-	var lastErr error
-	delay := cfg.Metadata.InitialDelay
-	if delay == 0 {
-		delay = defaultInitialDelay
-	}
-	maxRetries := cfg.Metadata.MaxRetries
-	if maxRetries == 0 {
-		maxRetries = defaultMaxRetries
-	}
-	maxDelay := cfg.Metadata.MaxDelay
-	if maxDelay == 0 {
-		maxDelay = defaultMaxDelay
-	}
-
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		if attempt > 0 {
-			slog.Info("Retrying metadata read",
-				slog.String("url", metadataURL),
-				slog.Int("attempt", attempt),
-				slog.Duration("delay", delay))
-
-			select {
-			case <-time.After(delay):
-				// Continue with retry
-			case <-ctx.Done():
-				return nil, fmt.Errorf("context cancelled while retrying metadata read: %w", ctx.Err())
-			}
-		}
-
-		metadataBytes, err := xml.ReadMetadataFromURL(client, metadataURL)
-		if err == nil {
-			if attempt > 0 {
-				slog.Info("Successfully read metadata after retry",
-					slog.String("url", metadataURL),
-					slog.Int("attempts", attempt+1))
-			}
-
-			return metadataBytes, nil
-		}
-
-		lastErr = err
-		slog.Warn("Failed to read metadata",
-			slog.String("url", metadataURL),
-			slog.Int("attempt", attempt+1),
-			slog.Int("max_attempts", maxRetries+1),
-			slog.Any("error", err))
-
-		// Exponential backoff with jitter
-		delay *= 2
-		if delay > maxDelay {
-			delay = maxDelay
-		}
-	}
-
-	return nil, fmt.Errorf("failed to read metadata after %d attempts: %w", maxRetries+1, lastErr)
+	return retryWithBackoff(ctx, cfg, metadataURL, func() ([]byte, error) {
+		return xml.ReadMetadataFromURL(client, metadataURL)
+	})
 }

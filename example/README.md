@@ -197,6 +197,25 @@ This setup was designed based on the requirements and discussion in [Issue #26](
 - **Consistent Technology**: Same technology stack for both IdP and SP
 - **Extensible**: Easy to add more test scenarios and configurations
 
+## Recent Improvements
+
+The example setup has been optimized to reduce code duplication and improve maintainability:
+
+### Configuration Consolidation
+- **Docker Compose**: Reduced ~50 lines by using YAML anchors for shared Keycloak configuration
+- **Certificate Generation**: Refactored to use functions, reducing ~15 lines of duplicate code
+- **SAML Decoding**: Merged duplicate Python scripts into one flexible tool with `--simple` flag
+
+### Development Tools
+- **Unified SAML Decoder**: `decode-saml.py` now supports both XML and regex parsing modes
+- **Validation Script**: Added `validate-setup.sh` to verify configuration integrity
+- **Streamlined Package Scripts**: Cleaned up npm test scripts in `package.json`
+
+### Benefits
+- **Reduced Maintenance**: Common configurations are centralized
+- **Improved Consistency**: Shared templates ensure uniform behavior
+- **Better Documentation**: Consolidated tools with clear usage instructions
+
 ## Contributing
 
 When adding new tests:
@@ -205,6 +224,7 @@ When adding new tests:
 2. Use verbose mode for debugging: `VERBOSE=true npm test`
 3. Update Makefile if needed
 4. Update this README with new instructions
+5. Run `bash validate-setup.sh` to ensure changes don't break setup
 
 ## License
 

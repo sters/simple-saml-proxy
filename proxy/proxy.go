@@ -21,7 +21,7 @@ func SetupHTTPHandlers(idp *saml.IDP, providers *saml.ServiceProviders, _ config
 
 	// Basic endpoints
 	mux.HandleFunc("/ping", handlePing)
-	
+
 	// SAML proxy endpoints - register these FIRST so they take precedence
 	mux.HandleFunc("/saml/acs", handleSAMLACS(idp, providers))
 	// For /acs, only handle if it's a SAML response (no id parameter)
@@ -50,12 +50,12 @@ func SetupHTTPHandlers(idp *saml.IDP, providers *saml.ServiceProviders, _ config
 		}
 	})
 	mux.HandleFunc("/idp-initiated", handleIDPInitiated)
-	
+
 	// Handle all /metadata/* routes through the IDP handler
 	// This includes /metadata, /metadata/sso, etc. (but NOT /metadata/acs since it's registered above)
 	mux.Handle("/metadata/", idp.IDP.HttpHandler())
 	mux.Handle("/metadata", idp.IDP.HttpHandler())
-	
+
 	// Legacy routes for backward compatibility
 	mux.Handle("/sso", handleSSO(idp))
 	mux.Handle("/callback", idp.IDP.HttpHandler())
