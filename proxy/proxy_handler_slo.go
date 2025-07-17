@@ -62,7 +62,7 @@ func handleSLO(idp *saml.IDP, _ *saml.ServiceProviders) http.HandlerFunc {
 			return
 		}
 
-		// TODO: Validate logout request signature when SAML library supports it
+		// Signature validation not implemented yet (tracked in issue #27)
 		// For now, we accept unsigned logout requests (common with HTTP-Redirect binding)
 		if logoutRequest.Signature != nil {
 			slog.Warn("Logout request signature validation not implemented",

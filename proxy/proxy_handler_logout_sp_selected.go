@@ -92,7 +92,7 @@ func handleLogoutSPSelected(idp *saml.IDP, _ *saml.ServiceProviders) http.Handle
 		// In production, this should come from SP metadata
 		logoutURL := spEntityID + "/logout"
 
-		// TODO: Extract SingleLogoutService from SP metadata when available
+		// SingleLogoutService extraction from metadata not implemented yet (tracked in issue #28)
 		_ = sp // silence unused variable warning
 
 		// Build the logout URL

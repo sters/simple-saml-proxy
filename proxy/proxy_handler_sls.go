@@ -125,7 +125,7 @@ func handleLogoutResponse(w http.ResponseWriter, r *http.Request, idp *saml.IDP,
 	// In production, this should come from SP metadata
 	logoutResponseURL := logoutCtx.OriginID + "/logout/response"
 
-	// TODO: Extract SingleLogoutService from SP metadata when available
+	// SingleLogoutService extraction from metadata not implemented yet (tracked in issue #28)
 	// The zitadel/saml ServiceProvider doesn't expose parsed metadata directly
 	// We would need to parse the metadata XML to extract SLO endpoints
 	_ = sp // silence unused variable warning

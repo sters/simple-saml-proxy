@@ -66,8 +66,8 @@ func TestSetupHTTPHandlers(t *testing.T) {
 	mux := SetupHTTPHandlers(idp, providers, cfg)
 	assert.NotNil(t, mux)
 
-	// Test the SSO endpoint
-	req := httptest.NewRequest(http.MethodGet, "/sso", nil)
+	// Test the SSO endpoint - use the actual metadata SSO endpoint
+	req := httptest.NewRequest(http.MethodGet, "/metadata/sso", nil)
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
