@@ -48,7 +48,7 @@ func handleLogoutSPSelected(idp *saml.IDP, _ *saml.ServiceProviders) http.Handle
 		}
 
 		// Verify the SP is allowed
-		sp, err := storage.GetEntityByID(r.Context(), spEntityID)
+		_, err = storage.GetEntityByID(r.Context(), spEntityID)
 		if err != nil {
 			slog.Error("Invalid SP entity ID",
 				slog.String("entityID", spEntityID),
@@ -88,15 +88,35 @@ func handleLogoutSPSelected(idp *saml.IDP, _ *saml.ServiceProviders) http.Handle
 			},
 		}
 
-		// For now, we'll assume a standard logout endpoint
-		// In production, this should come from SP metadata
-		logoutURL := spEntityID + "/logout"
+		// Extract SingleLogoutService from SP metadata
+		sls, err := storage.GetSingleLogoutServiceFromSP(r.Context(), spEntityID)
+		if err != nil {
+			slog.Warn("Failed to extract SingleLogoutService from metadata, using fallback",
+				slog.String("entityID", spEntityID),
+				slog.String("error", err.Error()))
+			// Fallback to the previous hardcoded pattern for backward compatibility
+			logoutURL := spEntityID + "/logout"
+			logoutURLStr, err := buildLogoutURLToSP(logoutRequest, logoutURL, logoutCtx.ID)
+			if err != nil {
+				slog.Error("Failed to build fallback logout URL", slog.String("error", err.Error()))
+				http.Error(w, "Failed to create logout request", http.StatusInternalServerError)
 
-		// SingleLogoutService extraction from metadata not implemented yet (tracked in issue #28)
-		_ = sp // silence unused variable warning
+				return
+			}
+			// Redirect to SP with logout request
+			slog.Info("Redirecting to SP for logout (fallback)", slog.String("url", logoutURLStr))
+			http.Redirect(w, r, logoutURLStr, http.StatusFound)
 
-		// Build the logout URL
-		logoutURLStr, err := buildLogoutURLToSP(logoutRequest, logoutURL, logoutCtx.ID)
+			return
+		}
+
+		slog.Info("Extracted SingleLogoutService from metadata",
+			slog.String("entityID", spEntityID),
+			slog.String("binding", sls.Binding),
+			slog.String("location", sls.Location))
+
+		// Build the logout URL using the extracted endpoint
+		logoutURLStr, err := buildLogoutURLToSP(logoutRequest, sls.Location, logoutCtx.ID)
 		if err != nil {
 			slog.Error("Failed to build logout URL", slog.String("error", err.Error()))
 			http.Error(w, "Failed to create logout request", http.StatusInternalServerError)

@@ -28,6 +28,8 @@ var (
 	ErrAuthRequestNotFound    = errors.New("auth request not found")
 	ErrInvalidAuthRequestType = errors.New("invalid auth request type")
 	ErrLogoutContextNotFound  = errors.New("logout context not found")
+	ErrNoSPSSODescriptor      = errors.New("no SPSSODescriptor found in metadata")
+	ErrNoSingleLogoutService  = errors.New("no SingleLogoutService found in metadata")
 )
 
 // Storage implements the zitadel/saml Storage interfaces.
@@ -49,6 +51,12 @@ type Storage struct {
 	// Cache for logout contexts
 	logoutContexts     map[string]*LogoutContext
 	logoutContextsLock sync.RWMutex
+}
+
+// SingleLogoutService represents a parsed SingleLogoutService endpoint from SP metadata.
+type SingleLogoutService struct {
+	Binding  string
+	Location string
 }
 
 // NewStorage creates a new Storage.
@@ -465,4 +473,40 @@ func (s *Storage) CheckAndMarkLogoutRequestProcessed(contextID, requestID string
 	logoutContext.ProcessedRequests[requestID] = true
 
 	return false, nil
+}
+
+// GetSingleLogoutServiceFromSP extracts SingleLogoutService endpoint from SP metadata.
+func (s *Storage) GetSingleLogoutServiceFromSP(ctx context.Context, entityID string) (*SingleLogoutService, error) {
+	sp, err := s.GetEntityByID(ctx, entityID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get SP entity: %w", err)
+	}
+
+	return extractSingleLogoutService(sp)
+}
+
+// extractSingleLogoutService extracts SingleLogoutService endpoint from SP metadata.
+func extractSingleLogoutService(sp *serviceprovider.ServiceProvider) (*SingleLogoutService, error) {
+	if sp.Metadata == nil || sp.Metadata.SPSSODescriptor == nil {
+		return nil, ErrNoSPSSODescriptor
+	}
+
+	// Priority order for binding types (as per ADR)
+	bindings := []string{
+		"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect",
+		"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST",
+	}
+
+	for _, binding := range bindings {
+		for _, sls := range sp.Metadata.SPSSODescriptor.SingleLogoutService {
+			if sls.Binding == binding {
+				return &SingleLogoutService{
+					Binding:  sls.Binding,
+					Location: sls.Location,
+				}, nil
+			}
+		}
+	}
+
+	return nil, ErrNoSingleLogoutService
 }
