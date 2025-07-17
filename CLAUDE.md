@@ -114,6 +114,8 @@ Configuration is loaded from environment variables:
 - `METADATA_MAX_RETRIES`: Max retry attempts for metadata fetching (default: 5)
 - `METADATA_INITIAL_DELAY`: Initial retry delay (default: 1s)
 - `METADATA_MAX_DELAY`: Maximum retry delay (default: 30s)
+- `PROXY_REQUIRE_SIGNED_LOGOUT_REQUESTS`: Global setting for SLO signature validation (default: false)
+- `PROXY_ALLOWED_SP_X_REQUIRE_SIGNED_LOGOUT_REQUESTS`: Per-SP SLO signature requirement
 
 ## Testing Approach
 

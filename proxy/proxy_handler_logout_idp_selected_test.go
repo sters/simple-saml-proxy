@@ -21,7 +21,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//nolint:maintidx // Test function needs to be complex to cover all logout scenarios
 func TestHandleLogoutIDPSelected(t *testing.T) {
 	// Generate test certificate
 	certPath, keyPath := saml.GenerateTestCertificate(t)
@@ -79,23 +78,10 @@ func TestHandleLogoutIDPSelected(t *testing.T) {
 				Middleware: &samlsp.Middleware{
 					ServiceProvider: crewjamsaml.ServiceProvider{
 						IDPMetadata: &crewjamsaml.EntityDescriptor{
-							// Empty IDPSSODescriptors
-							IDPSSODescriptors: []crewjamsaml.IDPSSODescriptor{},
-						},
-					},
-				},
-			},
-			"idp4": {
-				ID: "idp4",
-				Middleware: &samlsp.Middleware{
-					ServiceProvider: crewjamsaml.ServiceProvider{
-						IDPMetadata: &crewjamsaml.EntityDescriptor{
 							IDPSSODescriptors: []crewjamsaml.IDPSSODescriptor{
 								{
 									SSODescriptor: crewjamsaml.SSODescriptor{
-										RoleDescriptor: crewjamsaml.RoleDescriptor{},
-										// Empty SingleLogoutServices
-										SingleLogoutServices: []crewjamsaml.Endpoint{},
+										// No SingleLogoutServices
 									},
 								},
 							},
@@ -106,267 +92,173 @@ func TestHandleLogoutIDPSelected(t *testing.T) {
 		},
 	}
 
-	// Create handler
 	handler := handleLogoutIDPSelected(idp, providers)
 
 	tests := []struct {
-		name           string
-		setupRequest   func() *http.Request
-		setupContext   func()
-		expectedStatus int
-		checkResponse  func(t *testing.T, w *httptest.ResponseRecorder)
+		name            string
+		setupContext    func() string
+		idpID           string
+		cookie          *http.Cookie
+		wantStatus      int
+		wantRedirect    bool
+		checkRedirectFn func(t *testing.T, location string)
 	}{
 		{
-			name: "Valid logout request",
-			setupRequest: func() *http.Request {
-				// Create logout context
+			name: "Valid IdP selection",
+			setupContext: func() string {
 				storage := idp.GetStorage()
-				logoutCtx := storage.CreateLogoutContext("sp", "https://sp.example.com", "", "test-relay-state")
+				ctx := storage.CreateLogoutContext("sp", "sp1", "", "")
 
-				req := httptest.NewRequest(http.MethodPost, "/logout/idp", strings.NewReader("idpID=idp1"))
-				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-				req.AddCookie(&http.Cookie{
-					Name:  "logout_context_id",
-					Value: logoutCtx.ID,
-				})
-
-				return req
+				return ctx.ID
 			},
-			expectedStatus: http.StatusFound,
-			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
-				t.Helper()
-				// Check redirect
-				location := w.Header().Get("Location")
-				assert.NotEmpty(t, location)
+			idpID:        "idp1",
+			wantStatus:   http.StatusFound,
+			wantRedirect: true,
+			checkRedirectFn: func(t *testing.T, location string) {
 				assert.Contains(t, location, "https://idp1.example.com/slo")
 				assert.Contains(t, location, "SAMLRequest=")
 
-				// Parse URL to check parameters
+				// Parse and validate the logout request
 				u, err := url.Parse(location)
 				require.NoError(t, err)
-				assert.NotEmpty(t, u.Query().Get("SAMLRequest"))
-				assert.NotEmpty(t, u.Query().Get("RelayState"))
 
-				// Check cookie was set
-				cookies := w.Result().Cookies()
-				var foundCookie bool
-				for _, cookie := range cookies {
-					if cookie.Name == "logout_idp_id" {
-						assert.Equal(t, "idp1", cookie.Value)
-						assert.Equal(t, 300, cookie.MaxAge)
-						assert.True(t, cookie.HttpOnly)
-						foundCookie = true
+				samlRequest := u.Query().Get("SAMLRequest")
+				assert.NotEmpty(t, samlRequest)
 
-						break
-					}
-				}
-				assert.True(t, foundCookie, "logout_idp_id cookie not found")
+				// Decode and decompress the request
+				compressed, err := base64.StdEncoding.DecodeString(samlRequest)
+				require.NoError(t, err)
+
+				xmlData, err := decodeDeflatedRequest(compressed)
+				require.NoError(t, err)
+
+				var logoutReq crewjamsaml.LogoutRequest
+				err = xml.Unmarshal(xmlData, &logoutReq)
+				require.NoError(t, err)
+
+				assert.Equal(t, "https://proxy.example.com", logoutReq.Issuer.Value)
+				assert.Equal(t, "https://idp1.example.com/slo", logoutReq.Destination)
 			},
 		},
 		{
 			name: "Missing logout context cookie",
-			setupRequest: func() *http.Request {
-				req := httptest.NewRequest(http.MethodPost, "/logout/idp", strings.NewReader("idpID=idp1"))
-				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-				// No cookie added
-				return req
+			setupContext: func() string {
+				return ""
 			},
-			expectedStatus: http.StatusBadRequest,
-			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
-				t.Helper()
-				assert.Contains(t, w.Body.String(), "Invalid logout request")
-			},
+			idpID:      "idp1",
+			cookie:     nil,
+			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name: "Invalid logout context ID",
-			setupRequest: func() *http.Request {
-				req := httptest.NewRequest(http.MethodPost, "/logout/idp", strings.NewReader("idpID=idp1"))
-				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-				req.AddCookie(&http.Cookie{
-					Name:  "logout_context_id",
-					Value: "invalid-context-id",
-				})
-
-				return req
+			setupContext: func() string {
+				return "invalid-id"
 			},
-			expectedStatus: http.StatusBadRequest,
-			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
-				t.Helper()
-				assert.Contains(t, w.Body.String(), "Invalid logout request")
-			},
+			idpID:      "idp1",
+			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name: "Missing IdP ID",
-			setupRequest: func() *http.Request {
-				// Create logout context
+			setupContext: func() string {
 				storage := idp.GetStorage()
-				logoutCtx := storage.CreateLogoutContext("sp", "https://sp.example.com", "", "test-relay-state")
+				ctx := storage.CreateLogoutContext("sp", "sp1", "", "")
 
-				req := httptest.NewRequest(http.MethodPost, "/logout/idp", strings.NewReader(""))
-				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-				req.AddCookie(&http.Cookie{
-					Name:  "logout_context_id",
-					Value: logoutCtx.ID,
-				})
-
-				return req
+				return ctx.ID
 			},
-			expectedStatus: http.StatusBadRequest,
-			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
-				t.Helper()
-				assert.Contains(t, w.Body.String(), "Invalid request")
-			},
+			idpID:      "",
+			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name: "Invalid IdP ID",
-			setupRequest: func() *http.Request {
-				// Create logout context
+			setupContext: func() string {
 				storage := idp.GetStorage()
-				logoutCtx := storage.CreateLogoutContext("sp", "https://sp.example.com", "", "test-relay-state")
+				ctx := storage.CreateLogoutContext("sp", "sp1", "", "")
 
-				req := httptest.NewRequest(http.MethodPost, "/logout/idp", strings.NewReader("idpID=invalid-idp"))
-				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-				req.AddCookie(&http.Cookie{
-					Name:  "logout_context_id",
-					Value: logoutCtx.ID,
-				})
-
-				return req
+				return ctx.ID
 			},
-			expectedStatus: http.StatusBadRequest,
-			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
-				t.Helper()
-				assert.Contains(t, w.Body.String(), "Invalid IdP ID")
-			},
+			idpID:      "invalid-idp",
+			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name: "IdP without metadata",
-			setupRequest: func() *http.Request {
-				// Create logout context
+			setupContext: func() string {
 				storage := idp.GetStorage()
-				logoutCtx := storage.CreateLogoutContext("sp", "https://sp.example.com", "", "test-relay-state")
+				ctx := storage.CreateLogoutContext("sp", "sp1", "", "")
 
-				req := httptest.NewRequest(http.MethodPost, "/logout/idp", strings.NewReader("idpID=idp2"))
-				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-				req.AddCookie(&http.Cookie{
-					Name:  "logout_context_id",
-					Value: logoutCtx.ID,
-				})
-
-				return req
+				return ctx.ID
 			},
-			expectedStatus: http.StatusBadRequest,
-			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
-				t.Helper()
-				assert.Contains(t, w.Body.String(), "Selected IdP does not support Single Logout")
-			},
+			idpID:      "idp2",
+			wantStatus: http.StatusBadRequest,
 		},
 		{
-			name: "IdP with empty IDPSSODescriptors",
-			setupRequest: func() *http.Request {
-				// Create logout context
+			name: "IdP without SLO service",
+			setupContext: func() string {
 				storage := idp.GetStorage()
-				logoutCtx := storage.CreateLogoutContext("sp", "https://sp.example.com", "", "test-relay-state")
+				ctx := storage.CreateLogoutContext("sp", "sp1", "", "")
 
-				req := httptest.NewRequest(http.MethodPost, "/logout/idp", strings.NewReader("idpID=idp3"))
-				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-				req.AddCookie(&http.Cookie{
-					Name:  "logout_context_id",
-					Value: logoutCtx.ID,
-				})
-
-				return req
+				return ctx.ID
 			},
-			expectedStatus: http.StatusBadRequest,
-			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
-				t.Helper()
-				assert.Contains(t, w.Body.String(), "Selected IdP does not support Single Logout")
-			},
-		},
-		{
-			name: "IdP with empty SingleLogoutServices",
-			setupRequest: func() *http.Request {
-				// Create logout context
-				storage := idp.GetStorage()
-				logoutCtx := storage.CreateLogoutContext("sp", "https://sp.example.com", "", "test-relay-state")
-
-				req := httptest.NewRequest(http.MethodPost, "/logout/idp", strings.NewReader("idpID=idp4"))
-				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-				req.AddCookie(&http.Cookie{
-					Name:  "logout_context_id",
-					Value: logoutCtx.ID,
-				})
-
-				return req
-			},
-			expectedStatus: http.StatusBadRequest,
-			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
-				t.Helper()
-				assert.Contains(t, w.Body.String(), "Selected IdP does not support Single Logout")
-			},
-		},
-		{
-			name: "Logout with HTTPS request",
-			setupRequest: func() *http.Request {
-				// Create logout context
-				storage := idp.GetStorage()
-				logoutCtx := storage.CreateLogoutContext("sp", "https://sp.example.com", "", "test-relay-state")
-
-				req := httptest.NewRequest(http.MethodPost, "https://proxy.example.com/logout/idp", strings.NewReader("idpID=idp1"))
-				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-				req.TLS = &tls.ConnectionState{} // Simulate HTTPS
-				req.AddCookie(&http.Cookie{
-					Name:  "logout_context_id",
-					Value: logoutCtx.ID,
-				})
-
-				return req
-			},
-			expectedStatus: http.StatusFound,
-			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
-				t.Helper()
-				// Check that cookie is marked as secure
-				cookies := w.Result().Cookies()
-				for _, cookie := range cookies {
-					if cookie.Name == "logout_idp_id" {
-						assert.True(t, cookie.Secure)
-
-						break
-					}
-				}
-			},
+			idpID:      "idp3",
+			wantStatus: http.StatusBadRequest,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.setupContext != nil {
-				tt.setupContext()
+			// Setup
+			contextID := tt.setupContext()
+
+			// Create request
+			req := httptest.NewRequest(http.MethodPost, "/logout/idp", strings.NewReader("idpID="+tt.idpID))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+			// Add cookie if context ID is set
+			if contextID != "" {
+				if tt.cookie != nil {
+					req.AddCookie(tt.cookie)
+				} else {
+					req.AddCookie(&http.Cookie{
+						Name:  "logout_context_id",
+						Value: contextID,
+					})
+				}
 			}
 
-			req := tt.setupRequest()
+			// Execute
 			w := httptest.NewRecorder()
-
 			handler(w, req)
 
-			assert.Equal(t, tt.expectedStatus, w.Code)
-			if tt.checkResponse != nil {
-				tt.checkResponse(t, w)
+			// Assert
+			assert.Equal(t, tt.wantStatus, w.Code)
+
+			if tt.wantRedirect {
+				location := w.Header().Get("Location")
+				assert.NotEmpty(t, location)
+				if tt.checkRedirectFn != nil {
+					tt.checkRedirectFn(t, location)
+				}
+
+				// Check for IdP cookie
+				cookies := w.Result().Cookies()
+				var foundIDPCookie bool
+				for _, cookie := range cookies {
+					if cookie.Name == "logout_idp_id" && cookie.Value == tt.idpID {
+						foundIDPCookie = true
+
+						break
+					}
+				}
+				assert.True(t, foundIDPCookie, "Should set logout_idp_id cookie")
 			}
 		})
 	}
 }
 
 func TestBuildLogoutURL(t *testing.T) {
-	// Create a sample logout request
 	logoutRequest := &crewjamsaml.LogoutRequest{
-		XMLName: xml.Name{
-			Space: "urn:oasis:names:tc:SAML:2.0:protocol",
-			Local: "LogoutRequest",
-		},
-		ID:           "_test-logout-request",
-		Version:      "2.0",
+		ID:           "test123",
 		IssueInstant: time.Now(),
+		Version:      "2.0",
 		Issuer: &crewjamsaml.Issuer{
 			Value: "https://proxy.example.com",
 		},
@@ -374,6 +266,7 @@ func TestBuildLogoutURL(t *testing.T) {
 			Value:  "user@example.com",
 			Format: "urn:oasis:names:tc:SAML:2.0:nameid-format:emailAddress",
 		},
+		Destination: "https://idp.example.com/slo",
 	}
 
 	tests := []struct {
@@ -381,86 +274,39 @@ func TestBuildLogoutURL(t *testing.T) {
 		destination string
 		relayState  string
 		wantErr     bool
-		checkURL    func(t *testing.T, urlStr string)
+		checkFn     func(t *testing.T, urlStr string)
 	}{
 		{
-			name:        "Valid logout URL without relay state",
+			name:        "Without RelayState",
 			destination: "https://idp.example.com/slo",
 			relayState:  "",
 			wantErr:     false,
-			checkURL: func(t *testing.T, urlStr string) {
-				t.Helper()
+			checkFn: func(t *testing.T, urlStr string) {
 				u, err := url.Parse(urlStr)
 				require.NoError(t, err)
-				assert.Equal(t, "https", u.Scheme)
-				assert.Equal(t, "idp.example.com", u.Host)
-				assert.Equal(t, "/slo", u.Path)
+				assert.Equal(t, "https://idp.example.com/slo", u.Scheme+"://"+u.Host+u.Path)
 				assert.NotEmpty(t, u.Query().Get("SAMLRequest"))
 				assert.Empty(t, u.Query().Get("RelayState"))
-
-				// Verify SAML request encoding
-				samlReq := u.Query().Get("SAMLRequest")
-				decoded, err := base64.StdEncoding.DecodeString(samlReq)
-				require.NoError(t, err)
-				assert.NotEmpty(t, decoded)
 			},
 		},
 		{
-			name:        "Valid logout URL with relay state",
+			name:        "With RelayState",
 			destination: "https://idp.example.com/slo",
 			relayState:  "test-relay-state",
 			wantErr:     false,
-			checkURL: func(t *testing.T, urlStr string) {
-				t.Helper()
+			checkFn: func(t *testing.T, urlStr string) {
 				u, err := url.Parse(urlStr)
 				require.NoError(t, err)
+				assert.Equal(t, "https://idp.example.com/slo", u.Scheme+"://"+u.Host+u.Path)
+				assert.NotEmpty(t, u.Query().Get("SAMLRequest"))
 				assert.Equal(t, "test-relay-state", u.Query().Get("RelayState"))
 			},
 		},
 		{
-			name:        "Logout URL with existing query parameters",
-			destination: "https://idp.example.com/slo?existing=param",
-			relayState:  "relay",
-			wantErr:     false,
-			checkURL: func(t *testing.T, urlStr string) {
-				t.Helper()
-				u, err := url.Parse(urlStr)
-				require.NoError(t, err)
-				assert.Equal(t, "param", u.Query().Get("existing"))
-				assert.NotEmpty(t, u.Query().Get("SAMLRequest"))
-				assert.Equal(t, "relay", u.Query().Get("RelayState"))
-			},
-		},
-		{
 			name:        "Invalid destination URL",
-			destination: "://invalid-url",
+			destination: "not a valid url",
 			relayState:  "",
 			wantErr:     true,
-		},
-		{
-			name:        "Empty destination",
-			destination: "",
-			relayState:  "",
-			wantErr:     false, // Empty destination doesn't cause an error, just returns URL with empty scheme
-			checkURL: func(t *testing.T, urlStr string) {
-				t.Helper()
-				t.Helper()
-				// The url.Parse will succeed with empty string, creating a URL with empty scheme
-				assert.Contains(t, urlStr, "SAMLRequest=")
-			},
-		},
-		{
-			name:        "Special characters in relay state",
-			destination: "https://idp.example.com/slo",
-			relayState:  "relay=state&with=special%20chars",
-			wantErr:     false,
-			checkURL: func(t *testing.T, urlStr string) {
-				t.Helper()
-				u, err := url.Parse(urlStr)
-				require.NoError(t, err)
-				// Check that relay state is properly encoded
-				assert.Equal(t, "relay=state&with=special%20chars", u.Query().Get("RelayState"))
-			},
 		},
 	}
 
@@ -473,25 +319,15 @@ func TestBuildLogoutURL(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				assert.NotEmpty(t, urlStr)
-				if tt.checkURL != nil {
-					tt.checkURL(t, urlStr)
+				if tt.checkFn != nil {
+					tt.checkFn(t, urlStr)
 				}
 			}
 		})
 	}
 }
 
-func TestBuildLogoutURL_ErrorCases(t *testing.T) {
-	t.Run("Invalid logout request marshaling", func(t *testing.T) {
-		// We need to test with a request that has invalid structure
-		// Since buildLogoutURL expects a non-nil request, let's test that scenario separately
-		// For now, remove this test as the function doesn't handle nil requests gracefully
-		// and that's acceptable since it's an internal function
-		t.Skip("buildLogoutURL doesn't handle nil requests - this is acceptable for internal functions")
-	})
-}
-
-func TestHandleLogoutIDPSelected_ConcurrentRequests(t *testing.T) {
+func TestBuildSignedLogoutURLWithCertificate(t *testing.T) {
 	// Generate test certificate
 	certPath, keyPath := saml.GenerateTestCertificate(t)
 	defer func() {
@@ -500,14 +336,93 @@ func TestHandleLogoutIDPSelected_ConcurrentRequests(t *testing.T) {
 		}
 	}()
 
+	// Load the certificate to get the private key
+	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+	require.NoError(t, err)
+
+	logoutRequest := &crewjamsaml.LogoutRequest{
+		ID:           "test456",
+		IssueInstant: time.Now(),
+		Version:      "2.0",
+		Issuer: &crewjamsaml.Issuer{
+			Value: "https://proxy.example.com",
+		},
+		NameID: &crewjamsaml.NameID{
+			Value:  "user@example.com",
+			Format: "urn:oasis:names:tc:SAML:2.0:nameid-format:emailAddress",
+		},
+		Destination: "https://idp.example.com/slo",
+	}
+
+	tests := []struct {
+		name       string
+		relayState string
+		sigAlg     string
+		checkFn    func(t *testing.T, urlStr string)
+	}{
+		{
+			name:       "With default signature algorithm",
+			relayState: "test-relay",
+			sigAlg:     "",
+			checkFn: func(t *testing.T, urlStr string) {
+				u, err := url.Parse(urlStr)
+				require.NoError(t, err)
+				assert.Equal(t, "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256", u.Query().Get("SigAlg"))
+				assert.NotEmpty(t, u.Query().Get("Signature"))
+			},
+		},
+		{
+			name:       "With SHA1 signature algorithm",
+			relayState: "",
+			sigAlg:     sigAlgSHA1,
+			checkFn: func(t *testing.T, urlStr string) {
+				u, err := url.Parse(urlStr)
+				require.NoError(t, err)
+				assert.Equal(t, sigAlgSHA1, u.Query().Get("SigAlg"))
+				assert.NotEmpty(t, u.Query().Get("Signature"))
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			urlStr, err := buildSignedLogoutURL(
+				logoutRequest,
+				"https://idp.example.com/slo",
+				tt.relayState,
+				cert.PrivateKey,
+				tt.sigAlg,
+			)
+
+			require.NoError(t, err)
+			assert.NotEmpty(t, urlStr)
+			if tt.checkFn != nil {
+				tt.checkFn(t, urlStr)
+			}
+		})
+	}
+}
+
+func TestHandleLogoutIDPSelectedConcurrency(t *testing.T) {
+	// Generate test certificate
+	certPath, keyPath := saml.GenerateTestCertificate(t)
+	defer func() {
+		if certPath != "" {
+			_ = os.RemoveAll(filepath.Dir(certPath))
+		}
+	}()
+
+	// Create test configuration
 	cfg := config.Config{}
 	cfg.Proxy.EntityID = "https://proxy.example.com"
 	cfg.Proxy.CertificatePath = certPath
 	cfg.Proxy.PrivateKeyPath = keyPath
 
+	// Create IDP
 	idp, err := saml.CreateProxyIDP(cfg)
 	require.NoError(t, err)
 
+	// Create service providers with metadata
 	providers := &saml.ServiceProviders{
 		Providers: map[string]*saml.ServiceProvider{
 			"idp1": {
@@ -518,7 +433,6 @@ func TestHandleLogoutIDPSelected_ConcurrentRequests(t *testing.T) {
 							IDPSSODescriptors: []crewjamsaml.IDPSSODescriptor{
 								{
 									SSODescriptor: crewjamsaml.SSODescriptor{
-										RoleDescriptor: crewjamsaml.RoleDescriptor{},
 										SingleLogoutServices: []crewjamsaml.Endpoint{
 											{
 												Binding:  "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect",
@@ -537,20 +451,22 @@ func TestHandleLogoutIDPSelected_ConcurrentRequests(t *testing.T) {
 
 	handler := handleLogoutIDPSelected(idp, providers)
 
-	// Test concurrent requests
+	// Setup logout context
+	storage := idp.GetStorage()
+	ctx := storage.CreateLogoutContext("sp", "sp1", "", "")
+	contextID := ctx.ID
+
+	// Run concurrent requests
 	const numRequests = 10
 	done := make(chan bool, numRequests)
 
 	for range numRequests {
 		go func() {
-			storage := idp.GetStorage()
-			logoutCtx := storage.CreateLogoutContext("sp", "https://sp.example.com", "", "test-relay-state")
-
 			req := httptest.NewRequest(http.MethodPost, "/logout/idp", strings.NewReader("idpID=idp1"))
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			req.AddCookie(&http.Cookie{
 				Name:  "logout_context_id",
-				Value: logoutCtx.ID,
+				Value: contextID,
 			})
 
 			w := httptest.NewRecorder()

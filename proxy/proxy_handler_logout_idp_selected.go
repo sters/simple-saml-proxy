@@ -1,7 +1,10 @@
 package proxy
 
 import (
+	"crypto"
+	"crypto/rsa"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -11,6 +14,16 @@ import (
 	"github.com/beevik/etree"
 	crewjamsaml "github.com/crewjam/saml"
 	"github.com/sters/simple-saml-proxy/proxy/saml"
+)
+
+const (
+	sigAlgSHA1   = "http://www.w3.org/2000/09/xmldsig#rsa-sha1"
+	sigAlgSHA256 = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"
+)
+
+var (
+	errUnsupportedSigAlg = errors.New("unsupported signature algorithm")
+	errPrivateKeyNotRSA  = errors.New("private key must be an RSA key")
 )
 
 // handleLogoutIDPSelected handles the IdP selection for logout and creates the upstream logout request.
@@ -69,7 +82,7 @@ func handleLogoutIDPSelected(idp *saml.IDP, providers *saml.ServiceProviders) ht
 			IssueInstant: time.Now(),
 			Version:      "2.0",
 			Issuer: &crewjamsaml.Issuer{
-				Value: idp.IDP.GetEntityID(r.Context()),
+				Value: idp.EntityID,
 			},
 			NameID: &crewjamsaml.NameID{
 				// This would normally come from the original logout request or session
@@ -93,6 +106,10 @@ func handleLogoutIDPSelected(idp *saml.IDP, providers *saml.ServiceProviders) ht
 		logoutRequest.Destination = sloService.Location
 
 		// Build the logout URL
+		// Check if we need to sign the logout request
+		// Note: For now, we'll always use unsigned logout requests for proxy-initiated logouts
+		// The configuration RequireSignedLogoutRequests is for incoming requests, not outgoing
+		// If we want to sign outgoing requests, we would need to check the target IdP's requirements
 		logoutURL, err := buildLogoutURL(logoutRequest, sloService.Location, logoutCtx.ID)
 		if err != nil {
 			slog.Error("Failed to build logout URL", slog.String("error", err.Error()))
@@ -147,7 +164,93 @@ func buildLogoutURL(logoutRequest *crewjamsaml.LogoutRequest, destination string
 	if relayState != "" {
 		query.Set("RelayState", relayState)
 	}
+
 	logoutURL.RawQuery = query.Encode()
 
 	return logoutURL.String(), nil
+}
+
+// buildSignedLogoutURL creates a signed logout URL for HTTP-Redirect binding.
+func buildSignedLogoutURL(logoutRequest *crewjamsaml.LogoutRequest, destination string, relayState string, privateKey interface{}, sigAlg string) (string, error) {
+	// First build the unsigned URL
+	unsignedURL, err := buildLogoutURL(logoutRequest, destination, relayState)
+	if err != nil {
+		return "", err
+	}
+
+	// Parse the URL to modify query parameters
+	logoutURL, err := url.Parse(unsignedURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse logout URL: %w", err)
+	}
+
+	// Get the current query values
+	query := logoutURL.Query()
+
+	// Add signature algorithm
+	if sigAlg == "" {
+		sigAlg = sigAlgSHA256
+	}
+	query.Set("SigAlg", sigAlg)
+
+	// Create the signature data string according to SAML spec
+	// The order matters: SAMLRequest, RelayState (if present), SigAlg
+	var signatureData string
+	samlRequest := query.Get("SAMLRequest")
+	if relayState != "" {
+		signatureData = fmt.Sprintf("SAMLRequest=%s&RelayState=%s&SigAlg=%s",
+			url.QueryEscape(samlRequest),
+			url.QueryEscape(relayState),
+			url.QueryEscape(sigAlg))
+	} else {
+		signatureData = fmt.Sprintf("SAMLRequest=%s&SigAlg=%s",
+			url.QueryEscape(samlRequest),
+			url.QueryEscape(sigAlg))
+	}
+
+	// Sign the data
+	signature, err := signData([]byte(signatureData), privateKey, sigAlg)
+	if err != nil {
+		return "", fmt.Errorf("failed to sign logout request: %w", err)
+	}
+
+	// Base64 encode the signature and add to query
+	query.Set("Signature", base64.StdEncoding.EncodeToString(signature))
+
+	// Update the URL with the new query including signature
+	logoutURL.RawQuery = query.Encode()
+
+	return logoutURL.String(), nil
+}
+
+// signData signs the given data using the private key and specified algorithm.
+func signData(data []byte, privateKey interface{}, sigAlg string) ([]byte, error) {
+	// Determine hash algorithm
+	var hashFunc crypto.Hash
+	switch sigAlg {
+	case sigAlgSHA1:
+		hashFunc = crypto.SHA1
+	case sigAlgSHA256:
+		hashFunc = crypto.SHA256
+	default:
+		return nil, fmt.Errorf("%w: %s", errUnsupportedSigAlg, sigAlg)
+	}
+
+	// Compute hash
+	h := hashFunc.New()
+	h.Write(data)
+	digest := h.Sum(nil)
+
+	// Sign with private key
+	rsaKey, ok := privateKey.(*rsa.PrivateKey)
+	if !ok {
+		return nil, errPrivateKeyNotRSA
+	}
+
+	signature, err := rsa.SignPKCS1v15(nil, rsaKey, hashFunc, digest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign data: %w", err)
+	}
+
+	return signature, nil
 }

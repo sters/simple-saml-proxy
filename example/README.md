@@ -126,6 +126,10 @@ IDP_0_METADATA_URL: "http://keycloak-idp:8080/realms/test/protocol/saml/descript
 # SP configuration
 PROXY_ALLOWED_SP_0_ENTITY_ID: "http://keycloak-sp:8080/realms/test"
 PROXY_ALLOWED_SP_0_ACS_URL: "http://keycloak-sp:8080/realms/test/broker/saml/endpoint"
+
+# SLO Signature Validation (optional, default: false)
+PROXY_REQUIRE_SIGNED_LOGOUT_REQUESTS: "false"  # Global setting
+PROXY_ALLOWED_SP_0_REQUIRE_SIGNED_LOGOUT_REQUESTS: "false"  # Per-SP setting
 ```
 
 ### Keycloak Configuration

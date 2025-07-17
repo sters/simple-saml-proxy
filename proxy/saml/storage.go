@@ -41,6 +41,9 @@ type Storage struct {
 	spCache     map[string]*serviceprovider.ServiceProvider
 	spCacheLock sync.RWMutex
 
+	// Cache for SP certificates
+	spCertCache *SPCertificateCache
+
 	// Cache for auth requests
 	authRequests     map[string]*AuthRequest
 	authRequestsLock sync.RWMutex
@@ -70,6 +73,7 @@ func NewStorage(cfg config.Config) (*Storage, error) {
 		config:          cfg,
 		cert:            cert,
 		spCache:         make(map[string]*serviceprovider.ServiceProvider),
+		spCertCache:     NewSPCertificateCache(),
 		authRequests:    make(map[string]*AuthRequest),
 		entityIDByAppID: make(map[string]string),
 		logoutContexts:  make(map[string]*LogoutContext),
@@ -426,6 +430,16 @@ func (s *Storage) DeleteLogoutContext(id string) {
 // GetAllowedSPs returns the list of allowed service providers from configuration.
 func (s *Storage) GetAllowedSPs() []config.SPConfig {
 	return s.config.Proxy.AllowedSP
+}
+
+// GetSPCertificateCache returns the SP certificate cache.
+func (s *Storage) GetSPCertificateCache() *SPCertificateCache {
+	return s.spCertCache
+}
+
+// GetConfig returns the configuration.
+func (s *Storage) GetConfig() config.Config {
+	return s.config
 }
 
 // CleanupCompletedAuthRequests removes completed auth requests older than the specified duration.

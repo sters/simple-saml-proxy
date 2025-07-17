@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted (2025-01-17)
 
 ## Context
 
@@ -190,3 +190,30 @@ type SPConfig struct {
 1. Disable signature validation via configuration
 2. No code changes required
 3. Instant restoration of previous behavior
+
+## Implementation Status (2025-07-17)
+
+### Completed
+- ✅ Phase 1: Core signature validation logic and configuration support
+- ✅ Phase 1: Error handling for invalid signatures
+- ✅ Phase 2: HTTP-Redirect binding signature validation (partial - validation logic without SP certificate verification)
+- ✅ Phase 2: HTTP-POST binding XML signature validation
+- ✅ Phase 2: Signature generation functions for proxy-initiated logouts
+- ✅ Phase 4: Unit tests for signature validation
+- ✅ Phase 4: Documentation updates
+
+### Implementation Details
+- Added `RequireSignedLogoutRequests` configuration at both global and per-SP levels
+- Implemented signature validation framework in `proxy_handler_slo.go`
+- Created signature generation utilities in `proxy_handler_logout_idp_selected.go`
+- Implemented XML signature validation for HTTP-POST binding using `russellhaering/goxmldsig`
+- Added comprehensive unit tests for configuration and signature handling
+- Updated SAML specification support documentation
+
+### Remaining Work
+- Phase 3: Enhanced security features (certificate management, algorithm configuration, audit logging)
+- Phase 4: Integration tests with actual IdP/SP implementations
+
+### Known Limitations
+- The current implementation logs warnings but continues processing when SP certificates cannot be retrieved (backward compatibility)
+- SP certificate retrieval depends on metadata availability and proper configuration

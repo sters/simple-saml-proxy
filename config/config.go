@@ -20,22 +20,24 @@ type IDPConfig struct {
 }
 
 type SPConfig struct {
-	EntityID    string `env:"ENTITY_ID"`
-	AcsURL      string `env:"ACS_URL"`
-	MetadataURL string `env:"METADATA_URL"`
+	EntityID                    string `env:"ENTITY_ID"`
+	AcsURL                      string `env:"ACS_URL"`
+	MetadataURL                 string `env:"METADATA_URL"`
+	RequireSignedLogoutRequests bool   `env:"REQUIRE_SIGNED_LOGOUT_REQUESTS" envDefault:"false"`
 }
 
 // Config holds all the configuration parameters for the SAML proxy.
 type Config struct {
 	Proxy struct {
-		EntityID        string     `env:"ENTITY_ID"                 envDefault:"http://localhost:8080"`
-		AcsURL          string     `env:"ACS_URL"                   envDefault:"http://localhost:8080/sso/acs"`
-		MetadataURL     string     `env:"METADATA_URL"              envDefault:"http://localhost:8080/metadata"`
-		SLOURL          string     `env:"SLO_URL"                   envDefault:"http://localhost:8080/slo"`
-		SLSURL          string     `env:"SLS_URL"                   envDefault:"http://localhost:8080/sls"`
-		PrivateKeyPath  string     `env:"PRIVATE_KEY_PATH,required"`
-		CertificatePath string     `env:"CERTIFICATE_PATH,required"`
-		AllowedSP       []SPConfig `envPrefix:"ALLOWED_SP_"`
+		EntityID                    string     `env:"ENTITY_ID"                      envDefault:"http://localhost:8080"`
+		AcsURL                      string     `env:"ACS_URL"                        envDefault:"http://localhost:8080/sso/acs"`
+		MetadataURL                 string     `env:"METADATA_URL"                   envDefault:"http://localhost:8080/metadata"`
+		SLOURL                      string     `env:"SLO_URL"                        envDefault:"http://localhost:8080/slo"`
+		SLSURL                      string     `env:"SLS_URL"                        envDefault:"http://localhost:8080/sls"`
+		PrivateKeyPath              string     `env:"PRIVATE_KEY_PATH,required"`
+		CertificatePath             string     `env:"CERTIFICATE_PATH,required"`
+		RequireSignedLogoutRequests bool       `env:"REQUIRE_SIGNED_LOGOUT_REQUESTS" envDefault:"false"`
+		AllowedSP                   []SPConfig `envPrefix:"ALLOWED_SP_"`
 	} `envPrefix:"PROXY_"`
 
 	// Support for multiple IDP

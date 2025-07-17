@@ -16,7 +16,7 @@ import (
 // - To Service Providers (SPs), it appears as an IdP
 // - To Identity Providers (IdPs), it appears as an SP
 // It allows users to select which IdP they want to use for authentication.
-func SetupHTTPHandlers(idp *saml.IDP, providers *saml.ServiceProviders, _ config.Config) http.Handler {
+func SetupHTTPHandlers(idp *saml.IDP, providers *saml.ServiceProviders, cfg config.Config) http.Handler {
 	mux := http.NewServeMux()
 
 	// Basic endpoints
@@ -61,7 +61,7 @@ func SetupHTTPHandlers(idp *saml.IDP, providers *saml.ServiceProviders, _ config
 	mux.Handle("/callback", idp.IDP.HttpHandler())
 
 	// Single Logout endpoints
-	mux.HandleFunc("/slo", handleSLO(idp, providers))
+	mux.HandleFunc("/slo", handleSLO(idp, providers, cfg))
 	mux.HandleFunc("/sls", handleSLS(idp, providers))
 	mux.HandleFunc("/slo/response", handleSLOResponse(idp, providers))
 

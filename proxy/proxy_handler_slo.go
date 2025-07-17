@@ -3,6 +3,10 @@ package proxy
 import (
 	"bytes"
 	"compress/flate"
+	"context"
+	"crypto"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/xml"
 	"errors"
@@ -10,9 +14,13 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 
 	crewjamsaml "github.com/crewjam/saml"
+	dsig "github.com/russellhaering/goxmldsig"
+	"github.com/russellhaering/goxmldsig/etreeutils"
+	"github.com/sters/simple-saml-proxy/config"
 	"github.com/sters/simple-saml-proxy/proxy/saml"
 )
 
@@ -20,19 +28,48 @@ var (
 	errLogoutRequestMissingIssuer      = errors.New("logout request missing issuer")
 	errLogoutRequestIssueInstantFuture = errors.New("logout request issue instant is in the future")
 	errLogoutRequestTooOld             = errors.New("logout request is too old")
+	errLogoutRequestSignatureRequired  = errors.New("logout request signature is required but not present")
+	errIDPNotAvailable                 = errors.New("IDP not available")
+	errCertNotRSA                      = errors.New("certificate does not contain an RSA public key")
+	errUnsupportedSigAlgorithm         = errors.New("unsupported signature algorithm")
 )
 
 // handleSLO handles Single Logout requests initiated by Service Providers.
 // Flow: SP → Proxy → Upstream IdP.
-func handleSLO(idp *saml.IDP, _ *saml.ServiceProviders) http.HandlerFunc {
+func handleSLO(idp *saml.IDP, _ *saml.ServiceProviders, cfg config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		slog.Info("Received SLO request from SP",
 			slog.String("method", r.Method),
 			slog.String("url", r.URL.String()),
 		)
 
-		// Get the SAMLRequest parameter
-		samlRequestParam := r.URL.Query().Get("SAMLRequest")
+		var samlRequestParam string
+		var relayState string
+
+		// Handle different bindings based on HTTP method
+		switch r.Method {
+		case http.MethodGet:
+			// HTTP-Redirect binding
+			samlRequestParam = r.URL.Query().Get("SAMLRequest")
+			relayState = r.URL.Query().Get("RelayState")
+		case http.MethodPost:
+			// HTTP-POST binding
+			// Parse form data
+			if err := r.ParseForm(); err != nil {
+				slog.Error("Failed to parse form data", slog.String("error", err.Error()))
+				http.Error(w, "Invalid form data", http.StatusBadRequest)
+
+				return
+			}
+			samlRequestParam = r.FormValue("SAMLRequest")
+			relayState = r.FormValue("RelayState")
+		default:
+			slog.Error("Unsupported HTTP method for SLO", slog.String("method", r.Method))
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+
+			return
+		}
+
 		if samlRequestParam == "" {
 			slog.Error("No SAMLRequest parameter in logout request")
 			http.Error(w, "Missing SAMLRequest parameter", http.StatusBadRequest)
@@ -62,14 +99,18 @@ func handleSLO(idp *saml.IDP, _ *saml.ServiceProviders) http.HandlerFunc {
 			return
 		}
 
-		// Signature validation not implemented yet (tracked in issue #27)
-		// For now, we accept unsigned logout requests (common with HTTP-Redirect binding)
-		if logoutRequest.Signature != nil {
-			slog.Warn("Logout request signature validation not implemented",
+		// Validate signature if configured
+		requireSignature := determineSignatureRequirement(cfg, logoutRequest.Issuer.Value)
+		if err := validateLogoutRequestSignature(logoutRequest, idp, logoutRequest.Issuer.Value, r.URL.RawQuery, requireSignature); err != nil {
+			slog.Error("Logout request signature validation failed",
 				slog.String("issuer", logoutRequest.Issuer.Value),
+				slog.String("error", err.Error()),
 			)
+			http.Error(w, "Invalid logout request signature", http.StatusBadRequest)
+
+			return
 		}
-		_ = sp // Mark as used for future signature validation
+		_ = sp // Mark as used for future enhanced validation
 
 		// Check for replay attack - verify IssueInstant is recent
 		if err := validateIssueInstant(logoutRequest.IssueInstant); err != nil {
@@ -82,14 +123,12 @@ func handleSLO(idp *saml.IDP, _ *saml.ServiceProviders) http.HandlerFunc {
 			return
 		}
 
-		// Get relay state if present
-		relayState := r.URL.Query().Get("RelayState")
-
 		slog.Info("Parsed logout request",
 			slog.String("issuer", logoutRequest.Issuer.Value),
 			slog.String("nameID", getNameIDValue(logoutRequest)),
 			slog.String("sessionIndex", getSessionIndex(logoutRequest)),
 			slog.String("relayState", relayState),
+			slog.String("binding", getBindingType(r)),
 		)
 
 		// Create a logout context to track this logout flow
@@ -217,4 +256,238 @@ func validateIssueInstant(issueInstant time.Time) error {
 	}
 
 	return nil
+}
+
+// validateLogoutRequestSignature validates the signature of a logout request.
+// For HTTP-Redirect binding, it validates query parameter signatures.
+// For HTTP-POST binding, it validates embedded signatures.
+func validateLogoutRequestSignature(
+	logoutRequest *crewjamsaml.LogoutRequest,
+	idp *saml.IDP,
+	spEntityID string,
+	rawQuery string,
+	requireSignature bool,
+) error {
+	// Check if signature is required but not present
+	if requireSignature && logoutRequest.Signature == nil && rawQuery == "" {
+		return errLogoutRequestSignatureRequired
+	}
+
+	// No signature to validate
+	if logoutRequest.Signature == nil && rawQuery == "" {
+		return nil
+	}
+
+	// For HTTP-Redirect binding with query parameters
+	if logoutRequest.Signature == nil && rawQuery != "" {
+		return validateRedirectSignature(rawQuery, idp, spEntityID)
+	}
+
+	// For HTTP-POST binding with embedded signature
+	if logoutRequest.Signature != nil {
+		return validateEmbeddedSignature(logoutRequest, idp, spEntityID)
+	}
+
+	return nil
+}
+
+// validateRedirectSignature validates signatures passed as query parameters in HTTP-Redirect binding.
+func validateRedirectSignature(rawQuery string, idp *saml.IDP, spEntityID string) error {
+	// Parse query parameters
+	params, err := url.ParseQuery(rawQuery)
+	if err != nil {
+		return fmt.Errorf("failed to parse query parameters: %w", err)
+	}
+
+	// Get required parameters
+	samlRequest := params.Get("SAMLRequest")
+	relayState := params.Get("RelayState")
+	sigAlg := params.Get("SigAlg")
+	signature := params.Get("Signature")
+
+	if signature == "" || sigAlg == "" {
+		return nil // No signature present
+	}
+
+	// Reconstruct the signed data according to SAML spec
+	// The signed string must use the exact query parameter values as received
+	var signedData string
+	if relayState != "" {
+		signedData = fmt.Sprintf("SAMLRequest=%s&RelayState=%s&SigAlg=%s",
+			samlRequest, relayState, sigAlg)
+	} else {
+		signedData = fmt.Sprintf("SAMLRequest=%s&SigAlg=%s",
+			samlRequest, sigAlg)
+	}
+
+	// Decode the signature
+	signatureBytes, err := base64.StdEncoding.DecodeString(signature)
+	if err != nil {
+		return fmt.Errorf("failed to decode signature: %w", err)
+	}
+
+	// Get SP certificate
+	cert, err := getSPSigningCertificate(idp, spEntityID)
+	if err != nil {
+		// Log warning but continue for now (backward compatibility)
+		slog.Warn("Failed to get SP signing certificate",
+			slog.String("sp", spEntityID),
+			slog.String("error", err.Error()))
+
+		return nil
+	}
+
+	// Verify the signature
+	if err := verifyRedirectSignature([]byte(signedData), signatureBytes, cert, sigAlg); err != nil {
+		return fmt.Errorf("signature verification failed: %w", err)
+	}
+
+	slog.Info("Successfully validated HTTP-Redirect signature",
+		slog.String("sp", spEntityID),
+		slog.String("sigAlg", sigAlg))
+
+	return nil
+}
+
+// validateEmbeddedSignature validates signatures embedded in the logout request (HTTP-POST binding).
+func validateEmbeddedSignature(logoutRequest *crewjamsaml.LogoutRequest, idp *saml.IDP, spEntityID string) error {
+	// Check if signature element exists
+	if logoutRequest.Signature == nil {
+		return nil
+	}
+
+	// Get the logout request as an etree element
+	requestElement := logoutRequest.Element()
+	if requestElement == nil {
+		return errors.New("failed to get logout request element")
+	}
+
+	// Get SP certificate for signature validation
+	cert, err := getSPSigningCertificate(idp, spEntityID)
+	if err != nil {
+		// Log warning but continue for backward compatibility
+		slog.Warn("Failed to get SP signing certificate for embedded signature validation",
+			slog.String("sp", spEntityID),
+			slog.String("error", err.Error()))
+
+		return nil
+	}
+
+	// Create certificate store with the SP's certificate
+	certificateStore := dsig.MemoryX509CertificateStore{
+		Roots: []*x509.Certificate{cert},
+	}
+
+	// Create validation context
+	validationContext := dsig.NewDefaultValidationContext(&certificateStore)
+	validationContext.IdAttribute = "ID"
+	if crewjamsaml.Clock != nil {
+		validationContext.Clock = crewjamsaml.Clock
+	}
+
+	// Build parent context for proper namespace handling
+	ctx, err := etreeutils.NSBuildParentContext(requestElement)
+	if err != nil {
+		return fmt.Errorf("failed to build parent context: %w", err)
+	}
+
+	// Build sub-context for the element
+	ctx, err = ctx.SubContext(requestElement)
+	if err != nil {
+		return fmt.Errorf("failed to build sub-context: %w", err)
+	}
+
+	// Detach the element with proper namespace handling
+	detachedElement, err := etreeutils.NSDetatch(ctx, requestElement)
+	if err != nil {
+		return fmt.Errorf("failed to detach element: %w", err)
+	}
+
+	// Validate the signature
+	if _, err := validationContext.Validate(detachedElement); err != nil {
+		return fmt.Errorf("signature verification failed: %w", err)
+	}
+
+	slog.Info("Successfully validated embedded XML signature",
+		slog.String("sp", spEntityID))
+
+	return nil
+}
+
+// determineSignatureRequirement checks if signature validation is required for a specific SP.
+// SP-specific settings override global settings.
+func determineSignatureRequirement(cfg config.Config, spEntityID string) bool {
+	// Check for SP-specific configuration
+	for _, sp := range cfg.Proxy.AllowedSP {
+		if sp.EntityID == spEntityID {
+			return sp.RequireSignedLogoutRequests
+		}
+	}
+
+	// Fall back to global configuration
+	return cfg.Proxy.RequireSignedLogoutRequests
+}
+
+// getSPSigningCertificate retrieves the signing certificate for a specific SP.
+func getSPSigningCertificate(idp *saml.IDP, spEntityID string) (*x509.Certificate, error) {
+	if idp == nil {
+		return nil, errIDPNotAvailable
+	}
+
+	storage := idp.GetStorage()
+	if storage == nil {
+		return nil, errors.New("storage not available")
+	}
+
+	// Get the certificate from metadata using the cache
+	cache := storage.GetSPCertificateCache()
+	cert, err := saml.GetSPSigningCertificateFromMetadata(context.Background(), storage.GetConfig(), spEntityID, cache)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get SP signing certificate: %w", err)
+	}
+
+	return cert, nil
+}
+
+// verifyRedirectSignature verifies the signature of HTTP-Redirect binding data.
+func verifyRedirectSignature(data []byte, signature []byte, cert *x509.Certificate, sigAlg string) error {
+	// Get the public key from the certificate
+	publicKey, ok := cert.PublicKey.(*rsa.PublicKey)
+	if !ok {
+		return errCertNotRSA
+	}
+
+	// Determine hash algorithm
+	var hashFunc crypto.Hash
+	switch sigAlg {
+	case sigAlgSHA1:
+		hashFunc = crypto.SHA1
+		slog.Warn("SHA1 signature algorithm is deprecated")
+	case sigAlgSHA256:
+		hashFunc = crypto.SHA256
+	default:
+		return fmt.Errorf("%w: %s", errUnsupportedSigAlgorithm, sigAlg)
+	}
+
+	// Hash the data
+	h := hashFunc.New()
+	h.Write(data)
+	digest := h.Sum(nil)
+
+	// Verify the signature
+	err := rsa.VerifyPKCS1v15(publicKey, hashFunc, digest, signature)
+	if err != nil {
+		return fmt.Errorf("signature verification failed: %w", err)
+	}
+
+	return nil
+}
+
+// getBindingType determines the SAML binding type based on the HTTP request.
+func getBindingType(r *http.Request) string {
+	if r.Method == http.MethodPost {
+		return "HTTP-POST"
+	}
+
+	return "HTTP-Redirect"
 }
