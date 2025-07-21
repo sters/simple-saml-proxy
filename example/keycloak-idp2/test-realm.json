@@ -1,0 +1,113 @@
+{
+  "realm": "test2",
+  "enabled": true,
+  "displayName": "Test IdP2 Realm (Enterprise)",
+  "accessTokenLifespan": 3600,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "attributes": {
+    "saml.issuer": "http://localhost:8083/realms/test2"
+  },
+  "users": [
+    {
+      "username": "enterpriseuser",
+      "enabled": true,
+      "email": "enterpriseuser@company.com",
+      "firstName": "Enterprise",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "enterprisepassword",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "testuser",
+      "enabled": true,
+      "email": "testuser@company.com",
+      "firstName": "Test",
+      "lastName": "User (IDP2)",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "testpassword",
+          "temporary": false
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "http://localhost:8082/saml/metadata",
+      "name": "SAML Proxy Client (crewjam)",
+      "enabled": true,
+      "protocol": "saml",
+      "frontchannelLogout": true,
+      "attributes": {
+        "saml.assertion.signature": "true",
+        "saml.force.post.binding": "true",
+        "saml.multivalued.roles": "false",
+        "saml.encrypt": "false",
+        "saml.server.signature": "true",
+        "saml.signature.algorithm": "RSA_SHA256",
+        "saml.client.signature": "false",
+        "saml.authnstatement": "true",
+        "display.on.consent.screen": "false"
+      },
+      "redirectUris": [
+        "http://localhost:8082/saml/acs"
+      ],
+      "baseUrl": "http://localhost:8082",
+      "adminUrl": "http://localhost:8082"
+    },
+    {
+      "clientId": "http://localhost:8082/metadata",
+      "name": "SAML Proxy Client (zitadel)",
+      "enabled": true,
+      "protocol": "saml",
+      "frontchannelLogout": true,
+      "attributes": {
+        "saml.assertion.signature": "true",
+        "saml.force.post.binding": "true",
+        "saml.multivalued.roles": "false",
+        "saml.encrypt": "false",
+        "saml.server.signature": "true",
+        "saml.signature.algorithm": "RSA_SHA256",
+        "saml.client.signature": "false",
+        "saml.authnstatement": "true",
+        "display.on.consent.screen": "false"
+      },
+      "redirectUris": [
+        "http://localhost:8082/metadata/acs"
+      ],
+      "baseUrl": "http://localhost:8082",
+      "adminUrl": "http://localhost:8082"
+    },
+    {
+      "clientId": "http://localhost:8082",
+      "name": "SAML Proxy Client (base)",
+      "enabled": true,
+      "protocol": "saml",
+      "frontchannelLogout": true,
+      "attributes": {
+        "saml.assertion.signature": "true",
+        "saml.force.post.binding": "true",
+        "saml.multivalued.roles": "false",
+        "saml.encrypt": "false",
+        "saml.server.signature": "true",
+        "saml.signature.algorithm": "RSA_SHA256",
+        "saml.client.signature": "false",
+        "saml.authnstatement": "true",
+        "display.on.consent.screen": "false"
+      },
+      "redirectUris": [
+        "http://localhost:8082/metadata/acs",
+        "http://localhost:8082/saml/acs"
+      ],
+      "baseUrl": "http://localhost:8082",
+      "adminUrl": "http://localhost:8082"
+    }
+  ]
+}

@@ -4,11 +4,12 @@ This directory contains the integration testing setup for the Simple SAML Proxy 
 
 ## Architecture
 
-The integration testing environment uses a **Keycloak + Keycloak** setup:
+The integration testing environment uses a **Multi-Keycloak** setup to test the proxy's IDP selection functionality:
 
-- **Keycloak IdP** (port 8080): Acts as the Identity Provider with test users
+- **Keycloak IdP** (port 8080): Acts as the first Identity Provider ("Development IdP") with test users
+- **Keycloak IdP2** (port 8083): Acts as the second Identity Provider ("Enterprise IdP") with enterprise users
 - **Keycloak SP** (port 8081): Acts as the Service Provider consuming authentication
-- **Simple SAML Proxy** (port 8082): The proxy being tested, bridges IdP and SP
+- **Simple SAML Proxy** (port 8082): The proxy being tested, bridges multiple IDPs and SP
 
 ## Quick Start
 
@@ -33,11 +34,30 @@ make test       # Run integration tests
 ### Access Points
 
 - **Keycloak IdP Admin**: http://localhost:8080/admin (admin/admin)
+- **Keycloak IdP2 Admin**: http://localhost:8083/admin (admin/admin)
 - **Keycloak SP Admin**: http://localhost:8081/admin (admin/admin)
 - **SAML Proxy**: http://localhost:8082
-- **Test User**: testuser/testpassword
+
+### Test Users
+
+#### Development IdP (port 8080)
+- **testuser/testpassword** - Standard test user
+
+#### Enterprise IdP (port 8083)
+- **enterpriseuser/enterprisepassword** - Enterprise user
+- **testuser/testpassword** - Test user (IDP2 variant)
 
 ## Testing
+
+### IDP Selection Screen Testing
+
+With the multi-IDP setup, you can now test the proxy's IDP selection functionality:
+
+1. **Start the environment**: `make dev-setup`
+2. **Access Keycloak SP**: http://localhost:8081
+3. **Initiate SAML login** through the SP's SAML broker
+4. **Observe IDP selection screen** at the proxy (should show "Development IdP" and "Enterprise IdP")
+5. **Test different IDPs** by selecting each option and logging in with respective users
 
 ### End-to-End Tests (Playwright)
 
@@ -119,9 +139,14 @@ PROXY_ENTITY_ID: "http://localhost:8082/metadata"
 PROXY_ACS_URL: "http://localhost:8082/acs"
 PROXY_SSO_URL: "http://localhost:8082/sso"
 
-# IdP configuration
+# IdP configuration (Multiple IDPs)
 IDP_0_ID: "keycloak-idp"
+IDP_0_NAME: "Development IdP"
 IDP_0_METADATA_URL: "http://keycloak-idp:8080/realms/test/protocol/saml/descriptor"
+
+IDP_1_ID: "keycloak-idp2"
+IDP_1_NAME: "Enterprise IdP"
+IDP_1_METADATA_URL: "http://keycloak-idp2:8083/realms/test2/protocol/saml/descriptor"
 
 # SP configuration
 PROXY_ALLOWED_SP_0_ENTITY_ID: "http://keycloak-sp:8080/realms/test"

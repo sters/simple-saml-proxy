@@ -66,6 +66,9 @@ logs-proxy: ## Show logs from SAML proxy only
 logs-idp: ## Show logs from Keycloak IdP only
 	@docker-compose logs -f keycloak-idp
 
+logs-idp2: ## Show logs from Keycloak IdP2 only
+	@docker-compose logs -f keycloak-idp2
+
 logs-sp: ## Show logs from Keycloak SP only
 	@docker-compose logs -f keycloak-sp
 
@@ -74,6 +77,9 @@ shell-proxy: ## Get shell access to SAML proxy container
 
 shell-idp: ## Get shell access to Keycloak IdP container
 	@docker-compose exec keycloak-idp bash
+
+shell-idp2: ## Get shell access to Keycloak IdP2 container
+	@docker-compose exec keycloak-idp2 bash
 
 shell-sp: ## Get shell access to Keycloak SP container
 	@docker-compose exec keycloak-sp bash

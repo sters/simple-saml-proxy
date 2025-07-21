@@ -41,6 +41,25 @@ services:
     volumes:
       - ./keycloak-idp:/opt/keycloak/data/import
 
+  # Keycloak as second Identity Provider
+  keycloak-idp2:
+    <<: *keycloak-common
+    container_name: keycloak-idp2
+    environment:
+      <<: *keycloak-env
+      KC_HOSTNAME_URL: "http://localhost:8083"
+      KC_HTTP_PORT: 8083
+    ports:
+      - "8083:8083"
+    volumes:
+      - ./keycloak-idp2:/opt/keycloak/data/import
+    command:
+      - start-dev
+      - --import-realm
+      - --hostname-strict=false
+      - --hostname-strict-https=false
+      - --http-port=8083
+
   # Keycloak as Service Provider  
   keycloak-sp:
     <<: *keycloak-common
@@ -77,9 +96,15 @@ services:
       
       # Identity Provider configuration (Keycloak IdP)
       IDP_0_ID: "keycloak-idp"
-      IDP_0_NAME: "Keycloak IdP"
+      IDP_0_NAME: "Development IdP"
       IDP_0_METADATA_URL: "http://keycloak-idp:8080/realms/test/protocol/saml/descriptor"
       IDP_0_SSO_URL: "http://keycloak-idp:8080/realms/test/protocol/saml"
+      
+      # Second Identity Provider configuration (Keycloak IdP2)
+      IDP_1_ID: "keycloak-idp2"
+      IDP_1_NAME: "Enterprise IdP"
+      IDP_1_METADATA_URL: "http://keycloak-idp2:8083/realms/test2/protocol/saml/descriptor"
+      IDP_1_SSO_URL: "http://keycloak-idp2:8083/realms/test2/protocol/saml"
       
       # Allowed Service Providers (Keycloak SP)
       PROXY_ALLOWED_SP_0_ENTITY_ID: "http://localhost:8081/realms/sp-realm"
@@ -104,6 +129,7 @@ services:
       - saml-network
     depends_on:
       - keycloak-idp
+      - keycloak-idp2
       - keycloak-sp
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/metadata"]
