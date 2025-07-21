@@ -90,15 +90,13 @@ func TestGetSPSigningCertificateIntegration(t *testing.T) {
 	}
 
 	// Create test certificates and keys
-	// Use the project's test certificates
-	certPath := filepath.Join("..", "e2e", "proxy.crt")
-	keyPath := filepath.Join("..", "e2e", "proxy.key")
-
-	// Verify files exist
-	_, err = os.Stat(certPath)
-	require.NoError(t, err, "Test certificate file not found")
-	_, err = os.Stat(keyPath)
-	require.NoError(t, err, "Test key file not found")
+	// Generate temporary test certificates instead of using e2e certificates
+	certPath, keyPath := saml.GenerateTestCertificate(t)
+	defer func() {
+		if certPath != "" {
+			_ = os.RemoveAll(filepath.Dir(certPath))
+		}
+	}()
 
 	cfg.Proxy.CertificatePath = certPath
 	cfg.Proxy.PrivateKeyPath = keyPath
