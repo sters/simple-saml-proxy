@@ -739,7 +739,7 @@ func TestE2EFlowErrorHandling_InvalidSAMLRequest(t *testing.T) {
 	defer mockIdp.Close()
 
 	// Send malformed SAML request
-	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL+"/sso?SAMLRequest=malformed", nil)
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL+"/metadata/sso?SAMLRequest=malformed", nil)
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()

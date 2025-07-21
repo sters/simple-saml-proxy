@@ -495,8 +495,8 @@ func (c *MockSAMLClient) InitiateLogin(ctx context.Context, proxyURL string) (*h
 		return nil, fmt.Errorf("failed to encode SAML request: %w", err)
 	}
 
-	// Build URL
-	ssoURL := fmt.Sprintf("%s/sso?SAMLRequest=%s&RelayState=test-state", proxyURL, url.QueryEscape(encoded))
+	// Build URL - use the correct SSO endpoint path
+	ssoURL := fmt.Sprintf("%s/metadata/sso?SAMLRequest=%s&RelayState=test-state", proxyURL, url.QueryEscape(encoded))
 
 	// Make request
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ssoURL, nil)

@@ -497,13 +497,13 @@ func TestLoggingAndMonitoring(t *testing.T) {
 
 	t.Run("Error logging on invalid requests", func(t *testing.T) {
 		// Test invalid SSO request
-		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, proxyServer.URL+"/sso", nil)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, proxyServer.URL+"/metadata/sso", nil)
 		require.NoError(t, err)
 		resp, err := http.DefaultClient.Do(req)
 		require.NoError(t, err)
 		defer resp.Body.Close()
 
-		// The zitadel/saml library returns 200 with an error page for invalid requests
+		// The zitadel/saml library returns 200 with an error message for requests without SAMLRequest
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 
 		// Test invalid ACS request to the proxy's ACS endpoint

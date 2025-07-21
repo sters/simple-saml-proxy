@@ -82,7 +82,7 @@ func TestLogoutResponseHandling(t *testing.T) {
 		encoded := encodeLogoutResponse(t, logoutResponse)
 
 		// Create request with logout context cookie
-		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, proxyServer.URL+"/sls?SAMLResponse="+encoded, nil)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, proxyServer.URL+"/slo/response?SAMLResponse="+encoded+"&RelayState=test_relay", nil)
 		require.NoError(t, err)
 		req.AddCookie(&http.Cookie{
 			Name:  "logout_context_id",

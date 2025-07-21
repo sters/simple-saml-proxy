@@ -22,6 +22,10 @@ var (
 	ErrNoSigningCertificate = errors.New("no signing certificate found in metadata")
 	// ErrInvalidCertificate indicates the certificate data is malformed.
 	ErrInvalidCertificate = errors.New("invalid certificate data")
+	// ErrSPNotInAllowedList indicates the SP is not in the allowed list.
+	ErrSPNotInAllowedList = errors.New("SP not found in allowed list")
+	// ErrNoMetadataURL indicates no metadata URL configured for SP.
+	ErrNoMetadataURL = errors.New("no metadata URL configured for SP")
 )
 
 // SPCertificateCache caches SP signing certificates to avoid repeated metadata fetches.
@@ -73,12 +77,12 @@ func GetSPSigningCertificateFromMetadata(ctx context.Context, cfg config.Config,
 	}
 
 	if spConfig == nil {
-		return nil, fmt.Errorf("SP not found in allowed list: %s", spEntityID)
+		return nil, fmt.Errorf("%w: %s", ErrSPNotInAllowedList, spEntityID)
 	}
 
 	// If no metadata URL is configured, we can't fetch the certificate
 	if spConfig.MetadataURL == "" {
-		return nil, fmt.Errorf("no metadata URL configured for SP: %s", spEntityID)
+		return nil, fmt.Errorf("%w: %s", ErrNoMetadataURL, spEntityID)
 	}
 
 	// Fetch and parse the metadata

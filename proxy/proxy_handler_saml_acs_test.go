@@ -96,7 +96,9 @@ func TestHandleSAMLACS(t *testing.T) {
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		// Now the handler creates a minimal auth request when not found,
+		// so it continues processing and fails at the missing IDP ID cookie
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Contains(t, w.Body.String(), "Invalid request")
 	})
 
