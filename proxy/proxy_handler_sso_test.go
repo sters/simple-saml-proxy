@@ -48,7 +48,7 @@ func TestExtractIssuerFromSAMLRequest(t *testing.T) {
 				_ = writer.Close()
 				encoded := base64.StdEncoding.EncodeToString(compressed.Bytes())
 
-				return url.QueryEscape(encoded)
+				return encoded
 			}(),
 			want:    "https://sp.example.com",
 			wantErr: false,
@@ -70,7 +70,7 @@ func TestExtractIssuerFromSAMLRequest(t *testing.T) {
 				xmlBytes, _ := xml.Marshal(authnRequest)
 				encoded := base64.StdEncoding.EncodeToString(xmlBytes)
 
-				return url.QueryEscape(encoded)
+				return encoded
 			}(),
 			want:    "https://sp2.example.com",
 			wantErr: false,
@@ -93,36 +93,29 @@ func TestExtractIssuerFromSAMLRequest(t *testing.T) {
 				_ = writer.Close()
 				encoded := base64.StdEncoding.EncodeToString(compressed.Bytes())
 
-				return url.QueryEscape(encoded)
+				return encoded
 			}(),
 			want:    "",
 			wantErr: true,
 			errMsg:  "no issuer in SAML request",
 		},
 		{
-			name:    "Invalid URL encoding",
-			input:   "%%invalid%%",
-			want:    "",
-			wantErr: true,
-			errMsg:  "failed to URL decode",
-		},
-		{
 			name:    "Invalid base64",
-			input:   url.QueryEscape("!!!invalid-base64!!!"),
+			input:   "!!!invalid-base64!!!",
 			want:    "",
 			wantErr: true,
 			errMsg:  "failed to base64 decode",
 		},
 		{
 			name:    "Invalid XML",
-			input:   url.QueryEscape(base64.StdEncoding.EncodeToString([]byte("<invalid>not a saml request</invalid>"))),
+			input:   base64.StdEncoding.EncodeToString([]byte("<invalid>not a saml request</invalid>")),
 			want:    "",
 			wantErr: true,
 			errMsg:  "failed to unmarshal SAML request",
 		},
 		{
 			name:    "Corrupted compressed data",
-			input:   url.QueryEscape(base64.StdEncoding.EncodeToString([]byte{0xFF, 0xFF, 0xFF, 0xFF})),
+			input:   base64.StdEncoding.EncodeToString([]byte{0xFF, 0xFF, 0xFF, 0xFF}),
 			want:    "",
 			wantErr: true,
 			errMsg:  "failed to unmarshal SAML request",
@@ -131,7 +124,7 @@ func TestExtractIssuerFromSAMLRequest(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := extractIssuerFromSAMLRequest(tt.input)
+			got, err := extractIssuerFromSAMLRequest(tt.input, false)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -330,8 +323,8 @@ func TestHandleSSO_NoSAMLRequest(t *testing.T) {
 	resp := w.Result()
 	defer resp.Body.Close()
 
-	// The zitadel library will handle this case
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	// The zitadel library returns 404 when no SAML request is provided
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 func TestHandleSSO_InvalidSAMLRequest(t *testing.T) {

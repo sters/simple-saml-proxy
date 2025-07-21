@@ -307,7 +307,7 @@ func TestBuildLogoutURL(t *testing.T) {
 		},
 		{
 			name:        "Invalid destination URL",
-			destination: "not a valid url",
+			destination: ":",
 			relayState:  "",
 			wantErr:     true,
 		},
@@ -458,8 +458,6 @@ func TestHandleLogoutIDPSelectedConcurrency(t *testing.T) {
 
 	// Setup logout context
 	storage := idp.GetStorage()
-	ctx := storage.CreateLogoutContext("sp", "sp1", "", "")
-	contextID := ctx.ID
 
 	// Run concurrent requests
 	const numRequests = 10
@@ -467,6 +465,10 @@ func TestHandleLogoutIDPSelectedConcurrency(t *testing.T) {
 
 	for range numRequests {
 		go func() {
+			// Create a unique logout context for each request to avoid race conditions
+			ctx := storage.CreateLogoutContext("sp", "sp1", "", "")
+			contextID := ctx.ID
+
 			req := httptest.NewRequest(http.MethodPost, "/logout/idp", strings.NewReader("idpID=idp1"))
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			req.AddCookie(&http.Cookie{

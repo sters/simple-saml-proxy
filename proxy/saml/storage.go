@@ -58,8 +58,9 @@ type Storage struct {
 
 // SingleLogoutService represents a parsed SingleLogoutService endpoint from SP metadata.
 type SingleLogoutService struct {
-	Binding  string
-	Location string
+	Binding          string
+	Location         string
+	ResponseLocation string // Optional response location (if different from Location)
 }
 
 // NewStorage creates a new Storage.
@@ -515,8 +516,9 @@ func extractSingleLogoutService(sp *serviceprovider.ServiceProvider) (*SingleLog
 		for _, sls := range sp.Metadata.SPSSODescriptor.SingleLogoutService {
 			if sls.Binding == binding {
 				return &SingleLogoutService{
-					Binding:  sls.Binding,
-					Location: sls.Location,
+					Binding:          sls.Binding,
+					Location:         sls.Location,
+					ResponseLocation: sls.ResponseLocation,
 				}, nil
 			}
 		}

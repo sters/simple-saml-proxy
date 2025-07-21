@@ -3,6 +3,7 @@ package proxy
 import (
 	"bytes"
 	"compress/flate"
+	"context"
 	"encoding/base64"
 	"encoding/xml"
 	"errors"
@@ -100,13 +101,11 @@ func handleSLOResponse(idp *saml.IDP, _ *saml.ServiceProviders) http.HandlerFunc
 			Status: logoutResponse.Status, // Pass through the status from SP
 		}
 
-		// For IdP-initiated flow, we need to send response back to the originating IdP
-		// The response URL should be in the IdP's metadata
-		// For now, we'll use a standard pattern
-		idpResponseURL := logoutCtx.OriginID + "/slo/response"
+		// Determine where to send the response based on the logout flow type
+		responseURL := getLogoutResponseURL(r.Context(), storage, logoutCtx)
 
 		// Build the logout response URL
-		responseURL, err := buildLogoutResponseURL(finalResponse, idpResponseURL, logoutCtx.RelayState)
+		redirectURL, err := buildLogoutResponseURL(finalResponse, responseURL, logoutCtx.RelayState)
 		if err != nil {
 			slog.Error("Failed to build logout response URL", slog.String("error", err.Error()))
 			http.Error(w, "Failed to create logout response", http.StatusInternalServerError)
@@ -138,8 +137,8 @@ func handleSLOResponse(idp *saml.IDP, _ *saml.ServiceProviders) http.HandlerFunc
 		})
 
 		// Redirect to IdP with logout response
-		slog.Info("Redirecting to IdP with logout response", slog.String("url", responseURL))
-		http.Redirect(w, r, responseURL, http.StatusFound)
+		slog.Info("Redirecting to IdP with logout response", slog.String("url", redirectURL))
+		http.Redirect(w, r, redirectURL, http.StatusFound)
 	}
 }
 
@@ -243,4 +242,31 @@ func validateResponseIssueInstant(issueInstant time.Time) error {
 	}
 
 	return nil
+}
+
+// getLogoutResponseURL determines the appropriate URL to send logout response to.
+func getLogoutResponseURL(ctx context.Context, storage *saml.Storage, logoutCtx *saml.LogoutContext) string {
+	if logoutCtx.OriginType != "sp" {
+		// IdP-initiated flow: send response back to the IdP
+		// For now, we'll use a standard pattern
+		return logoutCtx.OriginID + "/slo/response"
+	}
+
+	// SP-initiated flow: send response back to the SP
+	// Try to get the SingleLogoutService from SP metadata
+	sls, err := storage.GetSingleLogoutServiceFromSP(ctx, logoutCtx.OriginID)
+	if err != nil {
+		slog.Warn("Failed to extract SingleLogoutService from SP metadata, using fallback",
+			slog.String("entityID", logoutCtx.OriginID),
+			slog.String("error", err.Error()))
+		// Fallback to standard pattern
+		return logoutCtx.OriginID + "/logout/response"
+	}
+
+	// Use ResponseLocation if available, otherwise use Location
+	if sls.ResponseLocation != "" {
+		return sls.ResponseLocation
+	}
+
+	return sls.Location
 }

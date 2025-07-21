@@ -11,7 +11,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"net/url"
 
 	crewjamsaml "github.com/crewjam/saml"
 	"github.com/sters/simple-saml-proxy/proxy/saml"
@@ -25,8 +24,20 @@ func handleSSO(idp *saml.IDP) http.HandlerFunc {
 	originalHandler := idp.IDP.HttpHandler()
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Only validate for SAML requests
-		samlRequestParam := r.URL.Query().Get("SAMLRequest")
+		// Get SAMLRequest from either query params (GET) or form body (POST)
+		var samlRequestParam string
+		if r.Method == http.MethodGet {
+			samlRequestParam = r.URL.Query().Get("SAMLRequest")
+		} else if r.Method == http.MethodPost {
+			if err := r.ParseForm(); err != nil {
+				slog.Error("Failed to parse form", slog.String("error", err.Error()))
+				http.Error(w, "Bad Request", http.StatusBadRequest)
+
+				return
+			}
+			samlRequestParam = r.FormValue("SAMLRequest")
+		}
+
 		if samlRequestParam == "" {
 			// No SAML request, let the original handler deal with it
 			originalHandler.ServeHTTP(w, r)
@@ -35,11 +46,13 @@ func handleSSO(idp *saml.IDP) http.HandlerFunc {
 		}
 
 		// Decode and parse the SAML request to get the issuer
-		issuerEntityID, err := extractIssuerFromSAMLRequest(samlRequestParam)
+		// For POST binding, the request is not deflated
+		isPostBinding := r.Method == http.MethodPost
+		issuerEntityID, err := extractIssuerFromSAMLRequest(samlRequestParam, isPostBinding)
 		if err != nil {
 			slog.Error("Failed to extract issuer from SAML request", slog.String("error", err.Error()))
-			// Let the original handler deal with the error
-			originalHandler.ServeHTTP(w, r)
+			// Return SAML error response for invalid request
+			respondWithSAMLError(w, r, idp, "", "RequestDenied", "Invalid SAML request")
 
 			return
 		}
@@ -65,29 +78,38 @@ func handleSSO(idp *saml.IDP) http.HandlerFunc {
 }
 
 // extractIssuerFromSAMLRequest decodes a SAML request and extracts the issuer entity ID.
-func extractIssuerFromSAMLRequest(samlRequestParam string) (string, error) {
-	// URL decode
-	decoded, err := url.QueryUnescape(samlRequestParam)
-	if err != nil {
-		return "", fmt.Errorf("failed to URL decode SAML request: %w", err)
-	}
+func extractIssuerFromSAMLRequest(samlRequestParam string, isPostBinding bool) (string, error) {
+	var xmlData []byte
 
-	// Base64 decode
-	compressed, err := base64.StdEncoding.DecodeString(decoded)
-	if err != nil {
-		return "", fmt.Errorf("failed to base64 decode SAML request: %w", err)
-	}
+	if isPostBinding {
+		// For POST binding, the request is base64 encoded but not URL encoded or deflated
+		decoded, err := base64.StdEncoding.DecodeString(samlRequestParam)
+		if err != nil {
+			return "", fmt.Errorf("failed to base64 decode SAML request: %w", err)
+		}
+		xmlData = decoded
+	} else {
+		// For GET binding (HTTP-Redirect), the request is base64 encoded and deflated
+		// The URL decoding has already been done by r.URL.Query().Get()
 
-	// Decompress using flate
-	decompressed, err := decodeDeflatedSAMLRequest(compressed)
-	if err != nil {
-		// Try without decompression in case it's not compressed
-		decompressed = compressed
+		// Base64 decode
+		compressed, err := base64.StdEncoding.DecodeString(samlRequestParam)
+		if err != nil {
+			return "", fmt.Errorf("failed to base64 decode SAML request: %w", err)
+		}
+
+		// Decompress using flate
+		decompressed, err := decodeDeflatedSAMLRequest(compressed)
+		if err != nil {
+			// Try without decompression in case it's not compressed
+			decompressed = compressed
+		}
+		xmlData = decompressed
 	}
 
 	// Parse as AuthnRequest
 	var authnRequest crewjamsaml.AuthnRequest
-	if err := xml.Unmarshal(decompressed, &authnRequest); err != nil {
+	if err := xml.Unmarshal(xmlData, &authnRequest); err != nil {
 		return "", fmt.Errorf("failed to unmarshal SAML request: %w", err)
 	}
 
