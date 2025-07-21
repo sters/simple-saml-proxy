@@ -35,6 +35,7 @@
       "linkOnly": false,
       "firstBrokerLoginFlowAlias": "first broker login",
       "config": {
+        "syncMode": "FORCE",
         "hideOnLoginPage": "false",
         "validateSignature": "false",
         "postBindingResponse": "true",

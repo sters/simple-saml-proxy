@@ -336,6 +336,10 @@ func (s *Storage) processUserAttributes(userinfo models.AttributeSetter, asserti
 	for _, attrStatement := range assertion.AttributeStatements {
 		for _, attr := range attrStatement.Attributes {
 			switch attr.Name {
+			case "username", "Username", "uid", "UID":
+				if len(attr.Values) > 0 {
+					userinfo.SetUsername(attr.Values[0].Value)
+				}
 			case "email", "Email", "mail":
 				if len(attr.Values) > 0 {
 					userinfo.SetEmail(attr.Values[0].Value)
