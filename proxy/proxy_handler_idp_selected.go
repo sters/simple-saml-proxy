@@ -53,13 +53,7 @@ func handleIDPSelected(idp *saml.IDP, providers *saml.ServiceProviders) http.Han
 			return
 		}
 
-		http.SetCookie(w, &http.Cookie{
-			Name:     cookieNameIDPID,
-			Value:    idpID,
-			Path:     "/",
-			HttpOnly: true,
-			Secure:   isSecureCookie(r),
-		})
+		SetSecureCookie(w, r, cookieNameIDPID, idpID, 300)
 
 		slog.Info("IDP found", slog.String("idp", idpID))
 

@@ -1,8 +1,6 @@
 package proxy
 
 import (
-	"bytes"
-	"compress/flate"
 	"context"
 	"crypto"
 	"crypto/rsa"
@@ -11,7 +9,6 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -59,7 +56,7 @@ func handleSLO(idp *saml.IDP, _ *saml.ServiceProviders, cfg config.Config) http.
 			// Parse form data
 			if err := r.ParseForm(); err != nil {
 				slog.Error("Failed to parse form data", slog.String("error", err.Error()))
-				http.Error(w, "Invalid form data", http.StatusBadRequest)
+				respondWithBadRequest(w, ErrInvalidFormData)
 
 				return
 			}
@@ -67,14 +64,14 @@ func handleSLO(idp *saml.IDP, _ *saml.ServiceProviders, cfg config.Config) http.
 			relayState = r.FormValue("RelayState")
 		default:
 			slog.Error("Unsupported HTTP method for SLO", slog.String("method", r.Method))
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			respondWithMethodNotAllowed(w)
 
 			return
 		}
 
 		if samlRequestParam == "" {
 			slog.Error("No SAMLRequest parameter in logout request")
-			http.Error(w, "Missing SAMLRequest parameter", http.StatusBadRequest)
+			respondWithBadRequest(w, ErrMissingSAMLRequest)
 
 			return
 		}
@@ -163,14 +160,7 @@ func handleSLO(idp *saml.IDP, _ *saml.ServiceProviders, cfg config.Config) http.
 		}
 
 		// Store logout request ID in a cookie for later retrieval
-		http.SetCookie(w, &http.Cookie{
-			Name:     "logout_context_id",
-			Value:    logoutCtx.ID,
-			Path:     "/",
-			HttpOnly: true,
-			Secure:   isSecureCookie(r),
-			MaxAge:   300, // 5 minutes
-		})
+		SetSecureCookie(w, r, "logout_context_id", logoutCtx.ID, 300)
 
 		// For now, redirect to IdP selection page
 		// In a production implementation, you might track which IdP was used for login
@@ -187,7 +177,7 @@ func parseLogoutRequest(samlRequestParam string) (*crewjamsaml.LogoutRequest, er
 	}
 
 	// Decompress using flate
-	decompressed, err := decodeDeflatedRequest(compressed)
+	decompressed, err := decodeDeflatedData(compressed)
 	if err != nil {
 		// Try without decompression in case it's not compressed
 		decompressed = compressed
@@ -205,22 +195,6 @@ func parseLogoutRequest(samlRequestParam string) (*crewjamsaml.LogoutRequest, er
 	}
 
 	return &logoutRequest, nil
-}
-
-// decodeDeflatedRequest decodes a deflated SAML request.
-func decodeDeflatedRequest(compressed []byte) ([]byte, error) {
-	reader := flate.NewReader(bytes.NewReader(compressed))
-	defer reader.Close()
-
-	var buf bytes.Buffer
-	// Limit the amount of data we'll read to prevent decompression bombs
-	limited := io.LimitReader(reader, 10*1024*1024) // 10MB limit
-	_, err := io.Copy(&buf, limited)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decompress request: %w", err)
-	}
-
-	return buf.Bytes(), nil
 }
 
 // getNameIDValue extracts the NameID value from a logout request.

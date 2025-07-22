@@ -179,7 +179,7 @@ func TestDecodeDeflatedSAMLRequest(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := decodeDeflatedSAMLRequest(tt.input)
+			got, err := decodeDeflatedData(tt.input)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -208,7 +208,7 @@ func TestDecodeDeflatedSAMLRequest_LargeData(t *testing.T) {
 	require.NoError(t, err)
 
 	// Try to decompress - should read up to the limit
-	result, err := decodeDeflatedSAMLRequest(compressed.Bytes())
+	result, err := decodeDeflatedData(compressed.Bytes())
 	require.NoError(t, err)
 	// Result should be truncated to 10MB
 	assert.LessOrEqual(t, len(result), 10*1024*1024)

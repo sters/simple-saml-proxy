@@ -1,18 +1,16 @@
 package proxy
 
 import (
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/x509/pkix"
-	"math/big"
 	"testing"
 	"time"
 
 	"github.com/beevik/etree"
 	crewjamsaml "github.com/crewjam/saml"
 	dsig "github.com/russellhaering/goxmldsig"
+	"github.com/sters/simple-saml-proxy/proxy/testutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -47,7 +45,7 @@ func TestValidateEmbeddedSignature(t *testing.T) {
 
 	t.Run("IDP not available", func(t *testing.T) {
 		// Create a properly signed request
-		spCert, spKey := generateTestCertificate(t, "SP Test")
+		spCert, spKey := testutil.GenerateTestCertificate(t, "SP Test")
 		logoutRequest := createSignedLogoutRequest(t, spKey, spCert)
 
 		// With nil IDP, getSPSigningCertificate will fail but we'll continue
@@ -61,7 +59,7 @@ func TestValidateEmbeddedSignatureWithValidation(t *testing.T) {
 	// For now, we're testing the basic structure and error handling
 	t.Run("Signature element parsing", func(t *testing.T) {
 		// Create a logout request with signature
-		spCert, spKey := generateTestCertificate(t, "SP Test")
+		spCert, spKey := testutil.GenerateTestCertificate(t, "SP Test")
 		// Create and sign a logout request
 		logoutRequest := &crewjamsaml.LogoutRequest{
 			ID:           "test-logout-request-id",
@@ -149,33 +147,4 @@ func createSignedLogoutRequest(t *testing.T, privateKey *rsa.PrivateKey, cert *x
 	logoutRequest.Signature = signatureEl
 
 	return logoutRequest
-}
-
-func generateTestCertificate(t *testing.T, cn string) (*x509.Certificate, *rsa.PrivateKey) {
-	t.Helper()
-	// Generate RSA key
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	require.NoError(t, err)
-
-	// Create certificate template
-	template := x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			CommonName: cn,
-		},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-	}
-
-	// Create certificate
-	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
-	require.NoError(t, err)
-
-	cert, err := x509.ParseCertificate(certDER)
-	require.NoError(t, err)
-
-	return cert, key
 }

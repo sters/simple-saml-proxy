@@ -7,12 +7,18 @@ import (
 
 // Standard error responses.
 const (
-	ErrInvalidRequest   = "Invalid request"
-	ErrInternalServer   = "Internal server error"
-	ErrInvalidLogout    = "Invalid logout request"
-	ErrUnauthorized     = "Unauthorized"
-	ErrBadRequest       = "Bad request"
-	ErrMethodNotAllowed = "Method not allowed"
+	ErrInvalidRequest              = "Invalid request"
+	ErrInternalServer              = "Internal server error"
+	ErrInvalidLogout               = "Invalid logout request"
+	ErrUnauthorized                = "Unauthorized"
+	ErrBadRequest                  = "Bad request"
+	ErrMethodNotAllowed            = "Method not allowed"
+	ErrInvalidIDPID                = "Invalid IDP ID"
+	ErrMissingSAMLRequest          = "Missing SAMLRequest parameter"
+	ErrInvalidFormData             = "Invalid form data"
+	ErrFailedToCreateLogoutRequest = "Failed to create logout request"
+	ErrIDPDoesNotSupportSLO        = "Selected IdP does not support Single Logout"
+	ErrNotImplemented              = "IdP-Initiated flow not yet implemented"
 )
 
 // respondWithError writes an error response with logging.
@@ -40,4 +46,24 @@ func respondWithInternalServerError(w http.ResponseWriter, logContext ...slog.At
 // respondWithInvalidLogout writes a 400 Bad Request response for logout errors.
 func respondWithInvalidLogout(w http.ResponseWriter, logContext ...slog.Attr) {
 	respondWithError(w, ErrInvalidLogout, http.StatusBadRequest, logContext...)
+}
+
+// respondWithBadRequest writes a 400 Bad Request response.
+func respondWithBadRequest(w http.ResponseWriter, message string, logContext ...slog.Attr) {
+	respondWithError(w, message, http.StatusBadRequest, logContext...)
+}
+
+// respondWithInvalidRequest writes a 400 Bad Request response with "Invalid request" message.
+func respondWithInvalidRequest(w http.ResponseWriter, logContext ...slog.Attr) {
+	respondWithError(w, ErrInvalidRequest, http.StatusBadRequest, logContext...)
+}
+
+// respondWithMethodNotAllowed writes a 405 Method Not Allowed response.
+func respondWithMethodNotAllowed(w http.ResponseWriter, logContext ...slog.Attr) {
+	respondWithError(w, ErrMethodNotAllowed, http.StatusMethodNotAllowed, logContext...)
+}
+
+// respondWithNotImplemented writes a 501 Not Implemented response.
+func respondWithNotImplemented(w http.ResponseWriter, message string, logContext ...slog.Attr) {
+	respondWithError(w, message, http.StatusNotImplemented, logContext...)
 }

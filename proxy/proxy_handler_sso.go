@@ -1,8 +1,6 @@
 package proxy
 
 import (
-	"bytes"
-	"compress/flate"
 	"encoding/base64"
 	"encoding/xml"
 	"errors"
@@ -99,7 +97,7 @@ func extractIssuerFromSAMLRequest(samlRequestParam string, isPostBinding bool) (
 		}
 
 		// Decompress using flate
-		decompressed, err := decodeDeflatedSAMLRequest(compressed)
+		decompressed, err := decodeDeflatedData(compressed)
 		if err != nil {
 			// Try without decompression in case it's not compressed
 			decompressed = compressed
@@ -118,22 +116,6 @@ func extractIssuerFromSAMLRequest(samlRequestParam string, isPostBinding bool) (
 	}
 
 	return authnRequest.Issuer.Value, nil
-}
-
-// decodeDeflatedSAMLRequest decodes a deflated SAML request.
-func decodeDeflatedSAMLRequest(compressed []byte) ([]byte, error) {
-	reader := flate.NewReader(bytes.NewReader(compressed))
-	defer reader.Close()
-
-	var buf bytes.Buffer
-	// Limit the amount of data we'll read to prevent decompression bombs
-	limited := io.LimitReader(reader, 10*1024*1024) // 10MB limit
-	_, err := io.Copy(&buf, limited)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decompress SAML request: %w", err)
-	}
-
-	return buf.Bytes(), nil
 }
 
 // respondWithSAMLError sends a SAML error response.

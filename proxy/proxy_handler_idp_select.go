@@ -62,7 +62,7 @@ func handleIDPSelect(idp *saml.IDP, providers *saml.ServiceProviders) http.Handl
 	return func(w http.ResponseWriter, r *http.Request) {
 		authRequestID := r.FormValue("id")
 		if authRequestID == "" {
-			http.Error(w, "Invalid request", http.StatusBadRequest)
+			respondWithInvalidRequest(w)
 
 			return
 		}
@@ -73,18 +73,12 @@ func handleIDPSelect(idp *saml.IDP, providers *saml.ServiceProviders) http.Handl
 				slog.String("id", authRequestID),
 				slog.String("error", err.Error()),
 			)
-			http.Error(w, "Invalid request", http.StatusInternalServerError)
+			respondWithInternalServerError(w)
 
 			return
 		}
 
-		http.SetCookie(w, &http.Cookie{
-			Name:     cookieNameAuthRequestID,
-			Value:    authRequestID,
-			Path:     "/",
-			HttpOnly: true,
-			Secure:   isSecureCookie(r),
-		})
+		SetSecureCookie(w, r, cookieNameAuthRequestID, authRequestID, 300)
 
 		// If there's only one IdP configured, auto-redirect to it
 		if len(providers.Providers) == 1 {
@@ -96,13 +90,7 @@ func handleIDPSelect(idp *saml.IDP, providers *saml.ServiceProviders) http.Handl
 				break
 			}
 			// Set the IdP cookie
-			http.SetCookie(w, &http.Cookie{
-				Name:     cookieNameIDPID,
-				Value:    singleIDPID,
-				Path:     "/",
-				HttpOnly: true,
-				Secure:   isSecureCookie(r),
-			})
+			SetSecureCookie(w, r, cookieNameIDPID, singleIDPID, 300)
 
 			// Redirect to the IdP selected handler
 			redirectURL := "/idp_selected?idpID=" + singleIDPID
@@ -132,7 +120,7 @@ func handleIDPSelect(idp *saml.IDP, providers *saml.ServiceProviders) http.Handl
 		tmpl, err := template.New("idpSelection").Parse(idpSelectionTemplate)
 		if err != nil {
 			slog.Error("Failed to parse IdP selection template", slog.String("error", err.Error()))
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			respondWithInternalServerError(w)
 
 			return
 		}
@@ -140,7 +128,7 @@ func handleIDPSelect(idp *saml.IDP, providers *saml.ServiceProviders) http.Handl
 		err = tmpl.Execute(w, data)
 		if err != nil {
 			slog.Error("Failed to execute template", slog.String("error", err.Error()))
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			respondWithInternalServerError(w)
 
 			return
 		}

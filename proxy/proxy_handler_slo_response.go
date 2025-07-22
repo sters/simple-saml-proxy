@@ -1,14 +1,11 @@
 package proxy
 
 import (
-	"bytes"
-	"compress/flate"
 	"context"
 	"encoding/base64"
 	"encoding/xml"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -117,24 +114,9 @@ func handleSLOResponse(idp *saml.IDP, _ *saml.ServiceProviders) http.HandlerFunc
 		storage.DeleteLogoutContext(logoutCtx.ID)
 
 		// Clear cookies
-		http.SetCookie(w, &http.Cookie{
-			Name:   "logout_context_id",
-			Value:  "",
-			Path:   "/",
-			MaxAge: -1,
-		})
-		http.SetCookie(w, &http.Cookie{
-			Name:   "logout_sp_id",
-			Value:  "",
-			Path:   "/",
-			MaxAge: -1,
-		})
-		http.SetCookie(w, &http.Cookie{
-			Name:   "logout_name_id",
-			Value:  "",
-			Path:   "/",
-			MaxAge: -1,
-		})
+		SetSecureCookie(w, r, "logout_context_id", "", -1)
+		SetSecureCookie(w, r, "logout_sp_id", "", -1)
+		SetSecureCookie(w, r, "logout_name_id", "", -1)
 
 		// Redirect to IdP with logout response
 		slog.Info("Redirecting to IdP with logout response", slog.String("url", redirectURL))
@@ -173,21 +155,6 @@ func parseLogoutResponse(samlResponseParam string) (*crewjamsaml.LogoutResponse,
 	}
 
 	return &logoutResponse, nil
-}
-
-// decodeDeflatedData decodes deflated data.
-func decodeDeflatedData(compressed []byte) ([]byte, error) {
-	reader := flate.NewReader(bytes.NewReader(compressed))
-	defer reader.Close()
-
-	var buf bytes.Buffer
-	limited := io.LimitReader(reader, 10*1024*1024) // 10MB limit
-	_, err := io.Copy(&buf, limited)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decompress data: %w", err)
-	}
-
-	return buf.Bytes(), nil
 }
 
 // buildLogoutResponseURL creates the logout response URL with encoded SAML response.

@@ -119,14 +119,7 @@ func handleLogoutIDPSelected(idp *saml.IDP, providers *saml.ServiceProviders) ht
 		}
 
 		// Store IdP ID in cookie for response handling
-		http.SetCookie(w, &http.Cookie{
-			Name:     "logout_idp_id",
-			Value:    idpID,
-			Path:     "/",
-			HttpOnly: true,
-			Secure:   isSecureCookie(r),
-			MaxAge:   300, // 5 minutes
-		})
+		SetSecureCookie(w, r, "logout_idp_id", idpID, 300)
 
 		// Redirect to upstream IdP
 		slog.Info("Redirecting to upstream IdP for logout", slog.String("url", logoutURL))

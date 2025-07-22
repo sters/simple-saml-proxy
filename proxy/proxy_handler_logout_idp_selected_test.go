@@ -130,7 +130,7 @@ func TestHandleLogoutIDPSelected(t *testing.T) {
 				compressed, err := base64.StdEncoding.DecodeString(samlRequest)
 				require.NoError(t, err)
 
-				xmlData, err := decodeDeflatedRequest(compressed)
+				xmlData, err := decodeDeflatedData(compressed)
 				require.NoError(t, err)
 
 				var logoutReq crewjamsaml.LogoutRequest
