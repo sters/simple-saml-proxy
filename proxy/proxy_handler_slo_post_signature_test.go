@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	crewjamsaml "github.com/crewjam/saml"
+	"github.com/sters/simple-saml-proxy/proxy/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,7 +19,7 @@ func TestHandleSLOWithHTTPPostSignature(t *testing.T) {
 	// This test simulates an HTTP-POST binding logout request with XML signature
 
 	// Generate test certificates
-	spCert, spKey := generateTestCertificate(t, "SP Test")
+	spCert, spKey := testutil.GenerateTestCertificate(t, "SP Test")
 
 	// Create a signed logout request
 	signedRequest := createSignedLogoutRequest(t, spKey, spCert)

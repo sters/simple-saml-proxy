@@ -1,21 +1,16 @@
 package proxy
 
 import (
-	"bytes"
-	"compress/flate"
 	"context"
 	"crypto"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
-	"encoding/xml"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
-	"time"
 
 	crewjamsaml "github.com/crewjam/saml"
 	dsig "github.com/russellhaering/goxmldsig"
@@ -25,15 +20,12 @@ import (
 )
 
 var (
-	errLogoutRequestMissingIssuer      = errors.New("logout request missing issuer")
-	errLogoutRequestIssueInstantFuture = errors.New("logout request issue instant is in the future")
-	errLogoutRequestTooOld             = errors.New("logout request is too old")
-	errLogoutRequestSignatureRequired  = errors.New("logout request signature is required but not present")
-	errIDPNotAvailable                 = errors.New("IDP not available")
-	errCertNotRSA                      = errors.New("certificate does not contain an RSA public key")
-	errUnsupportedSigAlgorithm         = errors.New("unsupported signature algorithm")
-	errLogoutRequestElementNotFound    = errors.New("failed to get logout request element")
-	errStorageNotAvailable             = errors.New("storage not available")
+	errLogoutRequestSignatureRequired = errors.New("logout request signature is required but not present")
+	errIDPNotAvailable                = errors.New("IDP not available")
+	errCertNotRSA                     = errors.New("certificate does not contain an RSA public key")
+	errUnsupportedSigAlgorithm        = errors.New("unsupported signature algorithm")
+	errLogoutRequestElementNotFound   = errors.New("failed to get logout request element")
+	errStorageNotAvailable            = errors.New("storage not available")
 )
 
 // handleSLO handles Single Logout requests initiated by Service Providers.
@@ -59,7 +51,7 @@ func handleSLO(idp *saml.IDP, _ *saml.ServiceProviders, cfg config.Config) http.
 			// Parse form data
 			if err := r.ParseForm(); err != nil {
 				slog.Error("Failed to parse form data", slog.String("error", err.Error()))
-				http.Error(w, "Invalid form data", http.StatusBadRequest)
+				respondWithBadRequest(w, ErrInvalidFormData)
 
 				return
 			}
@@ -67,14 +59,14 @@ func handleSLO(idp *saml.IDP, _ *saml.ServiceProviders, cfg config.Config) http.
 			relayState = r.FormValue("RelayState")
 		default:
 			slog.Error("Unsupported HTTP method for SLO", slog.String("method", r.Method))
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			respondWithMethodNotAllowed(w)
 
 			return
 		}
 
 		if samlRequestParam == "" {
 			slog.Error("No SAMLRequest parameter in logout request")
-			http.Error(w, "Missing SAMLRequest parameter", http.StatusBadRequest)
+			respondWithBadRequest(w, ErrMissingSAMLRequest)
 
 			return
 		}
@@ -115,7 +107,7 @@ func handleSLO(idp *saml.IDP, _ *saml.ServiceProviders, cfg config.Config) http.
 		_ = sp // Mark as used for future enhanced validation
 
 		// Check for replay attack - verify IssueInstant is recent
-		if err := validateIssueInstant(logoutRequest.IssueInstant); err != nil {
+		if err := validateSAMLIssueInstant(logoutRequest.IssueInstant, "logout request"); err != nil {
 			slog.Error("Logout request failed time validation",
 				slog.String("issuer", logoutRequest.Issuer.Value),
 				slog.String("error", err.Error()),
@@ -163,64 +155,12 @@ func handleSLO(idp *saml.IDP, _ *saml.ServiceProviders, cfg config.Config) http.
 		}
 
 		// Store logout request ID in a cookie for later retrieval
-		http.SetCookie(w, &http.Cookie{
-			Name:     "logout_context_id",
-			Value:    logoutCtx.ID,
-			Path:     "/",
-			HttpOnly: true,
-			Secure:   isSecureCookie(r),
-			MaxAge:   300, // 5 minutes
-		})
+		SetSecureCookie(w, r, "logout_context_id", logoutCtx.ID, 300)
 
 		// For now, redirect to IdP selection page
 		// In a production implementation, you might track which IdP was used for login
 		http.Redirect(w, r, "/logout_idp_select", http.StatusFound)
 	}
-}
-
-// parseLogoutRequest parses a SAML logout request from the SAMLRequest parameter.
-func parseLogoutRequest(samlRequestParam string) (*crewjamsaml.LogoutRequest, error) {
-	// Base64 decode (the samlRequestParam should already be URL-decoded by Go's query parsing)
-	compressed, err := base64.StdEncoding.DecodeString(samlRequestParam)
-	if err != nil {
-		return nil, fmt.Errorf("failed to base64 decode logout request: %w", err)
-	}
-
-	// Decompress using flate
-	decompressed, err := decodeDeflatedRequest(compressed)
-	if err != nil {
-		// Try without decompression in case it's not compressed
-		decompressed = compressed
-	}
-
-	// Parse as LogoutRequest
-	var logoutRequest crewjamsaml.LogoutRequest
-	if err := xml.Unmarshal(decompressed, &logoutRequest); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal logout request: %w", err)
-	}
-
-	// Validate required fields
-	if logoutRequest.Issuer == nil || logoutRequest.Issuer.Value == "" {
-		return nil, errLogoutRequestMissingIssuer
-	}
-
-	return &logoutRequest, nil
-}
-
-// decodeDeflatedRequest decodes a deflated SAML request.
-func decodeDeflatedRequest(compressed []byte) ([]byte, error) {
-	reader := flate.NewReader(bytes.NewReader(compressed))
-	defer reader.Close()
-
-	var buf bytes.Buffer
-	// Limit the amount of data we'll read to prevent decompression bombs
-	limited := io.LimitReader(reader, 10*1024*1024) // 10MB limit
-	_, err := io.Copy(&buf, limited)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decompress request: %w", err)
-	}
-
-	return buf.Bytes(), nil
 }
 
 // getNameIDValue extracts the NameID value from a logout request.
@@ -239,25 +179,6 @@ func getSessionIndex(req *crewjamsaml.LogoutRequest) string {
 	}
 
 	return ""
-}
-
-// validateIssueInstant checks if the logout request was issued recently to prevent replay attacks.
-func validateIssueInstant(issueInstant time.Time) error {
-	const maxAge = 5 * time.Minute
-
-	now := time.Now()
-	age := now.Sub(issueInstant)
-
-	if age < 0 {
-		// Issue instant is in the future
-		return fmt.Errorf("%w: %v", errLogoutRequestIssueInstantFuture, issueInstant)
-	}
-
-	if age > maxAge {
-		return fmt.Errorf("%w: issued %v ago", errLogoutRequestTooOld, age)
-	}
-
-	return nil
 }
 
 // validateLogoutRequestSignature validates the signature of a logout request.

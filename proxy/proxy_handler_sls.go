@@ -161,18 +161,8 @@ func handleLogoutResponse(w http.ResponseWriter, r *http.Request, idp *saml.IDP,
 	storage.DeleteLogoutContext(logoutCtx.ID)
 
 	// Clear cookies
-	http.SetCookie(w, &http.Cookie{
-		Name:   "logout_context_id",
-		Value:  "",
-		Path:   "/",
-		MaxAge: -1,
-	})
-	http.SetCookie(w, &http.Cookie{
-		Name:   "logout_idp_id",
-		Value:  "",
-		Path:   "/",
-		MaxAge: -1,
-	})
+	SetSecureCookie(w, r, "logout_context_id", "", -1)
+	SetSecureCookie(w, r, "logout_idp_id", "", -1)
 
 	// Redirect to SP with logout response
 	slog.Info("Redirecting to SP with logout response", slog.String("url", responseURL))
@@ -246,25 +236,11 @@ func handleIDPInitiatedLogout(w http.ResponseWriter, r *http.Request, idp *saml.
 	// Store the original logout request data in the context for later use
 	// We'll need the NameID and SessionIndex when creating logout requests to SPs
 	// For now, store in cookies (in production, might want to extend LogoutContext)
-	http.SetCookie(w, &http.Cookie{
-		Name:     "logout_context_id",
-		Value:    logoutCtx.ID,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   isSecureCookie(r),
-		MaxAge:   300, // 5 minutes
-	})
+	SetSecureCookie(w, r, "logout_context_id", logoutCtx.ID, 300)
 
 	// Store NameID for later use
 	if logoutRequest.NameID != nil {
-		http.SetCookie(w, &http.Cookie{
-			Name:     "logout_name_id",
-			Value:    logoutRequest.NameID.Value,
-			Path:     "/",
-			HttpOnly: true,
-			Secure:   isSecureCookie(r),
-			MaxAge:   300, // 5 minutes
-		})
+		SetSecureCookie(w, r, "logout_name_id", logoutRequest.NameID.Value, 300)
 	}
 
 	// Redirect to SP selection page

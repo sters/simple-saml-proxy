@@ -125,14 +125,7 @@ func handleLogoutSPSelected(idp *saml.IDP, _ *saml.ServiceProviders) http.Handle
 		}
 
 		// Store SP ID in cookie for response handling
-		http.SetCookie(w, &http.Cookie{
-			Name:     "logout_sp_id",
-			Value:    spEntityID,
-			Path:     "/",
-			HttpOnly: true,
-			Secure:   isSecureCookie(r),
-			MaxAge:   300, // 5 minutes
-		})
+		SetSecureCookie(w, r, "logout_sp_id", spEntityID, 300)
 
 		// Redirect to SP with logout request
 		slog.Info("Redirecting to SP for logout", slog.String("url", logoutURLStr))

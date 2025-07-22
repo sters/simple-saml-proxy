@@ -255,7 +255,7 @@ func TestDecodeDeflatedRequest(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := decodeDeflatedRequest(tt.input)
+			result, err := decodeDeflatedData(tt.input)
 
 			if tt.expectedError {
 				require.Error(t, err)
@@ -374,7 +374,7 @@ func TestValidateIssueInstant(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateIssueInstant(tt.issueInstant)
+			err := validateSAMLIssueInstant(tt.issueInstant, "logout request")
 
 			if tt.expectedError != "" {
 				require.Error(t, err)

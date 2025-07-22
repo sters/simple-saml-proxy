@@ -1,27 +1,16 @@
 package proxy
 
 import (
-	"bytes"
-	"compress/flate"
 	"context"
 	"encoding/base64"
-	"encoding/xml"
-	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/beevik/etree"
 	crewjamsaml "github.com/crewjam/saml"
 	"github.com/sters/simple-saml-proxy/proxy/saml"
-)
-
-var (
-	errResponseIssueInstantInFuture = errors.New("logout response issue instant is in the future")
-	errResponseTooOld               = errors.New("logout response is too old")
 )
 
 // handleSLOResponse handles logout responses from SPs in the IdP-initiated flow.
@@ -52,7 +41,7 @@ func handleSLOResponse(idp *saml.IDP, _ *saml.ServiceProviders) http.HandlerFunc
 		}
 
 		// Validate response issue instant
-		if err := validateResponseIssueInstant(logoutResponse.IssueInstant); err != nil {
+		if err := validateSAMLIssueInstant(logoutResponse.IssueInstant, "logout response"); err != nil {
 			slog.Error("SP logout response failed time validation",
 				slog.String("error", err.Error()),
 			)
@@ -117,24 +106,9 @@ func handleSLOResponse(idp *saml.IDP, _ *saml.ServiceProviders) http.HandlerFunc
 		storage.DeleteLogoutContext(logoutCtx.ID)
 
 		// Clear cookies
-		http.SetCookie(w, &http.Cookie{
-			Name:   "logout_context_id",
-			Value:  "",
-			Path:   "/",
-			MaxAge: -1,
-		})
-		http.SetCookie(w, &http.Cookie{
-			Name:   "logout_sp_id",
-			Value:  "",
-			Path:   "/",
-			MaxAge: -1,
-		})
-		http.SetCookie(w, &http.Cookie{
-			Name:   "logout_name_id",
-			Value:  "",
-			Path:   "/",
-			MaxAge: -1,
-		})
+		SetSecureCookie(w, r, "logout_context_id", "", -1)
+		SetSecureCookie(w, r, "logout_sp_id", "", -1)
+		SetSecureCookie(w, r, "logout_name_id", "", -1)
 
 		// Redirect to IdP with logout response
 		slog.Info("Redirecting to IdP with logout response", slog.String("url", redirectURL))
@@ -149,45 +123,6 @@ func getLogoutResponseStatus(resp *crewjamsaml.LogoutResponse) string {
 	}
 
 	return "unknown"
-}
-
-// parseLogoutResponse parses a SAML logout response.
-func parseLogoutResponse(samlResponseParam string) (*crewjamsaml.LogoutResponse, error) {
-	// Base64 decode (the samlResponseParam should already be URL-decoded by Go's query parsing)
-	compressed, err := base64.StdEncoding.DecodeString(samlResponseParam)
-	if err != nil {
-		return nil, fmt.Errorf("failed to base64 decode logout response: %w", err)
-	}
-
-	// Try to decompress
-	decompressed, err := decodeDeflatedData(compressed)
-	if err != nil {
-		// Try without decompression
-		decompressed = compressed
-	}
-
-	// Parse as LogoutResponse
-	var logoutResponse crewjamsaml.LogoutResponse
-	if err := xml.Unmarshal(decompressed, &logoutResponse); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal logout response: %w", err)
-	}
-
-	return &logoutResponse, nil
-}
-
-// decodeDeflatedData decodes deflated data.
-func decodeDeflatedData(compressed []byte) ([]byte, error) {
-	reader := flate.NewReader(bytes.NewReader(compressed))
-	defer reader.Close()
-
-	var buf bytes.Buffer
-	limited := io.LimitReader(reader, 10*1024*1024) // 10MB limit
-	_, err := io.Copy(&buf, limited)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decompress data: %w", err)
-	}
-
-	return buf.Bytes(), nil
 }
 
 // buildLogoutResponseURL creates the logout response URL with encoded SAML response.
@@ -223,25 +158,6 @@ func buildLogoutResponseURL(logoutResponse *crewjamsaml.LogoutResponse, destinat
 	responseURL.RawQuery = query.Encode()
 
 	return responseURL.String(), nil
-}
-
-// validateResponseIssueInstant checks if the logout response was issued recently.
-func validateResponseIssueInstant(issueInstant time.Time) error {
-	const maxAge = 5 * time.Minute
-
-	now := time.Now()
-	age := now.Sub(issueInstant)
-
-	if age < 0 {
-		// Issue instant is in the future
-		return fmt.Errorf("%w: %v", errResponseIssueInstantInFuture, issueInstant)
-	}
-
-	if age > maxAge {
-		return fmt.Errorf("%w: issued %v ago", errResponseTooOld, age)
-	}
-
-	return nil
 }
 
 // getLogoutResponseURL determines the appropriate URL to send logout response to.

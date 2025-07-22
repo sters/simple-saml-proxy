@@ -117,7 +117,7 @@ func TestHandleIDPSelect(t *testing.T) {
 		handler.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
-		assert.Contains(t, w.Body.String(), "Invalid request")
+		assert.Contains(t, w.Body.String(), "Internal server error")
 	})
 
 	t.Run("Auth request without RelayState", func(t *testing.T) {

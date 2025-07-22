@@ -59,6 +59,18 @@ With the multi-IDP setup, you can now test the proxy's IDP selection functionali
 4. **Observe IDP selection screen** at the proxy (should show "Development IdP" and "Enterprise IdP")
 5. **Test different IDPs** by selecting each option and logging in with respective users
 
+### IDP-Initiated Flow Testing
+
+Test the IDP-initiated flow where users start at the Identity Provider:
+
+1. **Login directly at Keycloak IdP**: http://localhost:8080
+2. **Navigate to applications** or use direct IDP-initiated URL
+3. **IdP sends unsolicited SAML response** to the proxy
+4. **Proxy shows SP selection page** (if multiple SPs configured)
+5. **User selects target SP** and is authenticated
+
+**Note**: With a single SP configured, the proxy automatically redirects to that SP without showing a selection page.
+
 ### End-to-End Tests (Playwright)
 
 ```bash
@@ -79,14 +91,22 @@ npm run test:debug         # Run in debug mode
 
 ### SAML Proxy Flow Testing
 
-The tests validate the complete SAML proxy flow:
+The tests validate the complete SAML proxy flows:
+
+#### SP-Initiated Flow
 ```
 SP →[SAML AuthnRequest]→ Proxy →[New SAML AuthnRequest]→ IdP →[SAML Response]→ Proxy →[New SAML Response]→ SP
+```
+
+#### IDP-Initiated Flow
+```
+IdP →[Unsolicited SAML Response]→ Proxy →[SP Selection]→ SP
 ```
 
 Key test files:
 - `tests/saml-flow.spec.js` - Simplified flow tests
 - `tests/saml-proxy-flow.spec.js` - Detailed proxy flow validation
+- `tests/idp-initiated-flow.spec.js` - IDP-initiated flow tests
 
 ### Verbose Mode Features
 
