@@ -3,22 +3,14 @@ package proxy
 import (
 	"context"
 	"encoding/base64"
-	"encoding/xml"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/beevik/etree"
 	crewjamsaml "github.com/crewjam/saml"
 	"github.com/sters/simple-saml-proxy/proxy/saml"
-)
-
-var (
-	errResponseIssueInstantInFuture = errors.New("logout response issue instant is in the future")
-	errResponseTooOld               = errors.New("logout response is too old")
 )
 
 // handleSLOResponse handles logout responses from SPs in the IdP-initiated flow.
@@ -49,7 +41,7 @@ func handleSLOResponse(idp *saml.IDP, _ *saml.ServiceProviders) http.HandlerFunc
 		}
 
 		// Validate response issue instant
-		if err := validateResponseIssueInstant(logoutResponse.IssueInstant); err != nil {
+		if err := validateSAMLIssueInstant(logoutResponse.IssueInstant, "logout response"); err != nil {
 			slog.Error("SP logout response failed time validation",
 				slog.String("error", err.Error()),
 			)
@@ -133,30 +125,6 @@ func getLogoutResponseStatus(resp *crewjamsaml.LogoutResponse) string {
 	return "unknown"
 }
 
-// parseLogoutResponse parses a SAML logout response.
-func parseLogoutResponse(samlResponseParam string) (*crewjamsaml.LogoutResponse, error) {
-	// Base64 decode (the samlResponseParam should already be URL-decoded by Go's query parsing)
-	compressed, err := base64.StdEncoding.DecodeString(samlResponseParam)
-	if err != nil {
-		return nil, fmt.Errorf("failed to base64 decode logout response: %w", err)
-	}
-
-	// Try to decompress
-	decompressed, err := decodeDeflatedData(compressed)
-	if err != nil {
-		// Try without decompression
-		decompressed = compressed
-	}
-
-	// Parse as LogoutResponse
-	var logoutResponse crewjamsaml.LogoutResponse
-	if err := xml.Unmarshal(decompressed, &logoutResponse); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal logout response: %w", err)
-	}
-
-	return &logoutResponse, nil
-}
-
 // buildLogoutResponseURL creates the logout response URL with encoded SAML response.
 func buildLogoutResponseURL(logoutResponse *crewjamsaml.LogoutResponse, destination string, relayState string) (string, error) {
 	// Marshal the logout response
@@ -190,25 +158,6 @@ func buildLogoutResponseURL(logoutResponse *crewjamsaml.LogoutResponse, destinat
 	responseURL.RawQuery = query.Encode()
 
 	return responseURL.String(), nil
-}
-
-// validateResponseIssueInstant checks if the logout response was issued recently.
-func validateResponseIssueInstant(issueInstant time.Time) error {
-	const maxAge = 5 * time.Minute
-
-	now := time.Now()
-	age := now.Sub(issueInstant)
-
-	if age < 0 {
-		// Issue instant is in the future
-		return fmt.Errorf("%w: %v", errResponseIssueInstantInFuture, issueInstant)
-	}
-
-	if age > maxAge {
-		return fmt.Errorf("%w: issued %v ago", errResponseTooOld, age)
-	}
-
-	return nil
 }
 
 // getLogoutResponseURL determines the appropriate URL to send logout response to.

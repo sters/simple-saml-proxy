@@ -148,31 +148,31 @@ func TestValidateResponseIssueInstant(t *testing.T) {
 			name:         "Invalid - too old (6 minutes)",
 			issueInstant: now.Add(-6 * time.Minute),
 			wantErr:      true,
-			errType:      errResponseTooOld,
+			errType:      errIssueInstantTooOld,
 		},
 		{
 			name:         "Invalid - too old (1 hour)",
 			issueInstant: now.Add(-1 * time.Hour),
 			wantErr:      true,
-			errType:      errResponseTooOld,
+			errType:      errIssueInstantTooOld,
 		},
 		{
 			name:         "Invalid - future time (1 minute)",
 			issueInstant: now.Add(1 * time.Minute),
 			wantErr:      true,
-			errType:      errResponseIssueInstantInFuture,
+			errType:      errIssueInstantInFuture,
 		},
 		{
 			name:         "Invalid - future time (1 hour)",
 			issueInstant: now.Add(1 * time.Hour),
 			wantErr:      true,
-			errType:      errResponseIssueInstantInFuture,
+			errType:      errIssueInstantInFuture,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateResponseIssueInstant(tt.issueInstant)
+			err := validateSAMLIssueInstant(tt.issueInstant, "logout response")
 
 			if tt.wantErr {
 				require.Error(t, err)
