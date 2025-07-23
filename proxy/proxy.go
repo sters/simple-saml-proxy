@@ -94,6 +94,14 @@ func SetupHTTPHandlers(idp *saml.IDP, providers *saml.ServiceProviders, cfg conf
 			handleLogoutSPSelect(idp, providers)(w, r)
 
 			return
+		case strings.HasPrefix(r.URL.Path, "/sp_selected"):
+			handleSPSelected(idp, providers)(w, r)
+
+			return
+		case strings.HasPrefix(r.URL.Path, "/sp_select"):
+			handleSPSelect(idp, providers)(w, r)
+
+			return
 		}
 
 		mux.ServeHTTP(w, r)

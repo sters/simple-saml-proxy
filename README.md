@@ -28,6 +28,7 @@ This dual-role pattern enables single-tenant applications to authenticate users 
 - Connect multiple Identity Providers simultaneously
 - User-friendly IdP selection interface
 - Support for both SP-initiated and IdP-initiated flows
+- Automatic SP selection for IdP-initiated flows
 
 ### 🔐 **Enterprise Security**
 - Full XML digital signature validation
@@ -196,11 +197,19 @@ sequenceDiagram
 
     User->>IdP: Login directly
     IdP->>Proxy: Unsolicited SAML Response
-    Proxy->>User: Show SP selection page
-    User->>Proxy: Select SP
+    alt Multiple SPs configured
+        Proxy->>User: Show SP selection page
+        User->>Proxy: Select SP
+    else Single SP configured
+        Note over Proxy: Auto-select SP
+    end
     Proxy->>SP: New SAML Response
     SP->>User: Access granted
 ```
+
+The proxy automatically detects IdP-initiated flows when a SAML response arrives without prior context. If only one SP is configured, it automatically redirects to that SP. For multiple SPs, a selection page is displayed.
+
+For detailed implementation and configuration information, see [IdP-Initiated Flow Documentation](docs/idp-initiated-flow.md).
 
 ## Development
 

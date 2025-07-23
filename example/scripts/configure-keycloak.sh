@@ -50,7 +50,7 @@ create_saml_idp() {
     
     log "Creating SAML Identity Provider in Keycloak SP..."
     
-    curl -s -X POST "$keycloak_url/admin/realms/test/identity-provider/instances" \
+    curl -s -X POST "$keycloak_url/admin/realms/sp-realm/identity-provider/instances" \
         -H "Authorization: Bearer $token" \
         -H "Content-Type: application/json" \
         -d '{
@@ -83,7 +83,7 @@ create_idp_mappers() {
     log "Creating Identity Provider mappers..."
     
     # Username mapper
-    curl -s -X POST "$keycloak_url/admin/realms/test/identity-provider/instances/saml-proxy/mappers" \
+    curl -s -X POST "$keycloak_url/admin/realms/sp-realm/identity-provider/instances/saml-proxy/mappers" \
         -H "Authorization: Bearer $token" \
         -H "Content-Type: application/json" \
         -d '{
@@ -97,7 +97,7 @@ create_idp_mappers() {
         }'
     
     # Email mapper
-    curl -s -X POST "$keycloak_url/admin/realms/test/identity-provider/instances/saml-proxy/mappers" \
+    curl -s -X POST "$keycloak_url/admin/realms/sp-realm/identity-provider/instances/saml-proxy/mappers" \
         -H "Authorization: Bearer $token" \
         -H "Content-Type: application/json" \
         -d '{
@@ -111,7 +111,7 @@ create_idp_mappers() {
         }'
     
     # First name mapper
-    curl -s -X POST "$keycloak_url/admin/realms/test/identity-provider/instances/saml-proxy/mappers" \
+    curl -s -X POST "$keycloak_url/admin/realms/sp-realm/identity-provider/instances/saml-proxy/mappers" \
         -H "Authorization: Bearer $token" \
         -H "Content-Type: application/json" \
         -d '{
@@ -125,7 +125,7 @@ create_idp_mappers() {
         }'
     
     # Last name mapper
-    curl -s -X POST "$keycloak_url/admin/realms/test/identity-provider/instances/saml-proxy/mappers" \
+    curl -s -X POST "$keycloak_url/admin/realms/sp-realm/identity-provider/instances/saml-proxy/mappers" \
         -H "Authorization: Bearer $token" \
         -H "Content-Type: application/json" \
         -d '{
@@ -194,7 +194,7 @@ main() {
     
     log "Keycloak configuration completed successfully!"
     log "You can now test the SAML flow by accessing:"
-    log "  - Keycloak SP: $KEYCLOAK_SP_URL/realms/test/account"
+    log "  - Keycloak SP: $KEYCLOAK_SP_URL/realms/sp-realm/account"
     log "  - SAML Proxy: $PROXY_URL"
 }
 
