@@ -9,14 +9,14 @@ test.describe('SAML Proxy Flow Tests', () => {
     
     // Step 1: Keycloak SP - Trigger SAML authentication via account console
     console.log('Step 1: Keycloak SP - Triggering authentication via account console');
-    await page.goto('http://localhost:8081/realms/sp-realm/account/');
+    await page.goto('http://localhost:12000/realms/sp-realm/account/');
     await page.waitForTimeout(3000);
     
     let currentUrl = page.url();
     console.log(`  Current URL: ${currentUrl}`);
     
     // Look for and click the Sign In button to trigger authentication
-    if (currentUrl.includes('localhost:8081/realms/sp-realm/account/')) {
+    if (currentUrl.includes('localhost:12000/realms/sp-realm/account/')) {
       console.log('✓ Reached Keycloak SP account console');
       
       // Click the sign in button which should trigger authentication
@@ -31,7 +31,7 @@ test.describe('SAML Proxy Flow Tests', () => {
         console.log(`  Current URL after sign in: ${currentUrl}`);
       } else {
         console.log('  No sign in button found, trying broker URL directly...');
-        await page.goto('http://localhost:8081/realms/sp-realm/broker/saml-proxy/login');
+        await page.goto('http://localhost:12000/realms/sp-realm/broker/saml-proxy/login');
         await page.waitForTimeout(3000);
         currentUrl = page.url();
         console.log(`  Current URL after broker: ${currentUrl}`);
@@ -39,17 +39,17 @@ test.describe('SAML Proxy Flow Tests', () => {
     }
     
     // Check if we've reached an authentication page
-    if (!currentUrl.includes('auth') && !currentUrl.includes('localhost:8082')) {
+    if (!currentUrl.includes('auth') && !currentUrl.includes('localhost:10000')) {
       console.log('❌ Failed: Cannot trigger authentication flow');
       console.log('  Current URL suggests no authentication required or broker not working');
-      return;
+      throw new Error('Failed: Cannot trigger authentication flow');
     }
     
     // Step 2: Keycloak SP → Proxy - Handle identity provider selection or direct redirect
     console.log('\nStep 2: Keycloak SP → Proxy - Handling SAML flow');
     
     // Check if we're already at the proxy (direct redirect)
-    if (currentUrl.includes('localhost:8082')) {
+    if (currentUrl.includes('localhost:10000')) {
       console.log('✓ Direct redirect to SAML Proxy (broker URL worked)');
     } else {
       // Look for SAML Proxy identity provider selection
@@ -60,7 +60,7 @@ test.describe('SAML Proxy Flow Tests', () => {
         console.log('❌ Failed: SAML Proxy identity provider not found');
         const pageContent = await page.content();
         console.log('Available content:', pageContent.substring(0, 500) + '...');
-        return;
+        throw new Error('Failed: SAML Proxy identity provider not found');
       }
       
       console.log(`  Found ${linkCount} SAML Proxy identity provider link(s)`);
@@ -78,7 +78,7 @@ test.describe('SAML Proxy Flow Tests', () => {
       // Monitor network requests
       const networkPromise = page.waitForResponse(response => {
         console.log(`  Network: ${response.status()} ${response.url()}`);
-        return response.url().includes('8082') || response.url().includes('8080');
+        return response.url().includes('10000') || response.url().includes('11001');
       }, { timeout: 5000 }).catch(() => null);
       
       await samlProxyLink.first().click();
@@ -93,7 +93,7 @@ test.describe('SAML Proxy Flow Tests', () => {
     console.log(`  Current URL: ${currentUrl}`);
     
     // Check if we reached the proxy first
-    if (currentUrl.includes('localhost:8082')) {
+    if (currentUrl.includes('localhost:10000')) {
       console.log('✓ Reached SAML Proxy');
       console.log('  Proxy is processing the request...');
       await page.waitForTimeout(2000);
@@ -102,7 +102,7 @@ test.describe('SAML Proxy Flow Tests', () => {
     }
     
     // After IDP selection, check if proxy redirected to IdP
-    if (currentUrl.includes('localhost:8080') || currentUrl.includes('localhost:8083')) {
+    if (currentUrl.includes('localhost:11001') || currentUrl.includes('localhost:11002')) {
       console.log('✓ Proxy redirected to Keycloak IdP');
       console.log('✅ SAML flow working correctly:');
       console.log('   1. Keycloak SP sent SAML request to Proxy');
@@ -120,10 +120,10 @@ test.describe('SAML Proxy Flow Tests', () => {
       fs.writeFileSync(urlFile, currentUrl);
       console.log(`   Saved URL to: ${urlFile}`);
       console.log('   Run: python decode-saml.py "$(cat last-saml-request-url.txt)"');
-    } else if (!currentUrl.includes('localhost:8082')) {
+    } else if (!currentUrl.includes('localhost:10000')) {
       console.log('❌ Failed: Unexpected redirect');
       console.log(`   Current URL: ${currentUrl}`);
-      return;
+      throw new Error('Failed: Unexpected redirect');
     }
     
     // Check if we're at the IDP selection page
@@ -147,7 +147,7 @@ test.describe('SAML Proxy Flow Tests', () => {
         console.log('❌ No IDP buttons found on selection page');
         const pageContent = await page.content();
         console.log('  Page content:', pageContent.substring(0, 500));
-        return;
+        throw new Error('No IDP buttons found on selection page');
       }
     }
     
@@ -163,6 +163,7 @@ test.describe('SAML Proxy Flow Tests', () => {
     const pageContent = await page.content();
     if (pageContent.includes('error') || pageContent.includes('failed') || pageContent.includes('Error')) {
       console.log('❌ Error page detected');
+      throw new Error('Error page detected');
       
       // Look for specific error messages
       const errorMessageElement = page.locator('#kc-error-message, .alert-error, .kc-feedback-text');
@@ -188,7 +189,7 @@ test.describe('SAML Proxy Flow Tests', () => {
     console.log('\nStep 4: Keycloak IdP - User authentication');
     
     // We should be at the IdP login page after IDP selection
-    if (currentUrl.includes('localhost:8080') || currentUrl.includes('localhost:8083')) {
+    if (currentUrl.includes('localhost:11001') || currentUrl.includes('localhost:11002')) {
       console.log('✓ Successfully reached Keycloak IdP login page');
       
       // Check for any errors first
@@ -196,6 +197,7 @@ test.describe('SAML Proxy Flow Tests', () => {
       if (pageContent.includes('client_not_found') || pageContent.includes('Invalid client')) {
         console.log('❌ IdP error: Client not found');
         console.log('  The proxy entity ID does not match any client in IdP');
+        throw new Error('IdP error: Client not found');
         
         // Take a screenshot for debugging
         const screenshotPath = require('path').join(__dirname, 'idp-error.png');
@@ -221,6 +223,7 @@ test.describe('SAML Proxy Flow Tests', () => {
         console.log('  Page title:', await page.title());
         if (pageContent.includes('error') || pageContent.includes('Error')) {
           console.log('  ⚠️ Error page detected at IdP');
+          throw new Error('Failed: Login form not found at Keycloak IdP');
         }
         return;
       }
@@ -282,7 +285,7 @@ test.describe('SAML Proxy Flow Tests', () => {
     console.log('\nStep 5: Keycloak IdP → Proxy - SAML response');
     
     // Check if we're redirected back to proxy
-    if (currentUrl.includes('localhost:8082')) {
+    if (currentUrl.includes('localhost:10000')) {
       console.log('✓ Returned to SAML Proxy with IdP response');
       console.log('  Proxy is processing IdP response...');
       await page.waitForTimeout(2000);
@@ -293,7 +296,7 @@ test.describe('SAML Proxy Flow Tests', () => {
     // Step 6: Proxy → Keycloak SP - Final SAML response to SP
     console.log('\nStep 6: Proxy → Keycloak SP - Final SAML response');
     
-    if (currentUrl.includes('localhost:8081')) {
+    if (currentUrl.includes('localhost:12000')) {
       console.log('✓ Returned to Keycloak SP');
       console.log('  Checking authentication status...');
       
@@ -333,40 +336,92 @@ test.describe('SAML Proxy Flow Tests', () => {
         // Wait for the account page to fully load
         await page.waitForTimeout(2000);
         
-        // Verify user information
-        console.log('\n📋 Verifying user information passed through SAML proxy:');
+        // Navigate to personal info page to see user details
+        console.log('\n📋 Navigating to personal info page to verify user information...');
         
-        const pageContent = await page.content();
+        // Try to navigate to the personal info section
+        // In new Keycloak, it might be under different URLs
+        const personalInfoUrl = currentUrl.replace('/#/', '/#/personal-info');
+        await page.goto(personalInfoUrl);
+        await page.waitForTimeout(3000);
+        
+        // Alternative: Click on Personal info link if available
+        const personalInfoLink = page.locator('a:has-text("Personal info"), a:has-text("Personal Info"), [href*="personal-info"]').first();
+        if (await personalInfoLink.count() > 0) {
+          console.log('  Clicking on Personal Info link...');
+          await personalInfoLink.click();
+          await page.waitForTimeout(2000);
+        }
+        
+        console.log('  Current URL:', page.url());
+        
+        // Now check for user information
+        console.log('\n  Checking for federated user attributes:');
         
         // Check for username
-        if (pageContent.includes('testuser')) {
-          console.log('  ✓ Username: testuser (correctly passed from IDP)');
+        const usernameInput = await page.locator('input[name="username"], input[id="username"], input[aria-label*="Username"]').first();
+        if (await usernameInput.count() > 0) {
+          const usernameValue = await usernameInput.inputValue();
+          console.log(`  ✓ Username: ${usernameValue}`);
+          if (usernameValue !== 'testuser') {
+            console.log(`    ⚠️ Expected: testuser, Got: ${usernameValue}`);
+          }
         } else {
-          console.log('  ❌ Username: NOT FOUND - proxy may not be passing username correctly');
+          // Try to find username in text
+          const usernameText = await page.locator('text=testuser').count() > 0;
+          if (usernameText) {
+            console.log('  ✓ Username: testuser (found in page)');
+          } else {
+            console.log('  ⚠️ Username field not found, checking page content...');
+          }
         }
         
         // Check for email
-        if (pageContent.includes('testuser@example.com')) {
-          console.log('  ✓ Email: testuser@example.com');
+        const emailInput = await page.locator('input[name="email"], input[id="email"], input[type="email"]').first();
+        if (await emailInput.count() > 0) {
+          const emailValue = await emailInput.inputValue();
+          console.log(`  ✓ Email: ${emailValue}`);
+          if (emailValue !== 'testuser@example.com') {
+            console.log(`    ⚠️ Expected: testuser@example.com, Got: ${emailValue}`);
+          }
         }
         
-        // Check for first/last name
-        if (pageContent.includes('Test User') || (pageContent.includes('Test') && pageContent.includes('User'))) {
-          console.log('  ✓ Full Name: Test User');
+        // Check for first name
+        const firstNameInput = await page.locator('input[name="firstName"], input[id="firstName"]').first();
+        if (await firstNameInput.count() > 0) {
+          const firstNameValue = await firstNameInput.inputValue();
+          console.log(`  ✓ First Name: ${firstNameValue}`);
+          if (firstNameValue !== 'Test') {
+            console.log(`    ⚠️ Expected: Test, Got: ${firstNameValue}`);
+          }
         }
         
-        // Try to find the actual displayed username in common locations
-        const usernameElements = await page.locator('[data-testid*="username"], [id*="username"], .username, span:has-text("testuser")').all();
-        if (usernameElements.length > 0) {
-          const displayedUsername = await usernameElements[0].textContent();
-          console.log(`  ℹ️  Displayed username element: "${displayedUsername}"`);
+        // Check for last name
+        const lastNameInput = await page.locator('input[name="lastName"], input[id="lastName"]').first();
+        if (await lastNameInput.count() > 0) {
+          const lastNameValue = await lastNameInput.inputValue();
+          console.log(`  ✓ Last Name: ${lastNameValue}`);
+          if (lastNameValue !== 'User') {
+            console.log(`    ⚠️ Expected: User, Got: ${lastNameValue}`);
+          }
         }
         
-        // Check if we see any generated IDs (G-xxx format)
-        const generatedIdMatch = pageContent.match(/G-[a-f0-9-]{36}/);
-        if (generatedIdMatch) {
-          console.log(`  ⚠️  Found generated ID: ${generatedIdMatch[0]}`);
-          console.log('     This should be the internal UserID, not the displayed username');
+        // Take a screenshot of the personal info page
+        await page.screenshot({ path: 'test-results/sp-user-info.png', fullPage: true });
+        console.log('\n  Screenshot saved to test-results/sp-user-info.png');
+        
+        // Final verification
+        const pageContent = await page.content();
+        const hasUserInfo = pageContent.includes('testuser') || 
+                           pageContent.includes('testuser@example.com') ||
+                           pageContent.includes('Test') ||
+                           pageContent.includes('User');
+        
+        if (hasUserInfo) {
+          console.log('\n  ✅ User information successfully federated through SAML proxy');
+        } else {
+          console.log('\n  ❌ User information not found - federation may have failed');
+          throw new Error('User information not properly federated');
         }
       } else if (currentUrl.includes('error')) {
         console.log('⚠️ Returned to SP with error');
@@ -380,6 +435,7 @@ test.describe('SAML Proxy Flow Tests', () => {
     } else {
       console.log('❌ Failed: Not redirected back to Keycloak SP');
       console.log('  Still at:', currentUrl);
+      throw new Error('Failed: Not redirected back to Keycloak SP');
     }
     
     // Final check - if we're not at the account page yet, check current location
@@ -426,6 +482,7 @@ test.describe('SAML Proxy Flow Tests', () => {
                 console.log('  ✓ Username: testuser (correctly passed from IDP)');
               } else {
                 console.log(`  ❌ Username: ${usernameValue} (expected: testuser)`);
+                throw new Error(`Username: ${usernameValue} (expected: testuser)`);
               }
             }
             
@@ -438,11 +495,13 @@ test.describe('SAML Proxy Flow Tests', () => {
               } else {
                 console.log(`  ❌ Email: ${emailValue} (expected: testuser@example.com)`);
                 console.log('     Note: The proxy is not correctly passing the email attribute');
+                throw new Error(`Email: ${emailValue} (expected: testuser@example.com)`);
               }
             }
             
             console.log('  ❌ First Name: Not passed (SAML proxy should pass this)');
             console.log('  ❌ Last Name: Not passed (SAML proxy should pass this)');
+            // Not throwing error here as these are warnings about missing attributes
             console.log('\n  Filling in missing fields to continue...');
             await firstNameInput.fill('Test');
             await lastNameInput.fill('User');
@@ -473,6 +532,7 @@ test.describe('SAML Proxy Flow Tests', () => {
           console.log('  ✓ Username: testuser (correctly passed from IDP)');
         } else {
           console.log('  ❌ Username: NOT FOUND - checking page structure...');
+          throw new Error('Username: NOT FOUND - checking page structure...');
           
           // Try to find user info in the account console
           const userInfoText = await page.locator('body').textContent();

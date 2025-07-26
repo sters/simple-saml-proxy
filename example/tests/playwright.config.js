@@ -12,7 +12,7 @@ module.exports = defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: process.env.VERBOSE === 'true' ? [['list', { printSteps: true }]] : 'html',
   use: {
-    baseURL: 'http://localhost:8082',
+    baseURL: 'http://localhost:10000',
     trace: process.env.VERBOSE === 'true' ? 'on' : 'on-first-retry',
     screenshot: process.env.VERBOSE === 'true' ? 'on' : 'only-on-failure',
     video: process.env.VERBOSE === 'true' ? 'on' : 'retain-on-failure',
@@ -34,7 +34,7 @@ module.exports = defineConfig({
 
   webServer: {
     command: 'echo "Services should be started via docker-compose"',
-    port: 8082,
+    port: 10000,
     reuseExistingServer: !process.env.CI,
   },
 });

@@ -5,9 +5,9 @@
 
 set -e
 
-KEYCLOAK_SP_URL="http://localhost:8081"
-KEYCLOAK_IDP_URL="http://localhost:8080"
-PROXY_URL="http://localhost:8082"
+KEYCLOAK_SP_URL="http://localhost:12000"
+KEYCLOAK_IDP_URL="http://localhost:11001"
+PROXY_URL="http://localhost:10000"
 
 # Colors for output
 RED='\033[0;31m'

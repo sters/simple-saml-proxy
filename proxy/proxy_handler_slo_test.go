@@ -364,7 +364,7 @@ func TestValidateIssueInstant(t *testing.T) {
 		{
 			name:          "Too old time",
 			issueInstant:  time.Now().Add(-10 * time.Minute),
-			expectedError: "logout request is too old",
+			expectedError: "logout request issue instant is too old",
 		},
 		{
 			name:         "Edge case - exactly 5 minutes old",

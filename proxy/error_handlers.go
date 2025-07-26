@@ -62,8 +62,3 @@ func respondWithInvalidRequest(w http.ResponseWriter, logContext ...slog.Attr) {
 func respondWithMethodNotAllowed(w http.ResponseWriter, logContext ...slog.Attr) {
 	respondWithError(w, ErrMethodNotAllowed, http.StatusMethodNotAllowed, logContext...)
 }
-
-// respondWithNotImplemented writes a 501 Not Implemented response.
-func respondWithNotImplemented(w http.ResponseWriter, message string, logContext ...slog.Attr) {
-	respondWithError(w, message, http.StatusNotImplemented, logContext...)
-}

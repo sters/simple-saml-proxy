@@ -6,7 +6,7 @@
   "ssoSessionIdleTimeout": 1800,
   "ssoSessionMaxLifespan": 36000,
   "attributes": {
-    "saml.issuer": "http://localhost:8080/realms/test"
+    "saml.issuer": "http://localhost:11001/realms/test"
   },
   "users": [
     {
@@ -26,11 +26,14 @@
   ],
   "clients": [
     {
-      "clientId": "http://localhost:8082/saml/metadata",
+      "clientId": "http://localhost:10000",
       "name": "SAML Proxy Client (crewjam)",
       "enabled": true,
       "protocol": "saml",
       "frontchannelLogout": true,
+      "publicClient": true,
+      "fullScopeAllowed": true,
+      "consentRequired": false,
       "attributes": {
         "saml.assertion.signature": "true",
         "saml.force.post.binding": "true",
@@ -41,14 +44,18 @@
         "saml.client.signature": "false",
         "saml.authnstatement": "true",
         "display.on.consent.screen": "false",
-        "saml_idp_initiated_sso_url_name": "saml-proxy",
-        "saml_idp_initiated_sso_relay_state": ""
+        "saml.assertion.consumer.url.post": "http://localhost:10000/metadata/acs",
+        "saml_single_logout_service_url_post": "http://localhost:10000/metadata/SLO",
+        "saml_assertion_consumer_url_post": "http://localhost:10000/metadata/acs"
       },
       "redirectUris": [
-        "http://localhost:8082/saml/acs"
+        "http://localhost:10000/*",
+        "http://localhost:10000/metadata/acs",
+        "http://localhost:10000/acs",
+        "http://localhost:10000/sp_select"
       ],
-      "baseUrl": "http://localhost:8082",
-      "adminUrl": "http://localhost:8082",
+      "baseUrl": "http://localhost:10000",
+      "adminUrl": "http://localhost:10000",
       "protocolMappers": [
         {
           "name": "username",
@@ -101,11 +108,14 @@
       ]
     },
     {
-      "clientId": "http://localhost:8082/metadata",
+      "clientId": "http://localhost:10000/metadata-zitadel",
       "name": "SAML Proxy Client (zitadel)",
-      "enabled": true,
+      "enabled": false,
       "protocol": "saml",
       "frontchannelLogout": true,
+      "publicClient": true,
+      "fullScopeAllowed": true,
+      "consentRequired": false,
       "attributes": {
         "saml.assertion.signature": "true",
         "saml.force.post.binding": "true",
@@ -118,10 +128,10 @@
         "display.on.consent.screen": "false"
       },
       "redirectUris": [
-        "http://localhost:8082/metadata/acs"
+        "http://localhost:10000/metadata/acs"
       ],
-      "baseUrl": "http://localhost:8082",
-      "adminUrl": "http://localhost:8082",
+      "baseUrl": "http://localhost:10000",
+      "adminUrl": "http://localhost:10000",
       "protocolMappers": [
         {
           "name": "username",
@@ -174,11 +184,14 @@
       ]
     },
     {
-      "clientId": "http://localhost:8082",
+      "clientId": "http://localhost:10000/base",
       "name": "SAML Proxy Client (base)",
-      "enabled": true,
+      "enabled": false,
       "protocol": "saml",
       "frontchannelLogout": true,
+      "publicClient": true,
+      "fullScopeAllowed": true,
+      "consentRequired": false,
       "attributes": {
         "saml.assertion.signature": "true",
         "saml.force.post.binding": "true",
@@ -188,14 +201,15 @@
         "saml.signature.algorithm": "RSA_SHA256",
         "saml.client.signature": "false",
         "saml.authnstatement": "true",
-        "display.on.consent.screen": "false"
+        "display.on.consent.screen": "false",
+        "saml.assertion.consumer.url.post": "http://localhost:10000/metadata/acs"
       },
       "redirectUris": [
-        "http://localhost:8082/metadata/acs",
-        "http://localhost:8082/saml/acs"
+        "http://localhost:10000/metadata/acs",
+        "http://localhost:10000/saml/acs"
       ],
-      "baseUrl": "http://localhost:8082",
-      "adminUrl": "http://localhost:8082",
+      "baseUrl": "http://localhost:10000",
+      "adminUrl": "http://localhost:10000",
       "protocolMappers": [
         {
           "name": "username",

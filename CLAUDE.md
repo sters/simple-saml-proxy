@@ -90,12 +90,6 @@ The application is structured as a stateless HTTP server with modular SAML handl
    - After IdP auth, proxy receives response at ACS endpoint
    - Proxy creates new assertion and sends to original SP
 
-2. **IdP-Initiated Flow**:
-   - User starts at IdP and authenticates
-   - IdP sends unsolicited response to proxy
-   - Proxy shows SP selection page
-   - User selects SP, proxy forwards assertion
-
 ## Configuration
 
 Configuration is loaded from environment variables:

@@ -119,7 +119,7 @@ simple-saml-proxy implements a subset of the SAML 2.0 specification, focusing on
 | Feature | Status | Notes |
 |---------|--------|-------|
 | SP-Initiated SSO | ✅ | Primary use case |
-| IdP-Initiated SSO | ✅ | Full support with SP selection |
+| IdP-Initiated SSO | ❌ | Not supported |
 | Multi-IdP Support | ✅ | Core feature with selection UI |
 | Multi-SP Support | ✅ | Configurable allowed SPs |
 | ForceAuthn | ❌ | Not implemented |
@@ -231,7 +231,6 @@ Potential enhancements could include:
 - **2025-01-17**: Implemented signature generation for proxy-initiated logout requests
 - **2025-07-11**: Implemented full XML digital signature support with RSA-SHA256
 - **2025-07-11**: Enhanced E2E testing with proper signature validation
-- **2025-07-10**: Improved IdP-initiated SSO flow with SP selection
 - **2025-07-10**: Added comprehensive test coverage for all SAML flows
 
 ## References

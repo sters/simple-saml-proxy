@@ -136,7 +136,7 @@ func CreateServiceProviders(ctx context.Context, cfg config.Config) (*ServicePro
 			Key:               privateKey,
 			Certificate:       keyPair.Leaf,
 			IDPMetadata:       ed,
-			AllowIDPInitiated: true,
+			AllowIDPInitiated: false,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create SAML SP for IDP %s: %w", idpConfig.ID, err)

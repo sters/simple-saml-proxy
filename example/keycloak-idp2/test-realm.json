@@ -6,7 +6,7 @@
   "ssoSessionIdleTimeout": 1800,
   "ssoSessionMaxLifespan": 36000,
   "attributes": {
-    "saml.issuer": "http://localhost:8083/realms/test2"
+    "saml.issuer": "http://localhost:11002/realms/test2"
   },
   "users": [
     {
@@ -40,7 +40,7 @@
   ],
   "clients": [
     {
-      "clientId": "http://localhost:8082/saml/metadata",
+      "clientId": "http://localhost:10000/saml/metadata",
       "name": "SAML Proxy Client (crewjam)",
       "enabled": true,
       "protocol": "saml",
@@ -56,16 +56,17 @@
         "saml.authnstatement": "true",
         "display.on.consent.screen": "false",
         "saml_idp_initiated_sso_url_name": "saml-proxy",
-        "saml_idp_initiated_sso_relay_state": ""
+        "saml_idp_initiated_sso_relay_state": "",
+        "saml.assertion.consumer.url.post": "http://localhost:10000/acs"
       },
       "redirectUris": [
-        "http://localhost:8082/saml/acs"
+        "http://localhost:10000/acs"
       ],
-      "baseUrl": "http://localhost:8082",
-      "adminUrl": "http://localhost:8082"
+      "baseUrl": "http://localhost:10000/acs",
+      "adminUrl": "http://localhost:10000"
     },
     {
-      "clientId": "http://localhost:8082/metadata",
+      "clientId": "http://localhost:10000/metadata",
       "name": "SAML Proxy Client (zitadel)",
       "enabled": true,
       "protocol": "saml",
@@ -79,16 +80,17 @@
         "saml.signature.algorithm": "RSA_SHA256",
         "saml.client.signature": "false",
         "saml.authnstatement": "true",
-        "display.on.consent.screen": "false"
+        "display.on.consent.screen": "false",
+        "saml.assertion.consumer.url.post": "http://localhost:10000/metadata/acs"
       },
       "redirectUris": [
-        "http://localhost:8082/metadata/acs"
+        "http://localhost:10000/metadata/acs"
       ],
-      "baseUrl": "http://localhost:8082",
-      "adminUrl": "http://localhost:8082"
+      "baseUrl": "http://localhost:10000",
+      "adminUrl": "http://localhost:10000"
     },
     {
-      "clientId": "http://localhost:8082",
+      "clientId": "http://localhost:10000",
       "name": "SAML Proxy Client (base)",
       "enabled": true,
       "protocol": "saml",
@@ -102,14 +104,15 @@
         "saml.signature.algorithm": "RSA_SHA256",
         "saml.client.signature": "false",
         "saml.authnstatement": "true",
-        "display.on.consent.screen": "false"
+        "display.on.consent.screen": "false",
+        "saml.assertion.consumer.url.post": "http://localhost:10000/acs"
       },
       "redirectUris": [
-        "http://localhost:8082/metadata/acs",
-        "http://localhost:8082/saml/acs"
+        "http://localhost:10000/metadata/acs",
+        "http://localhost:10000/saml/acs"
       ],
-      "baseUrl": "http://localhost:8082",
-      "adminUrl": "http://localhost:8082"
+      "baseUrl": "http://localhost:10000",
+      "adminUrl": "http://localhost:10000"
     }
   ]
 }

@@ -6,10 +6,10 @@ This directory contains the integration testing setup for the Simple SAML Proxy 
 
 The integration testing environment uses a **Multi-Keycloak** setup to test the proxy's IDP selection functionality:
 
-- **Keycloak IdP** (port 8080): Acts as the first Identity Provider ("Development IdP") with test users
-- **Keycloak IdP2** (port 8083): Acts as the second Identity Provider ("Enterprise IdP") with enterprise users
-- **Keycloak SP** (port 8081): Acts as the Service Provider consuming authentication
-- **Simple SAML Proxy** (port 8082): The proxy being tested, bridges multiple IDPs and SP
+- **Keycloak IdP** (port 11001): Acts as the first Identity Provider ("Development IdP") with test users
+- **Keycloak IdP2** (port 11002): Acts as the second Identity Provider ("Enterprise IdP") with enterprise users
+- **Keycloak SP** (port 12000): Acts as the Service Provider consuming authentication
+- **Simple SAML Proxy** (port 10000): The proxy being tested, bridges multiple IDPs and SP
 
 ## Quick Start
 
@@ -33,17 +33,17 @@ make test       # Run integration tests
 
 ### Access Points
 
-- **Keycloak IdP Admin**: http://localhost:8080/admin (admin/admin)
-- **Keycloak IdP2 Admin**: http://localhost:8083/admin (admin/admin)
-- **Keycloak SP Admin**: http://localhost:8081/admin (admin/admin)
-- **SAML Proxy**: http://localhost:8082
+- **Keycloak IdP Admin**: http://localhost:11001/admin (admin/admin)
+- **Keycloak IdP2 Admin**: http://localhost:11002/admin (admin/admin)
+- **Keycloak SP Admin**: http://localhost:12000/admin (admin/admin)
+- **SAML Proxy**: http://localhost:10000
 
 ### Test Users
 
-#### Development IdP (port 8080)
+#### Development IdP (port 11001)
 - **testuser/testpassword** - Standard test user
 
-#### Enterprise IdP (port 8083)
+#### Enterprise IdP (port 11002)
 - **enterpriseuser/enterprisepassword** - Enterprise user
 - **testuser/testpassword** - Test user (IDP2 variant)
 
@@ -54,22 +54,11 @@ make test       # Run integration tests
 With the multi-IDP setup, you can now test the proxy's IDP selection functionality:
 
 1. **Start the environment**: `make dev-setup`
-2. **Access Keycloak SP**: http://localhost:8081
+2. **Access Keycloak SP**: http://localhost:12000
 3. **Initiate SAML login** through the SP's SAML broker
 4. **Observe IDP selection screen** at the proxy (should show "Development IdP" and "Enterprise IdP")
 5. **Test different IDPs** by selecting each option and logging in with respective users
 
-### IDP-Initiated Flow Testing
-
-Test the IDP-initiated flow where users start at the Identity Provider:
-
-1. **Login directly at Keycloak IdP**: http://localhost:8080
-2. **Navigate to applications** or use direct IDP-initiated URL
-3. **IdP sends unsolicited SAML response** to the proxy
-4. **Proxy shows SP selection page** (if multiple SPs configured)
-5. **User selects target SP** and is authenticated
-
-**Note**: With a single SP configured, the proxy automatically redirects to that SP without showing a selection page.
 
 ### End-to-End Tests (Playwright)
 
@@ -98,15 +87,10 @@ The tests validate the complete SAML proxy flows:
 SP →[SAML AuthnRequest]→ Proxy →[New SAML AuthnRequest]→ IdP →[SAML Response]→ Proxy →[New SAML Response]→ SP
 ```
 
-#### IDP-Initiated Flow
-```
-IdP →[Unsolicited SAML Response]→ Proxy →[SP Selection]→ SP
-```
 
 Key test files:
 - `tests/saml-flow.spec.js` - Simplified flow tests
 - `tests/saml-proxy-flow.spec.js` - Detailed proxy flow validation
-- `tests/idp-initiated-flow.spec.js` - IDP-initiated flow tests
 
 ### Verbose Mode Features
 

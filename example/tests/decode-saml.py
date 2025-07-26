@@ -123,7 +123,7 @@ if __name__ == "__main__":
     
     if not args.url:
         print("Usage: python decode-saml.py '<URL>' [--simple]")
-        print("Example: python decode-saml.py 'http://localhost:8080/realms/test/protocol/saml?SAMLRequest=...'")
+        print("Example: python decode-saml.py 'http://localhost:11001/realms/test/protocol/saml?SAMLRequest=...'")
         sys.exit(1)
     
     decode_saml_request(args.url, args.simple)

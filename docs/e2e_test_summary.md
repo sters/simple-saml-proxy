@@ -166,10 +166,9 @@ The implemented tests comprehensively cover:
 ## Recommendations for Future Improvements
 
 1. **Digital Signature Implementation**: Complete the signing infrastructure with actual XML signature generation
-2. **IdP-Initiated Flow Tests**: Add tests for IdP-initiated flows once implemented in the proxy
-3. **Performance Tests**: Add tests to verify the proxy can handle concurrent requests and measure response times
-4. **Advanced Binding Support**: Implement and test HTTP-POST binding scenarios
-5. **Multi-Tenant Testing**: Add tests for complex multi-tenant scenarios with multiple SPs and IdPs
+2. **Performance Tests**: Add tests to verify the proxy can handle concurrent requests and measure response times
+3. **Advanced Binding Support**: Implement and test HTTP-POST binding scenarios
+4. **Multi-Tenant Testing**: Add tests for complex multi-tenant scenarios with multiple SPs and IdPs
 
 ## Running the Tests
 

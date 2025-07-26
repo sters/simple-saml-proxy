@@ -171,6 +171,13 @@ func (s *Storage) GetEntityIDByAppID(_ context.Context, appID string) (string, e
 	return entityID, nil
 }
 
+// SetEntityIDMapping sets the entity ID mapping for an app ID.
+func (s *Storage) SetEntityIDMapping(appID, entityID string) {
+	s.entityIDByAppIDLock.Lock()
+	s.entityIDByAppID[appID] = entityID
+	s.entityIDByAppIDLock.Unlock()
+}
+
 func (s *Storage) GetResponseSigningKey(_ context.Context) (*key.CertificateAndKey, error) {
 	return s.getCertificateAndKey()
 }

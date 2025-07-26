@@ -22,6 +22,23 @@ func SetupHTTPHandlers(idp *saml.IDP, providers *saml.ServiceProviders, cfg conf
 	// Basic endpoints
 	mux.HandleFunc("/ping", handlePing)
 
+	// Handle root path
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// Only handle exact root path
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+
+			return
+		}
+
+		// Default response for root
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte("SAML Proxy is running")); err != nil {
+			slog.Error("Failed to write response", slog.String("error", err.Error()))
+		}
+	})
+
 	// SAML proxy endpoints - register these FIRST so they take precedence
 	mux.HandleFunc("/saml/acs", handleSAMLACS(idp, providers))
 	// For /acs, only handle if it's a SAML response (no id parameter)
@@ -49,7 +66,6 @@ func SetupHTTPHandlers(idp *saml.IDP, providers *saml.ServiceProviders, cfg conf
 			handleSAMLACS(idp, providers)(w, r)
 		}
 	})
-	mux.HandleFunc("/idp-initiated", handleIDPInitiated)
 
 	// Handle all /metadata/* routes through the IDP handler
 	// This includes /metadata, /metadata/sso, etc. (but NOT /metadata/acs since it's registered above)
@@ -92,14 +108,6 @@ func SetupHTTPHandlers(idp *saml.IDP, providers *saml.ServiceProviders, cfg conf
 			return
 		case strings.HasPrefix(r.URL.Path, "/logout_sp_select"):
 			handleLogoutSPSelect(idp, providers)(w, r)
-
-			return
-		case strings.HasPrefix(r.URL.Path, "/sp_selected"):
-			handleSPSelected(idp, providers)(w, r)
-
-			return
-		case strings.HasPrefix(r.URL.Path, "/sp_select"):
-			handleSPSelect(idp, providers)(w, r)
 
 			return
 		}

@@ -27,8 +27,7 @@ This dual-role pattern enables single-tenant applications to authenticate users 
 ### 🏢 **Multi-Identity Provider Support**
 - Connect multiple Identity Providers simultaneously
 - User-friendly IdP selection interface
-- Support for both SP-initiated and IdP-initiated flows
-- Automatic SP selection for IdP-initiated flows
+- Support for SP-initiated authentication flows
 
 ### 🔐 **Enterprise Security**
 - Full XML digital signature validation
@@ -186,30 +185,6 @@ sequenceDiagram
     SP->>User: Access granted
 ```
 
-### IdP-Initiated Flow
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant IdP as Identity Provider
-    participant Proxy as SAML Proxy
-    participant SP as Service Provider
-
-    User->>IdP: Login directly
-    IdP->>Proxy: Unsolicited SAML Response
-    alt Multiple SPs configured
-        Proxy->>User: Show SP selection page
-        User->>Proxy: Select SP
-    else Single SP configured
-        Note over Proxy: Auto-select SP
-    end
-    Proxy->>SP: New SAML Response
-    SP->>User: Access granted
-```
-
-The proxy automatically detects IdP-initiated flows when a SAML response arrives without prior context. If only one SP is configured, it automatically redirects to that SP. For multiple SPs, a selection page is displayed.
-
-For detailed implementation and configuration information, see [IdP-Initiated Flow Documentation](docs/idp-initiated-flow.md).
 
 ## Development
 
@@ -302,7 +277,7 @@ Simple SAML Proxy implements core SAML 2.0 features:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| **Web Browser SSO Profile** | ✅ | Full support |
+| **Web Browser SSO Profile** | ✅ | SP-initiated flow support |
 | **HTTP-Redirect Binding** | ✅ | For authentication requests |
 | **HTTP-POST Binding** | ✅ | For SAML responses |
 | **XML Digital Signatures** | ✅ | RSA-SHA256 with validation |

@@ -6,7 +6,7 @@
   "ssoSessionIdleTimeout": 1800,
   "ssoSessionMaxLifespan": 36000,
   "attributes": {
-    "saml.issuer": "http://localhost:8081/realms/sp-realm"
+    "saml.issuer": "http://localhost:12000/realms/sp-realm"
   },
   "users": [
     {
@@ -22,7 +22,54 @@
       ]
     }
   ],
-  "clients": [],
+  "clients": [
+    {
+      "clientId": "test-app",
+      "name": "Test Application",
+      "rootUrl": "http://localhost:12000",
+      "adminUrl": "http://localhost:12000",
+      "baseUrl": "/realms/sp-realm/account",
+      "enabled": true,
+      "publicClient": true,
+      "redirectUris": [
+        "http://localhost:12000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:12000"
+      ],
+      "protocol": "openid-connect",
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    },
+    {
+      "clientId": "http://localhost:10000",
+      "name": "SAML Test Client",
+      "enabled": true,
+      "protocol": "saml",
+      "frontchannelLogout": true,
+      "attributes": {
+        "saml.assertion.signature": "false",
+        "saml.force.post.binding": "true",
+        "saml.multivalued.roles": "false",
+        "saml.encrypt": "false",
+        "saml.server.signature": "false",
+        "saml.signature.algorithm": "RSA_SHA256",
+        "saml.client.signature": "false",
+        "saml.authnstatement": "true",
+        "saml.server.signature.keyinfo.ext": "false",
+        "saml_force_name_id_format": "false",
+        "saml.assertion.lifespan": "600",
+        "saml_assertion_consumer_url_post": "http://localhost:12000/realms/sp-realm/protocol/saml",
+        "saml_name_id_format": "persistent"
+      },
+      "redirectUris": [
+        "http://localhost:12000/*"
+      ],
+      "defaultClientScopes": [],
+      "optionalClientScopes": []
+    }
+  ],
   "identityProviders": [
     {
       "alias": "saml-proxy",
@@ -44,15 +91,17 @@
         "wantAuthnRequestsSigned": "false",
         "wantAssertionsSigned": "false",
         "wantAssertionsEncrypted": "false",
+        "addReadTokenRoleOnCreate": "false",
         "forceAuthn": "false",
         "signatureAlgorithm": "RSA_SHA256",
         "nameIDPolicyFormat": "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent",
         "principalType": "SUBJECT",
         "allowCreate": "true",
-        "entityId": "http://localhost:8082",
-        "singleSignOnServiceUrl": "http://localhost:8082/metadata/sso",
-        "singleLogoutServiceUrl": "http://localhost:8082/metadata/SLO",
-        "backchannelSupported": "false"
+        "entityId": "http://localhost:10000",
+        "singleSignOnServiceUrl": "http://localhost:10000/metadata/sso",
+        "singleLogoutServiceUrl": "http://localhost:10000/metadata/SLO",
+        "backchannelSupported": "false",
+        "signingCertificate": "MIIDjTCCAnWgAwIBAgIUWsCEHzAH8AQtq23sOELm0/43LGkwDQYJKoZIhvcNAQELBQAwVjELMAkGA1UEBhMCVVMxDTALBgNVBAgMBFRlc3QxDTALBgNVBAcMBFRlc3QxDTALBgNVBAoMBFRlc3QxGjAYBgNVBAMMEXNpbXBsZS1zYW1sLXByb3h5MB4XDTI1MDcyNDA0NDkwNloXDTI2MDcyNDA0NDkwNlowVjELMAkGA1UEBhMCVVMxDTALBgNVBAgMBFRlc3QxDTALBgNVBAcMBFRlc3QxDTALBgNVBAoMBFRlc3QxGjAYBgNVBAMMEXNpbXBsZS1zYW1sLXByb3h5MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArxI6HeBampR1dXrR1fUQKBNZoHP/5DSQqgwfvI1cLWQhDsZz6eKMKh3yEpeXp9JaHmhgcyImCS4JVJpmBNfKmfdNkQnqJ1n1ns760AbVctMMiYKDgywxGfOjM5SArj7dGpfbv/4HUZRnJnRXmSIdNa0LG9ZVIZcQsuMGF4qrupHEJTKA2koe3TZS/9UDQ9QARSx4a0UAU5O0rCpUdi2xui6+Nd8UWN0Eysg5eJIpG+D7dae/sRcbx42FVlp8/XK4Od2kP4MIWUsAn3dMQc0VBeUkDhEhvvGqlYMbXuWAoWjZT5D3zCgIxPyH5q8NQI37DbrKYHnsBTtWovTSFyJX6wIDAQABo1MwUTAdBgNVHQ4EFgQUOILABI2Bz8DF/d+wjIQKH5CbKLwwHwYDVR0jBBgwFoAUOILABI2Bz8DF/d+wjIQKH5CbKLwwDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEABH4dx7VebLFjDntcN1PELasARzs1YD4ssT/gkm4DBu5T5LffQEj3ZtgoxDgMcsgHxNJDhplRagUIXrRuWblg5XBo6h2LNZMwxasu+g2u9lk8GUbYb4wB+IK48S6NbkcqC8RoEJQKwxrrrhSg5SkOUfSMB1Rx9Us0Cbgx8NQDgZIrlxeiknCA8fDrETjg/w4rqdU57pfNe88MQl/IhkfEuuAhXHt5wuedK8LFyUQg+6LeErZJZFlKAbijnGez0ABVVgqKgOUS1bLZb8FOqtCmG1p0U0wdU025F2iadCQwbjmR4NSp1WKsJBQ8ZKJJ8ONxOB9YSr2l+Hc8eDvbWwgZ0A=="
       }
     }
   ]
