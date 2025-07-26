@@ -51,8 +51,7 @@
       "redirectUris": [
         "http://localhost:10000/*",
         "http://localhost:10000/metadata/acs",
-        "http://localhost:10000/acs",
-        "http://localhost:10000/sp_select"
+        "http://localhost:10000/acs"
       ],
       "baseUrl": "http://localhost:10000",
       "adminUrl": "http://localhost:10000",

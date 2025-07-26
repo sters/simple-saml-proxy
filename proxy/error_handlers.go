@@ -18,7 +18,6 @@ const (
 	ErrInvalidFormData             = "Invalid form data"
 	ErrFailedToCreateLogoutRequest = "Failed to create logout request"
 	ErrIDPDoesNotSupportSLO        = "Selected IdP does not support Single Logout"
-	ErrNotImplemented              = "IdP-Initiated flow not yet implemented"
 )
 
 // respondWithError writes an error response with logging.

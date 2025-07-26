@@ -55,8 +55,6 @@
         "saml.client.signature": "false",
         "saml.authnstatement": "true",
         "display.on.consent.screen": "false",
-        "saml_idp_initiated_sso_url_name": "saml-proxy",
-        "saml_idp_initiated_sso_relay_state": "",
         "saml.assertion.consumer.url.post": "http://localhost:10000/acs"
       },
       "redirectUris": [

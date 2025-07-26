@@ -7,7 +7,6 @@
     "test": "playwright test",
     "test:flow": "playwright test saml-flow.spec.js",
     "test:proxy": "playwright test saml-proxy-flow.spec.js",
-    "test:idp-initiated": "playwright test idp-initiated-flow.spec.js",
     "test:verbose": "VERBOSE=true playwright test",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
