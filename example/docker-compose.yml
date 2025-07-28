@@ -93,9 +93,6 @@ services:
     environment:
       # Proxy configuration
       PROXY_ENTITY_ID: "http://localhost:10000"
-      PROXY_ACS_URL: "http://localhost:10000/acs"
-      PROXY_SSO_URL: "http://localhost:10000/metadata/sso"
-      PROXY_SLO_URL: "http://localhost:10000/metadata/SLO"
       PROXY_PRIVATE_KEY_PATH: "/certs/proxy.key"
       PROXY_CERTIFICATE_PATH: "/certs/proxy.crt"
       
@@ -117,6 +114,7 @@ services:
       
       # Server configuration
       SERVER_LISTEN_ADDRESS: ":8080"
+      LOG_LEVEL: "debug"
       
       # Metadata retry configuration
       METADATA_MAX_RETRIES: 10
@@ -129,15 +127,18 @@ services:
     networks:
       - saml-network
     depends_on:
-      - keycloak-idp
-      - keycloak-idp2
-      - keycloak-sp
+      keycloak-idp:
+        condition: service_healthy
+      keycloak-idp2:
+        condition: service_healthy
+      keycloak-sp:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/metadata"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/ping"]
       interval: 5s
       timeout: 3s
-      retries: 3
-      start_period: 10s
+      retries: 30
+      start_period: 20s
 
   # Test runner for integration tests
   test-runner:

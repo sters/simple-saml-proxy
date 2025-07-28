@@ -16,7 +16,22 @@ import (
 func main() {
 	ctx := context.Background()
 
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	// Set log level from environment variable
+	logLevel := slog.LevelInfo
+	if level := os.Getenv("LOG_LEVEL"); level != "" {
+		switch level {
+		case "debug":
+			logLevel = slog.LevelDebug
+		case "warn":
+			logLevel = slog.LevelWarn
+		case "error":
+			logLevel = slog.LevelError
+		}
+	}
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: logLevel,
+	}))
 	slog.SetDefault(logger)
 
 	cfg, err := config.LoadConfig()

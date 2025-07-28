@@ -1,6 +1,6 @@
 # Integration Testing Makefile for Simple SAML Proxy
 
-.PHONY: help setup start stop clean test test-basic test-e2e logs status
+.PHONY: help setup start stop clean test test-basic test-e2e logs status rebuild
 
 help: ## Show this help message
 	@echo "Available commands:"
@@ -13,8 +13,8 @@ setup: ## Generate certificates and prepare environment
 
 start: ## Start all services (Keycloak IdP, SP, and SAML Proxy)
 	@echo "Starting integration testing environment..."
-	@docker-compose up -d
-	@echo "Services starting... Use 'make logs' to see output"
+	@docker-compose up -d --wait
+	@echo "All services are ready!"
 
 configure: ## Configure Keycloak SP with SAML Identity Provider
 	@echo "Configuring Keycloak SP..."
@@ -29,7 +29,7 @@ clean: ## Stop services and remove volumes
 	@docker-compose down -v --remove-orphans
 	@docker system prune -f
 
-test: setup start configure test-e2e ## Run full integration test suite
+test: setup start test-e2e ## Run full integration test suite
 
 test-e2e-setup: ## Install Playwright dependencies
 	@echo "Setting up Playwright tests..."
@@ -57,7 +57,8 @@ rebuild: ## Rebuild and restart all services
 	@echo "Rebuilding services..."
 	@docker-compose down
 	@docker-compose build --no-cache
-	@docker-compose up -d
+	@docker-compose up -d --wait
+	@echo "All services are ready!"
 
 # Service-specific commands
 logs-proxy: ## Show logs from SAML proxy only

@@ -359,7 +359,7 @@ func TestHandleSLOResponse(t *testing.T) {
 	logoutCtx := storage.CreateLogoutContext("idp", "https://idp.example.com", "https://sp.example.com", "test-relay-state")
 
 	// Create handler
-	handler := handleSLOResponse(idp, nil)
+	handler := handleSLOResponse(idp, nil, cfg)
 
 	// Create a valid logout response
 	logoutResponse := &crewjamsaml.LogoutResponse{
@@ -393,7 +393,7 @@ func TestHandleSLOResponse(t *testing.T) {
 				compressed, _ := deflateCompress(xmlBytes)
 				encoded := base64.StdEncoding.EncodeToString(compressed)
 
-				req := httptest.NewRequest(http.MethodGet, "/slo/response?SAMLResponse="+url.QueryEscape(encoded), nil)
+				req := httptest.NewRequest(http.MethodGet, "/idp/slo/response?SAMLResponse="+url.QueryEscape(encoded), nil)
 				req.AddCookie(&http.Cookie{
 					Name:  "logout_context_id",
 					Value: logoutCtx.ID,
@@ -423,7 +423,7 @@ func TestHandleSLOResponse(t *testing.T) {
 		{
 			name: "Missing SAMLResponse parameter",
 			setupRequest: func() *http.Request {
-				req := httptest.NewRequest(http.MethodGet, "/slo/response", nil)
+				req := httptest.NewRequest(http.MethodGet, "/idp/slo/response", nil)
 				req.AddCookie(&http.Cookie{
 					Name:  "logout_context_id",
 					Value: logoutCtx.ID,
@@ -440,7 +440,7 @@ func TestHandleSLOResponse(t *testing.T) {
 		{
 			name: "Invalid SAMLResponse",
 			setupRequest: func() *http.Request {
-				req := httptest.NewRequest(http.MethodGet, "/slo/response?SAMLResponse=invalid-base64", nil)
+				req := httptest.NewRequest(http.MethodGet, "/idp/slo/response?SAMLResponse=invalid-base64", nil)
 				req.AddCookie(&http.Cookie{
 					Name:  "logout_context_id",
 					Value: logoutCtx.ID,
@@ -464,7 +464,7 @@ func TestHandleSLOResponse(t *testing.T) {
 				compressed, _ := deflateCompress(xmlBytes)
 				encoded := base64.StdEncoding.EncodeToString(compressed)
 
-				req := httptest.NewRequest(http.MethodGet, "/slo/response?SAMLResponse="+url.QueryEscape(encoded), nil)
+				req := httptest.NewRequest(http.MethodGet, "/idp/slo/response?SAMLResponse="+url.QueryEscape(encoded), nil)
 				req.AddCookie(&http.Cookie{
 					Name:  "logout_context_id",
 					Value: logoutCtx.ID,
@@ -485,7 +485,7 @@ func TestHandleSLOResponse(t *testing.T) {
 				compressed, _ := deflateCompress(xmlBytes)
 				encoded := base64.StdEncoding.EncodeToString(compressed)
 
-				req := httptest.NewRequest(http.MethodGet, "/slo/response?SAMLResponse="+url.QueryEscape(encoded), nil)
+				req := httptest.NewRequest(http.MethodGet, "/idp/slo/response?SAMLResponse="+url.QueryEscape(encoded), nil)
 				// No cookie added
 				return req
 			},
@@ -502,7 +502,7 @@ func TestHandleSLOResponse(t *testing.T) {
 				compressed, _ := deflateCompress(xmlBytes)
 				encoded := base64.StdEncoding.EncodeToString(compressed)
 
-				req := httptest.NewRequest(http.MethodGet, "/slo/response?SAMLResponse="+url.QueryEscape(encoded), nil)
+				req := httptest.NewRequest(http.MethodGet, "/idp/slo/response?SAMLResponse="+url.QueryEscape(encoded), nil)
 				req.AddCookie(&http.Cookie{
 					Name:  "logout_context_id",
 					Value: "non-existent-context",
@@ -530,7 +530,7 @@ func TestHandleSLOResponse(t *testing.T) {
 				compressed, _ := deflateCompress(xmlBytes)
 				encoded := base64.StdEncoding.EncodeToString(compressed)
 
-				req := httptest.NewRequest(http.MethodGet, "/slo/response?SAMLResponse="+url.QueryEscape(encoded), nil)
+				req := httptest.NewRequest(http.MethodGet, "/idp/slo/response?SAMLResponse="+url.QueryEscape(encoded), nil)
 				req.AddCookie(&http.Cookie{
 					Name:  "logout_context_id",
 					Value: testCtx.ID,
@@ -643,6 +643,30 @@ func TestHandleSLOResponse_Integration(t *testing.T) {
 	cfg.Proxy.EntityID = "https://proxy.example.com"
 	cfg.Proxy.CertificatePath = certPath
 	cfg.Proxy.PrivateKeyPath = keyPath
+	// Add allowed SP configuration
+	cfg.Proxy.AllowedSP = []config.SPConfig{
+		{
+			EntityID:    "https://sp.example.com",
+			MetadataURL: "test://metadata", // Will be mocked
+		},
+	}
+
+	// Set up metadata server
+	metadataXML := `<?xml version="1.0"?>
+<EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="https://sp.example.com">
+  <SPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://sp.example.com/logout/response"/>
+  </SPSSODescriptor>
+</EntityDescriptor>`
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(metadataXML))
+	}))
+	defer server.Close()
+
+	// Update config with real metadata URL
+	cfg.Proxy.AllowedSP[0].MetadataURL = server.URL
 
 	idp, err := saml.CreateProxyIDP(cfg)
 	require.NoError(t, err)
@@ -651,7 +675,7 @@ func TestHandleSLOResponse_Integration(t *testing.T) {
 	storage := idp.GetStorage()
 	logoutCtx := storage.CreateLogoutContext("idp", "https://idp.example.com", "https://sp.example.com", "relay=state&with=special%20chars")
 
-	handler := handleSLOResponse(idp, nil)
+	handler := handleSLOResponse(idp, nil, cfg)
 
 	// Create response
 	logoutResponse := &crewjamsaml.LogoutResponse{
@@ -676,7 +700,7 @@ func TestHandleSLOResponse_Integration(t *testing.T) {
 	compressed, _ := deflateCompress(xmlBytes)
 	encoded := base64.StdEncoding.EncodeToString(compressed)
 
-	req := httptest.NewRequest(http.MethodGet, "/slo/response?SAMLResponse="+url.QueryEscape(encoded), nil)
+	req := httptest.NewRequest(http.MethodGet, "/idp/slo/response?SAMLResponse="+url.QueryEscape(encoded), nil)
 	req.AddCookie(&http.Cookie{
 		Name:  "logout_context_id",
 		Value: logoutCtx.ID,

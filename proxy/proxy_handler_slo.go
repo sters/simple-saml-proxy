@@ -19,6 +19,11 @@ import (
 	"github.com/sters/simple-saml-proxy/proxy/saml"
 )
 
+const (
+	sigAlgSHA1   = "http://www.w3.org/2000/09/xmldsig#rsa-sha1"
+	sigAlgSHA256 = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"
+)
+
 var (
 	errLogoutRequestSignatureRequired = errors.New("logout request signature is required but not present")
 	errIDPNotAvailable                = errors.New("IDP not available")
@@ -253,12 +258,7 @@ func validateRedirectSignature(ctx context.Context, rawQuery string, idp *saml.I
 	// Get SP certificate
 	cert, err := getSPSigningCertificate(ctx, idp, spEntityID)
 	if err != nil {
-		// Log warning but continue for now (backward compatibility)
-		slog.Warn("Failed to get SP signing certificate",
-			slog.String("sp", spEntityID),
-			slog.String("error", err.Error()))
-
-		return nil
+		return fmt.Errorf("failed to get SP signing certificate: %w", err)
 	}
 
 	// Verify the signature
@@ -289,12 +289,7 @@ func validateEmbeddedSignature(ctx context.Context, logoutRequest *crewjamsaml.L
 	// Get SP certificate for signature validation
 	cert, err := getSPSigningCertificate(ctx, idp, spEntityID)
 	if err != nil {
-		// Log warning but continue for backward compatibility
-		slog.Warn("Failed to get SP signing certificate for embedded signature validation",
-			slog.String("sp", spEntityID),
-			slog.String("error", err.Error()))
-
-		return nil
+		return fmt.Errorf("failed to get SP signing certificate: %w", err)
 	}
 
 	// Create certificate store with the SP's certificate

@@ -151,11 +151,11 @@ func CreateServiceProviders(ctx context.Context, cfg config.Config) (*ServicePro
 		sp.ServiceProvider.MetadataURL = metadataURL
 
 		acsURL := *rootURL
-		acsURL.Path = "/metadata/acs"
+		acsURL.Path = "/sp/acs"
 		sp.ServiceProvider.AcsURL = acsURL
 
 		sloURL := *rootURL
-		sloURL.Path = "/metadata/SLO"
+		sloURL.Path = "/sp/sls"
 		sp.ServiceProvider.SloURL = sloURL
 
 		provider := &ServiceProvider{

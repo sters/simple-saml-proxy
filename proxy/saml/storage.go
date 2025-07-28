@@ -139,7 +139,7 @@ func (s *Storage) GetEntityByID(ctx context.Context, entityID string) (*servicep
 		loginURL := func(id string) string {
 			slog.Info("login URL", slog.String("id", id))
 
-			return "/idp_select?id=" + id
+			return "/idp/idp_select?id=" + id
 		}
 
 		// Create a new service provider
@@ -204,7 +204,7 @@ func (s *Storage) CreateAuthRequest(_ context.Context, authnRequest *samlp.Authn
 	s.authRequestsLock.Lock()
 	s.authRequests[id] = authRequest
 	// Also store by ACS URL for zitadel/saml library compatibility
-	acsURL := s.config.Proxy.AcsURL
+	acsURL := s.config.Proxy.EntityID + "/sp/acs"
 	if acsURL != "" {
 		s.authRequests[acsURL] = authRequest
 		slog.Info("Stored auth request by ACS URL", slog.String("url", acsURL), slog.String("id", id))

@@ -10,12 +10,13 @@ import (
 
 	"github.com/beevik/etree"
 	crewjamsaml "github.com/crewjam/saml"
+	"github.com/sters/simple-saml-proxy/config"
 	"github.com/sters/simple-saml-proxy/proxy/saml"
 )
 
 // handleSLOResponse handles logout responses from SPs in the IdP-initiated flow.
 // This completes the IdP-initiated logout by sending a response back to the originating IdP.
-func handleSLOResponse(idp *saml.IDP, _ *saml.ServiceProviders) http.HandlerFunc {
+func handleSLOResponse(idp *saml.IDP, _ *saml.ServiceProviders, cfg config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		slog.Info("Received logout response from SP",
 			slog.String("method", r.Method),
@@ -91,7 +92,7 @@ func handleSLOResponse(idp *saml.IDP, _ *saml.ServiceProviders) http.HandlerFunc
 		}
 
 		// Determine where to send the response based on the logout flow type
-		responseURL := getLogoutResponseURL(r.Context(), storage, logoutCtx)
+		responseURL := getLogoutResponseURL(r.Context(), storage, logoutCtx, cfg)
 
 		// Build the logout response URL
 		redirectURL, err := buildLogoutResponseURL(finalResponse, responseURL, logoutCtx.RelayState)
@@ -161,10 +162,9 @@ func buildLogoutResponseURL(logoutResponse *crewjamsaml.LogoutResponse, destinat
 }
 
 // getLogoutResponseURL determines the appropriate URL to send logout response to.
-func getLogoutResponseURL(ctx context.Context, storage *saml.Storage, logoutCtx *saml.LogoutContext) string {
+func getLogoutResponseURL(ctx context.Context, storage *saml.Storage, logoutCtx *saml.LogoutContext, cfg config.Config) string {
 	if logoutCtx.OriginType != "sp" {
-		// IdP-initiated flow: send response back to the IdP
-		// For now, we'll use a standard pattern
+		// Use the SLO response path from configuration
 		return logoutCtx.OriginID + "/slo/response"
 	}
 

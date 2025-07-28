@@ -43,6 +43,17 @@ get_access_token() {
         jq -r '.access_token'
 }
 
+# Function to delete existing SAML identity provider
+delete_saml_idp() {
+    local token=$1
+    local keycloak_url=$2
+    
+    log "Deleting existing SAML Identity Provider if it exists..."
+    
+    curl -s -X DELETE "$keycloak_url/admin/realms/sp-realm/identity-provider/instances/saml-proxy" \
+        -H "Authorization: Bearer $token"
+}
+
 # Function to create SAML identity provider
 create_saml_idp() {
     local token=$1
@@ -59,7 +70,7 @@ create_saml_idp() {
             "providerId": "saml",
             "enabled": true,
             "config": {
-                "singleSignOnServiceUrl": "'"$PROXY_URL/sso"'",
+                "singleSignOnServiceUrl": "'"$PROXY_URL/idp/sso"'",
                 "backchannelSupported": "false",
                 "nameIDPolicyFormat": "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent",
                 "postBindingAuthnRequest": "true",
@@ -70,7 +81,7 @@ create_saml_idp() {
                 "forceAuthn": "false",
                 "validateSignature": "false",
                 "signSpMetadata": "false",
-                "metadataDescriptorUrl": "'"$PROXY_URL/metadata"'"
+                "metadataDescriptorUrl": "'"$PROXY_URL/idp/metadata"'"
             }
         }'
 }
@@ -175,7 +186,7 @@ main() {
     # Wait for services
     wait_for_service "Keycloak SP" "$KEYCLOAK_SP_URL/realms/master"
     wait_for_service "Keycloak IdP" "$KEYCLOAK_IDP_URL/realms/master"
-    wait_for_service "SAML Proxy" "$PROXY_URL/metadata"
+    wait_for_service "SAML Proxy" "$PROXY_URL/idp/metadata"
     
     # Get access token
     log "Getting access token..."
@@ -185,6 +196,9 @@ main() {
         error "Failed to get access token"
         exit 1
     fi
+    
+    # Delete existing SAML identity provider
+    delete_saml_idp "$TOKEN" "$KEYCLOAK_SP_URL"
     
     # Create SAML identity provider
     create_saml_idp "$TOKEN" "$KEYCLOAK_SP_URL"

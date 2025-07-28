@@ -22,14 +22,27 @@ The integration testing environment uses a **Multi-Keycloak** setup to test the 
 
 ```bash
 # Generate certificates and start all services
-make dev-setup
+make test       # Run full integration test suite
 
 # Or manually:
 make setup      # Generate certificates
-make start      # Start all services
-make configure  # Configure Keycloak SP with SAML Identity Provider
-make test       # Run integration tests
+make start      # Start all services (automatically waits for health)
+make test-e2e   # Run integration tests
 ```
+
+### Health Checks
+
+The `make start` command uses Docker Compose's `--wait` flag to automatically wait for all services to be healthy before returning. This eliminates the need for manual sleep commands or additional scripts.
+
+Docker Compose monitors:
+- Container health status via built-in healthchecks
+- Service dependencies with `depends_on` and `condition: service_healthy`
+- Automatic retries and startup delays
+
+The services will start in the correct order:
+1. Keycloak IdPs and SP start first
+2. SAML Proxy waits for all Keycloak services to be healthy
+3. Tests can run immediately after `make start` completes
 
 ### Access Points
 
@@ -61,6 +74,8 @@ With the multi-IDP setup, you can now test the proxy's IDP selection functionali
 
 
 ### End-to-End Tests (Playwright)
+
+**Note**: Tests now exit automatically without requiring user input. The HTML report server no longer starts automatically after test completion.
 
 ```bash
 # Run all tests
@@ -172,7 +187,7 @@ PROXY_ALLOWED_SP_0_REQUIRE_SIGNED_LOGOUT_REQUESTS: "false"  # Per-SP setting
 
 ```bash
 # Start development environment
-make dev-setup
+make start          # Starts services with automatic health checking
 
 # View logs
 make logs           # All services
@@ -188,24 +203,33 @@ make shell-sp       # SP container
 # Clean up
 make clean          # Stop and remove volumes
 make stop           # Stop services only
+
+# Rebuild and restart
+make rebuild        # Rebuild and restart all services with health waiting
 ```
 
 ### Testing Workflow
 
-1. **Start Services**: `make start`
-2. **Configure Keycloak**: `make configure`
-3. **Run E2E Tests**: `make test-e2e`
-4. **Check Logs**: `make logs`
-5. **Clean Up**: `make clean`
+1. **Run Full Test Suite**: `make test` (includes setup, start, and test execution)
+2. **Check Logs**: `make logs` (if tests fail)
+3. **Clean Up**: `make clean`
+
+For manual testing:
+1. **Start Services**: `make start` (Docker Compose waits for health)
+2. **Run E2E Tests**: `make test-e2e`
+3. **Check Logs**: `make logs`
+4. **Clean Up**: `make clean`
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Services not starting**: Check if ports 8080, 8081, 8082 are available
+1. **Services not starting**: Check if ports 10000, 11001, 11002, 12000 are available
 2. **Certificate errors**: Regenerate certificates with `make setup`
 3. **Network issues**: Ensure Docker daemon is running
 4. **Test failures**: Check service logs with `make logs`
+5. **Health check timeout**: Services may take longer to start on slower machines
+6. **Service connection issues**: Check `docker-compose logs` for detailed errors
 
 ### Debugging
 

@@ -10,7 +10,7 @@ module.exports = defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: process.env.VERBOSE === 'true' ? [['list', { printSteps: true }]] : 'html',
+  reporter: process.env.VERBOSE === 'true' ? [['list', { printSteps: true }]] : [['html', { open: 'never' }]],
   use: {
     baseURL: 'http://localhost:10000',
     trace: process.env.VERBOSE === 'true' ? 'on' : 'on-first-retry',

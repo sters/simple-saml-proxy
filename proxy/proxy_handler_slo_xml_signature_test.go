@@ -38,9 +38,10 @@ func TestValidateEmbeddedSignature(t *testing.T) {
 			// Missing required fields like ID, Version, etc.
 		}
 
-		// Without an IDP, it will log a warning and return nil
+		// Without an IDP, it will fail to get SP certificate first
 		err := validateEmbeddedSignature(t.Context(), logoutRequest, nil, "https://sp.example.com")
-		require.NoError(t, err) // Currently returns nil when certificate retrieval fails
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to get SP signing certificate")
 	})
 
 	t.Run("IDP not available", func(t *testing.T) {
@@ -48,9 +49,10 @@ func TestValidateEmbeddedSignature(t *testing.T) {
 		spCert, spKey := testutil.GenerateTestCertificate(t, "SP Test")
 		logoutRequest := createSignedLogoutRequest(t, spKey, spCert)
 
-		// With nil IDP, getSPSigningCertificate will fail but we'll continue
+		// With nil IDP, getSPSigningCertificate will fail and return error
 		err := validateEmbeddedSignature(t.Context(), logoutRequest, nil, "https://sp.example.com")
-		require.NoError(t, err) // Should log warning but not error
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to get SP signing certificate")
 	})
 }
 

@@ -16,11 +16,6 @@ import (
 	"github.com/sters/simple-saml-proxy/proxy/saml"
 )
 
-const (
-	sigAlgSHA1   = "http://www.w3.org/2000/09/xmldsig#rsa-sha1"
-	sigAlgSHA256 = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"
-)
-
 var (
 	errUnsupportedSigAlg = errors.New("unsupported signature algorithm")
 	errPrivateKeyNotRSA  = errors.New("private key must be an RSA key")

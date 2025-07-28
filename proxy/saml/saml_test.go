@@ -40,8 +40,6 @@ func TestCreateProxyIDP(t *testing.T) {
 	// Create a test config
 	cfg := &config.Config{}
 	cfg.Proxy.EntityID = "http://test.example.com/metadata"
-	cfg.Proxy.AcsURL = "http://test.example.com/sso/acs"
-	cfg.Proxy.MetadataURL = "http://test.example.com/metadata"
 	cfg.Proxy.CertificatePath = certPath
 	cfg.Proxy.PrivateKeyPath = keyPath
 

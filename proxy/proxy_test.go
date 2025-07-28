@@ -67,7 +67,7 @@ func TestSetupHTTPHandlers(t *testing.T) {
 	assert.NotNil(t, mux)
 
 	// Test the SSO endpoint - use the actual metadata SSO endpoint
-	req := httptest.NewRequest(http.MethodGet, "/metadata/sso", nil)
+	req := httptest.NewRequest(http.MethodGet, "/idp/sso", nil)
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -75,7 +75,7 @@ func TestSetupHTTPHandlers(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "StatusCode")
 
 	// Test the metadata endpoint (should return IdP metadata)
-	req = httptest.NewRequest(http.MethodGet, "/metadata", nil)
+	req = httptest.NewRequest(http.MethodGet, "/idp/metadata", nil)
 	w = httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -120,6 +120,8 @@ func TestStartServer(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := config.Config{}
 			cfg.Server.ListenAddress = tt.listenAddress
+			// Set default entity ID
+			cfg.Proxy.EntityID = "http://test.example.com"
 
 			// For valid configurations, start server in background
 			if !tt.wantErr {

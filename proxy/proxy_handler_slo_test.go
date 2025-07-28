@@ -486,7 +486,7 @@ func TestValidateLogoutRequestSignature(t *testing.T) {
 			},
 			rawQuery:         "SAMLRequest=test&Signature=test&SigAlg=http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
 			requireSignature: false,
-			expectedError:    "", // Validation will pass (logged but not enforced in current implementation)
+			expectedError:    "failed to get SP signing certificate", // Will fail without IDP
 		},
 	}
 
@@ -523,10 +523,6 @@ func TestDetermineSignatureRequirement(t *testing.T) {
 			cfg: config.Config{
 				Proxy: struct {
 					EntityID                    string            `env:"ENTITY_ID"                      envDefault:"http://localhost:8080"`
-					AcsURL                      string            `env:"ACS_URL"                        envDefault:"http://localhost:8080/sso/acs"`
-					MetadataURL                 string            `env:"METADATA_URL"                   envDefault:"http://localhost:8080/metadata"`
-					SLOURL                      string            `env:"SLO_URL"                        envDefault:"http://localhost:8080/slo"`
-					SLSURL                      string            `env:"SLS_URL"                        envDefault:"http://localhost:8080/sls"`
 					PrivateKeyPath              string            `env:"PRIVATE_KEY_PATH,required"`
 					CertificatePath             string            `env:"CERTIFICATE_PATH,required"`
 					RequireSignedLogoutRequests bool              `env:"REQUIRE_SIGNED_LOGOUT_REQUESTS" envDefault:"false"`
@@ -553,10 +549,6 @@ func TestDetermineSignatureRequirement(t *testing.T) {
 			cfg: config.Config{
 				Proxy: struct {
 					EntityID                    string            `env:"ENTITY_ID"                      envDefault:"http://localhost:8080"`
-					AcsURL                      string            `env:"ACS_URL"                        envDefault:"http://localhost:8080/sso/acs"`
-					MetadataURL                 string            `env:"METADATA_URL"                   envDefault:"http://localhost:8080/metadata"`
-					SLOURL                      string            `env:"SLO_URL"                        envDefault:"http://localhost:8080/slo"`
-					SLSURL                      string            `env:"SLS_URL"                        envDefault:"http://localhost:8080/sls"`
 					PrivateKeyPath              string            `env:"PRIVATE_KEY_PATH,required"`
 					CertificatePath             string            `env:"CERTIFICATE_PATH,required"`
 					RequireSignedLogoutRequests bool              `env:"REQUIRE_SIGNED_LOGOUT_REQUESTS" envDefault:"false"`
@@ -579,10 +571,6 @@ func TestDetermineSignatureRequirement(t *testing.T) {
 			cfg: config.Config{
 				Proxy: struct {
 					EntityID                    string            `env:"ENTITY_ID"                      envDefault:"http://localhost:8080"`
-					AcsURL                      string            `env:"ACS_URL"                        envDefault:"http://localhost:8080/sso/acs"`
-					MetadataURL                 string            `env:"METADATA_URL"                   envDefault:"http://localhost:8080/metadata"`
-					SLOURL                      string            `env:"SLO_URL"                        envDefault:"http://localhost:8080/slo"`
-					SLSURL                      string            `env:"SLS_URL"                        envDefault:"http://localhost:8080/sls"`
 					PrivateKeyPath              string            `env:"PRIVATE_KEY_PATH,required"`
 					CertificatePath             string            `env:"CERTIFICATE_PATH,required"`
 					RequireSignedLogoutRequests bool              `env:"REQUIRE_SIGNED_LOGOUT_REQUESTS" envDefault:"false"`

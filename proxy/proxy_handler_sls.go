@@ -124,21 +124,10 @@ func handleLogoutResponse(w http.ResponseWriter, r *http.Request, idp *saml.IDP,
 	// Extract SingleLogoutService from SP metadata
 	sls, err := storage.GetSingleLogoutServiceFromSP(r.Context(), logoutCtx.OriginID)
 	if err != nil {
-		slog.Warn("Failed to extract SingleLogoutService from metadata, using fallback",
+		slog.Error("Failed to extract SingleLogoutService from metadata",
 			slog.String("entityID", logoutCtx.OriginID),
 			slog.String("error", err.Error()))
-		// Fallback to the previous hardcoded pattern for backward compatibility
-		logoutResponseURL := logoutCtx.OriginID + "/logout/response"
-		responseURL, err := buildLogoutResponseURL(finalResponse, logoutResponseURL, logoutCtx.RelayState)
-		if err != nil {
-			slog.Error("Failed to build fallback logout response URL", slog.String("error", err.Error()))
-			http.Error(w, "Failed to create logout response", http.StatusInternalServerError)
-
-			return
-		}
-		// Redirect to SP with logout response
-		slog.Info("Redirecting to SP with logout response (fallback)", slog.String("url", responseURL))
-		http.Redirect(w, r, responseURL, http.StatusFound)
+		http.Error(w, "Failed to get SP logout service", http.StatusInternalServerError)
 
 		return
 	}

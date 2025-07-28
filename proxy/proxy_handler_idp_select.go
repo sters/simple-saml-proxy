@@ -93,7 +93,7 @@ func handleIDPSelect(idp *saml.IDP, providers *saml.ServiceProviders) http.Handl
 			SetSecureCookie(w, r, cookieNameIDPID, singleIDPID, 300)
 
 			// Redirect to the IdP selected handler
-			redirectURL := "/idp_selected?idpID=" + singleIDPID
+			redirectURL := "/idp/idp_selected?idpID=" + singleIDPID
 			if ar, ok := authRequest.(*saml.AuthRequest); ok && ar.RelayState != "" {
 				redirectURL += "&RelayState=" + ar.RelayState
 			}
@@ -113,7 +113,7 @@ func handleIDPSelect(idp *saml.IDP, providers *saml.ServiceProviders) http.Handl
 			RelayState string
 		}{
 			Providers:  providers.Providers,
-			SelectURL:  "/idp_selected",
+			SelectURL:  "/idp/idp_selected",
 			RelayState: relayState,
 		}
 

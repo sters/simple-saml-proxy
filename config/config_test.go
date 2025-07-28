@@ -26,8 +26,6 @@ func TestLoadConfig(t *testing.T) {
 		// Set up test environment variables for single IDP
 		os.Clearenv()
 		t.Setenv("PROXY_ENTITY_ID", "http://test.example.com/metadata")
-		t.Setenv("PROXY_ACS_URL", "http://test.example.com/sso/acs")
-		t.Setenv("PROXY_METADATA_URL", "http://test.example.com/metadata")
 		t.Setenv("PROXY_PRIVATE_KEY_PATH", "/path/to/key.pem")
 		t.Setenv("PROXY_CERTIFICATE_PATH", "/path/to/cert.pem")
 		t.Setenv("IDP_0_ID", "default")
@@ -40,8 +38,6 @@ func TestLoadConfig(t *testing.T) {
 		config, err := LoadConfig()
 		require.NoError(t, err)
 		assert.Equal(t, "http://test.example.com/metadata", config.Proxy.EntityID)
-		assert.Equal(t, "http://test.example.com/sso/acs", config.Proxy.AcsURL)
-		assert.Equal(t, "http://test.example.com/metadata", config.Proxy.MetadataURL)
 		assert.Equal(t, "/path/to/key.pem", config.Proxy.PrivateKeyPath)
 		assert.Equal(t, "/path/to/cert.pem", config.Proxy.CertificatePath)
 
@@ -58,8 +54,6 @@ func TestLoadConfig(t *testing.T) {
 		// Set up test environment variables for multiple IDP
 		os.Clearenv()
 		t.Setenv("PROXY_ENTITY_ID", "http://test.example.com/metadata")
-		t.Setenv("PROXY_ACS_URL", "http://test.example.com/sso/acs")
-		t.Setenv("PROXY_METADATA_URL", "http://test.example.com/metadata")
 		t.Setenv("PROXY_PRIVATE_KEY_PATH", "/path/to/key.pem")
 		t.Setenv("PROXY_CERTIFICATE_PATH", "/path/to/cert.pem")
 		t.Setenv("IDP_0_ID", "idp1")
@@ -77,8 +71,6 @@ func TestLoadConfig(t *testing.T) {
 		config, err := LoadConfig()
 		require.NoError(t, err)
 		assert.Equal(t, "http://test.example.com/metadata", config.Proxy.EntityID)
-		assert.Equal(t, "http://test.example.com/sso/acs", config.Proxy.AcsURL)
-		assert.Equal(t, "http://test.example.com/metadata", config.Proxy.MetadataURL)
 		assert.Equal(t, "/path/to/key.pem", config.Proxy.PrivateKeyPath)
 		assert.Equal(t, "/path/to/cert.pem", config.Proxy.CertificatePath)
 
@@ -109,8 +101,6 @@ func TestLoadConfig(t *testing.T) {
 		// Set up test environment variables without any IDP
 		os.Clearenv()
 		t.Setenv("PROXY_ENTITY_ID", "http://test.example.com/metadata")
-		t.Setenv("PROXY_ACS_URL", "http://test.example.com/sso/acs")
-		t.Setenv("PROXY_METADATA_URL", "http://test.example.com/metadata")
 		t.Setenv("PROXY_PRIVATE_KEY_PATH", "/path/to/key.pem")
 		t.Setenv("PROXY_CERTIFICATE_PATH", "/path/to/cert.pem")
 		t.Setenv("SERVER_LISTEN_ADDRESS", ":9090")
@@ -125,8 +115,6 @@ func TestLoadConfig(t *testing.T) {
 		// Set up test environment variables without required fields
 		os.Clearenv()
 		t.Setenv("PROXY_ENTITY_ID", "http://test.example.com/metadata")
-		t.Setenv("PROXY_ACS_URL", "http://test.example.com/sso/acs")
-		t.Setenv("PROXY_METADATA_URL", "http://test.example.com/metadata")
 		// Missing PROXY_PRIVATE_KEY_PATH and PROXY_CERTIFICATE_PATH
 		t.Setenv("IDP_0_ID", "default")
 		t.Setenv("IDP_0_ENTITY_ID", "https://idp.example.com/saml/metadata")
@@ -156,8 +144,6 @@ func TestLoadConfig(t *testing.T) {
 
 		// Verify default values are set correctly
 		assert.Equal(t, "http://localhost:8080", config.Proxy.EntityID)
-		assert.Equal(t, "http://localhost:8080/sso/acs", config.Proxy.AcsURL)
-		assert.Equal(t, "http://localhost:8080/metadata", config.Proxy.MetadataURL)
 		assert.Equal(t, ":8080", config.Server.ListenAddress)
 	})
 
@@ -165,8 +151,6 @@ func TestLoadConfig(t *testing.T) {
 		// Set up test environment variables with allowed SPs
 		os.Clearenv()
 		t.Setenv("PROXY_ENTITY_ID", "http://test.example.com/metadata")
-		t.Setenv("PROXY_ACS_URL", "http://test.example.com/sso/acs")
-		t.Setenv("PROXY_METADATA_URL", "http://test.example.com/metadata")
 		t.Setenv("PROXY_PRIVATE_KEY_PATH", "/path/to/key.pem")
 		t.Setenv("PROXY_CERTIFICATE_PATH", "/path/to/cert.pem")
 		t.Setenv("IDP_0_ID", "default")
@@ -208,8 +192,6 @@ func TestLoadConfig(t *testing.T) {
 		// Set up test environment variables with IDP using MetadataURL
 		os.Clearenv()
 		t.Setenv("PROXY_ENTITY_ID", "http://test.example.com/metadata")
-		t.Setenv("PROXY_ACS_URL", "http://test.example.com/sso/acs")
-		t.Setenv("PROXY_METADATA_URL", "http://test.example.com/metadata")
 		t.Setenv("PROXY_PRIVATE_KEY_PATH", "/path/to/key.pem")
 		t.Setenv("PROXY_CERTIFICATE_PATH", "/path/to/cert.pem")
 		t.Setenv("IDP_0_ID", "metadata-idp")
@@ -226,4 +208,5 @@ func TestLoadConfig(t *testing.T) {
 		assert.Empty(t, config.IDP[0].EntityID)
 		assert.Empty(t, config.IDP[0].SSOURL)
 	})
+
 }

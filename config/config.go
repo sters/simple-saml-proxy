@@ -30,10 +30,6 @@ type SPConfig struct {
 type Config struct {
 	Proxy struct {
 		EntityID                    string     `env:"ENTITY_ID"                      envDefault:"http://localhost:8080"`
-		AcsURL                      string     `env:"ACS_URL"                        envDefault:"http://localhost:8080/sso/acs"`
-		MetadataURL                 string     `env:"METADATA_URL"                   envDefault:"http://localhost:8080/metadata"`
-		SLOURL                      string     `env:"SLO_URL"                        envDefault:"http://localhost:8080/slo"`
-		SLSURL                      string     `env:"SLS_URL"                        envDefault:"http://localhost:8080/sls"`
 		PrivateKeyPath              string     `env:"PRIVATE_KEY_PATH,required"`
 		CertificatePath             string     `env:"CERTIFICATE_PATH,required"`
 		RequireSignedLogoutRequests bool       `env:"REQUIRE_SIGNED_LOGOUT_REQUESTS" envDefault:"false"`
@@ -70,5 +66,7 @@ func LoadConfig() (Config, error) {
 		return config, ErrNoIDPConfigured
 	}
 
+
 	return config, nil
 }
+

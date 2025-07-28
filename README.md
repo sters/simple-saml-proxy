@@ -78,7 +78,6 @@ Set environment variables:
 ```bash
 # Proxy configuration
 export PROXY_ENTITY_ID="https://your-proxy.example.com"
-export PROXY_ACS_URL="https://your-proxy.example.com/acs"
 export PROXY_PRIVATE_KEY_PATH="./proxy-private.key"
 export PROXY_CERTIFICATE_PATH="./proxy-cert.crt"
 
@@ -103,9 +102,9 @@ simple-saml-proxy
 ```
 
 Your proxy will be available at:
-- **Metadata URL**: `https://your-proxy.example.com/metadata`
-- **SSO URL**: `https://your-proxy.example.com/sso`
-- **ACS URL**: `https://your-proxy.example.com/acs`
+- **Metadata URL**: `https://your-proxy.example.com/idp/metadata`
+- **SSO URL**: `https://your-proxy.example.com/idp/sso`
+- **ACS URL**: `https://your-proxy.example.com/sp/acs`
 
 ## Configuration Reference
 
@@ -114,7 +113,6 @@ Your proxy will be available at:
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `PROXY_ENTITY_ID` | Proxy's SAML entity ID | `https://proxy.example.com` |
-| `PROXY_ACS_URL` | Assertion Consumer Service URL | `https://proxy.example.com/acs` |
 | `PROXY_PRIVATE_KEY_PATH` | Path to proxy private key | `./certs/proxy.key` |
 | `PROXY_CERTIFICATE_PATH` | Path to proxy certificate | `./certs/proxy.crt` |
 | `IDP_0_ID` | Identity Provider identifier | `keycloak-main` |
@@ -156,11 +154,30 @@ export PROXY_ALLOWED_SP_1_METADATA_URL="https://app2.example.com/saml/metadata"
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `SERVER_LISTEN_ADDRESS` | `:8080` | Server listen address |
-| `PROXY_METADATA_URL` | `/metadata` | Metadata endpoint path |
-| `PROXY_SLO_URL` | `/slo` | Single Logout URL |
 | `METADATA_MAX_RETRIES` | `5` | Max metadata fetch retries |
 | `METADATA_INITIAL_DELAY` | `1s` | Initial retry delay |
 | `PROXY_REQUIRE_SIGNED_LOGOUT_REQUESTS` | `false` | Global SLO signature requirement |
+
+### Endpoint Structure
+
+The proxy organizes endpoints based on their role:
+
+#### IdP Endpoints (for Service Providers)
+- `/idp/metadata` - SAML metadata
+- `/idp/sso` - Single Sign-On endpoint  
+- `/idp/slo` - Single Logout endpoint
+- `/idp/slo/response` - Single Logout response endpoint
+
+#### SP Endpoints (for Identity Providers)
+- `/sp/acs` - Assertion Consumer Service
+- `/sp/sls` - Single Logout Service
+- `/sp/idp_select` - IdP selection page
+- `/sp/idp_selected` - IdP selection handler
+
+**Notes**: 
+- All path values must start with `/`
+- Only paths are allowed, not full URLs
+- The metadata endpoint is always available at `/metadata` for compatibility
 
 ## Authentication Flows
 
@@ -252,7 +269,6 @@ services:
       - "8080:8080"
     environment:
       PROXY_ENTITY_ID: "https://proxy.yourcompany.com"
-      PROXY_ACS_URL: "https://proxy.yourcompany.com/acs"
       PROXY_PRIVATE_KEY_PATH: "/certs/proxy.key"
       PROXY_CERTIFICATE_PATH: "/certs/proxy.crt"
       IDP_0_ID: "main-idp"

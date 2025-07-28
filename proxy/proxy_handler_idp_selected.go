@@ -79,9 +79,9 @@ func handleIDPSelected(idp *saml.IDP, providers *saml.ServiceProviders) http.Han
 		slog.Info("Original issuer", slog.String("issuer", authReq.Issuer.Value))
 		authReq.Issuer.Value = idp.EntityID
 		slog.Info("Updated issuer", slog.String("issuer", authReq.Issuer.Value))
-
-		// Also update the ACS URL to use the metadata path
-		provider.Middleware.ServiceProvider.AcsURL.Path = "/metadata/acs"
+		
+		// Log the ACS URL being used
+		slog.Info("ACS URL in SAML request", slog.String("acs_url", authReq.AssertionConsumerServiceURL))
 
 		// Create redirect URL with the modified auth request
 		redirectURL, err := authReq.Redirect(relayState, &provider.Middleware.ServiceProvider)
