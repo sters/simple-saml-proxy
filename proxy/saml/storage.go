@@ -37,21 +37,17 @@ type Storage struct {
 	config config.Config
 	cert   tls.Certificate
 
-	// Cache for service providers
 	spCache     map[string]*serviceprovider.ServiceProvider
 	spCacheLock sync.RWMutex
 
-	// Cache for SP certificates
 	spCertCache *SPCertificateCache
 
-	// Cache for auth requests
 	authRequests     map[string]*AuthRequest
 	authRequestsLock sync.RWMutex
 
 	entityIDByAppID     map[string]string
 	entityIDByAppIDLock sync.RWMutex
 
-	// Cache for logout contexts
 	logoutContexts     map[string]*LogoutContext
 	logoutContextsLock sync.RWMutex
 }
@@ -60,7 +56,7 @@ type Storage struct {
 type SingleLogoutService struct {
 	Binding          string
 	Location         string
-	ResponseLocation string // Optional response location (if different from Location)
+	ResponseLocation string
 }
 
 // NewStorage creates a new Storage.
@@ -81,18 +77,13 @@ func NewStorage(cfg config.Config) (*Storage, error) {
 	}, nil
 }
 
-// EntityStorage interface implementation
-
 func (s *Storage) GetCA(_ context.Context) (*key.CertificateAndKey, error) {
-	// For simplicity, we'll use the same certificate for CA, metadata signing, and response signing
 	return s.getCertificateAndKey()
 }
 
 func (s *Storage) GetMetadataSigningKey(_ context.Context) (*key.CertificateAndKey, error) {
 	return s.getCertificateAndKey()
 }
-
-// IdentityProviderStorage interface implementation
 
 func (s *Storage) GetEntityByID(ctx context.Context, entityID string) (*serviceprovider.ServiceProvider, error) {
 	s.spCacheLock.RLock()
@@ -103,13 +94,11 @@ func (s *Storage) GetEntityByID(ctx context.Context, entityID string) (*servicep
 		return sp, nil
 	}
 
-	// If not in cache, create a new one
 	for _, allowedSP := range s.config.Proxy.AllowedSP {
 		if allowedSP.EntityID != entityID {
 			continue
 		}
 
-		// Create a service provider config for requester info
 		var metadataBytes []byte
 		if allowedSP.MetadataURL != "" {
 			b, err := ReadMetadataFromURLWithRetry(ctx, http.DefaultClient, allowedSP.MetadataURL, s.config)
@@ -118,7 +107,6 @@ func (s *Storage) GetEntityByID(ctx context.Context, entityID string) (*servicep
 			}
 			metadataBytes = b
 		} else {
-			// Create a minimal but valid metadata for SP without a metadata URL
 			metadataBytes = []byte(`<EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="` + entityID + `">
 				<SPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
 					<AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="` + entityID + `/acs" index="0"/>
@@ -126,7 +114,6 @@ func (s *Storage) GetEntityByID(ctx context.Context, entityID string) (*servicep
 			</EntityDescriptor>`)
 		}
 
-		// Validate the metadata can be parsed
 		_, err := xml.ParseMetadataXmlIntoStruct(metadataBytes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse metadata: %w", err)
@@ -135,20 +122,17 @@ func (s *Storage) GetEntityByID(ctx context.Context, entityID string) (*servicep
 			Metadata: metadataBytes,
 		}
 
-		// loginURL for Proxy IdP (Not for SP, Not for actual IdP)
 		loginURL := func(id string) string {
 			slog.Info("login URL", slog.String("id", id))
 
 			return "/idp/idp_select?id=" + id
 		}
 
-		// Create a new service provider
 		sp, err := serviceprovider.NewServiceProvider(entityID, spConfig, loginURL)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create service provider: %w", err)
 		}
 
-		// Cache the service provider
 		s.spCacheLock.Lock()
 		s.spCache[entityID] = sp
 		s.spCacheLock.Unlock()
@@ -201,15 +185,22 @@ func (s *Storage) CreateAuthRequest(_ context.Context, authnRequest *samlp.Authn
 		IsDone:                   false,
 	}
 
+	slog.Info("Creating auth request",
+		slog.String("id", id),
+		slog.String("appID", appID),
+		slog.String("issuer", authnRequest.Issuer.Text),
+		slog.String("acs_url", authnRequest.AssertionConsumerServiceURL),
+	)
+
 	s.authRequestsLock.Lock()
 	s.authRequests[id] = authRequest
-	// Also store by ACS URL for zitadel/saml library compatibility
-	acsURL := s.config.Proxy.EntityID + "/sp/acs"
-	if acsURL != "" {
-		s.authRequests[acsURL] = authRequest
-		slog.Info("Stored auth request by ACS URL", slog.String("url", acsURL), slog.String("id", id))
-	}
 	s.authRequestsLock.Unlock()
+
+	slog.Info("Auth request stored",
+		slog.String("id", id),
+		slog.String("acs_url", authRequest.AccessConsumerServiceURL),
+		slog.String("issuer", authRequest.Issuer),
+	)
 
 	s.entityIDByAppIDLock.Lock()
 	s.entityIDByAppID[appID] = authnRequest.Issuer.Text
@@ -225,16 +216,7 @@ func (s *Storage) AuthRequestByID(_ context.Context, id string) (models.AuthRequ
 	s.authRequestsLock.RUnlock()
 
 	if !ok {
-		// If not found by ID, try to find by URL (for zitadel/saml library compatibility)
-		slog.Info("Auth request not found by ID, trying by URL", slog.String("id", id))
-		s.authRequestsLock.RLock()
-		authRequest, ok = s.authRequests[id] // id might be a URL
-		s.authRequestsLock.RUnlock()
-
-		if !ok {
-			return nil, fmt.Errorf("%w: %s", ErrAuthRequestNotFound, id)
-		}
-		slog.Info("Found auth request by URL", slog.String("url", id))
+		return nil, fmt.Errorf("%w: %s", ErrAuthRequestNotFound, id)
 	}
 
 	return authRequest, nil

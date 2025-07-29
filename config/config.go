@@ -36,7 +36,6 @@ type Config struct {
 		AllowedSP                   []SPConfig `envPrefix:"ALLOWED_SP_"`
 	} `envPrefix:"PROXY_"`
 
-	// Support for multiple IDP
 	IDP []IDPConfig `envPrefix:"IDP_"`
 
 	Server struct {
@@ -66,7 +65,5 @@ func LoadConfig() (Config, error) {
 		return config, ErrNoIDPConfigured
 	}
 
-
 	return config, nil
 }
-

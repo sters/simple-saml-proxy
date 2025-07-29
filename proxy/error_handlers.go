@@ -22,7 +22,6 @@ const (
 
 // respondWithError writes an error response with logging.
 func respondWithError(w http.ResponseWriter, message string, statusCode int, logContext ...slog.Attr) {
-	// Log the error with context
 	logArgs := []any{
 		slog.String("error", message),
 		slog.Int("status", statusCode),
@@ -32,8 +31,6 @@ func respondWithError(w http.ResponseWriter, message string, statusCode int, log
 	}
 
 	slog.Error("HTTP error response", logArgs...)
-
-	// Write the error response
 	http.Error(w, message, statusCode)
 }
 

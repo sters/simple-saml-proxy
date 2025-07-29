@@ -15,7 +15,6 @@ const (
 	relayStateLength        = 42
 )
 
-// isSecureCookie determines if cookies should be secure based on the request.
 func isSecureCookie(r *http.Request) bool {
 	return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 }
@@ -29,7 +28,6 @@ func randomBytes(n int) []byte {
 	return rv
 }
 
-// deflateCompress compresses data using deflate compression.
 func deflateCompress(data []byte) ([]byte, error) {
 	var buf bytes.Buffer
 	writer, err := flate.NewWriter(&buf, flate.DefaultCompression)

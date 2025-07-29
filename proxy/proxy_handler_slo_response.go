@@ -162,7 +162,7 @@ func buildLogoutResponseURL(logoutResponse *crewjamsaml.LogoutResponse, destinat
 }
 
 // getLogoutResponseURL determines the appropriate URL to send logout response to.
-func getLogoutResponseURL(ctx context.Context, storage *saml.Storage, logoutCtx *saml.LogoutContext, cfg config.Config) string {
+func getLogoutResponseURL(ctx context.Context, storage *saml.Storage, logoutCtx *saml.LogoutContext, _ config.Config) string {
 	if logoutCtx.OriginType != "sp" {
 		// Use the SLO response path from configuration
 		return logoutCtx.OriginID + "/slo/response"

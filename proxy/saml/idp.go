@@ -12,10 +12,9 @@ import (
 
 // IDP represents the SAML Identity Provider configuration.
 type IDP struct {
-	// Using zitadel/saml
 	EntityID   string
-	IDP        *provider.Provider // Exported for proxy package access
-	IDPStorage *Storage           // Exported for proxy package access
+	IDP        *provider.Provider
+	IDPStorage *Storage
 }
 
 // GetStorage returns the IDP's storage for testing purposes.
@@ -30,7 +29,6 @@ func (i *IDP) GetProvider() *provider.Provider {
 
 // CreateProxyIDP creates a SAML Identity Provider middleware from the configuration.
 func CreateProxyIDP(cfg config.Config) (*IDP, error) {
-	// Create a new storage
 	storage, err := NewStorage(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage: %w", err)
@@ -41,19 +39,14 @@ func CreateProxyIDP(cfg config.Config) (*IDP, error) {
 		slog.String("entityID", cfg.Proxy.EntityID),
 	)
 
-	// Create metadata endpoint
 	metadataEndpoint := provider.NewEndpoint("/idp/metadata")
-
-	// Create endpoints relative to the metadata base path
-	// These will be accessible at /sso, /acs, etc.
 	ssoEndpoint := provider.NewEndpoint("/idp/sso")
 	callbackEndpoint := provider.NewEndpoint("/idp/acs")
 
-	// Create IDP config
 	idpConfig := &provider.IdentityProviderConfig{
 		MetadataIDPConfig: &provider.MetadataIDPConfig{
-			ValidUntil:    24 * time.Hour, // Metadata valid for 24 hours
-			CacheDuration: "PT24H",        // Cache for 24 hours
+			ValidUntil:    24 * time.Hour,
+			CacheDuration: "PT24H",
 		},
 		Endpoints: &provider.EndpointConfig{
 			SingleSignOn: &ssoEndpoint,
@@ -62,7 +55,6 @@ func CreateProxyIDP(cfg config.Config) (*IDP, error) {
 		SignatureAlgorithm: "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
 	}
 
-	// Create provider config
 	providerConfig := &provider.Config{
 		Metadata:  &metadataEndpoint,
 		IDPConfig: idpConfig,
@@ -73,21 +65,17 @@ func CreateProxyIDP(cfg config.Config) (*IDP, error) {
 		},
 	}
 
-	// Create issuer function
 	issuerFunc := func(_ bool) (provider.IssuerFromRequest, error) {
-		return func(r *http.Request) string {
-			r.FormValue("SAMLRequest")
-
+		return func(_ *http.Request) string {
 			return cfg.Proxy.EntityID
 		}, nil
 	}
 
-	// Create provider
 	p, err := provider.NewProvider(
 		storage,
 		issuerFunc,
 		providerConfig,
-		provider.WithAllowInsecure(), // Allow HTTP for development
+		provider.WithAllowInsecure(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create provider: %w", err)
