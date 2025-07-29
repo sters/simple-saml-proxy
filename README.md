@@ -301,7 +301,6 @@ Simple SAML Proxy implements core SAML 2.0 features:
 | **Metadata Generation** | ✅ | Available at `/metadata` |
 | **Multi-IdP Support** | ✅ | Core feature |
 
-For detailed compliance information, see [docs/saml2_specification_support.md](docs/saml2_specification_support.md).
 
 ## Troubleshooting
 
@@ -363,7 +362,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Support
 
-- 📖 **Documentation**: [docs/](docs/) directory
+- 📖 **Documentation**: See [CLAUDE.md](CLAUDE.md) for development details
 - 🐛 **Issues**: [GitHub Issues](https://github.com/sters/simple-saml-proxy/issues)
 - 💬 **Discussions**: [GitHub Discussions](https://github.com/sters/simple-saml-proxy/discussions)
 - 📧 **Security**: Report security issues privately
