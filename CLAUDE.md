@@ -76,10 +76,18 @@ The application is structured as a stateless HTTP server with modular SAML handl
    - Creates SAML providers and starts HTTP server
 
 2. **`/proxy/`**: Core proxy implementation
-   - `config.go`: Environment-based configuration structures
-   - `proxy.go`: HTTP handlers and routing logic
-   - `saml.go`: SAML provider creation and management
-   - `storage.go`: In-memory storage for auth requests
+   - HTTP handlers and routing logic
+   - Error handling and response utilities
+   - SAML request/response processing
+
+3. **`/proxy/saml/`**: SAML-specific implementation
+   - `idp.go`: Identity Provider configuration and setup
+   - `storage.go`: In-memory storage for auth requests and logout contexts
+   - Certificate and metadata management
+
+4. **`/config/`**: Configuration management
+   - Environment-based configuration structures
+   - Configuration validation and loading
 
 ### Key Flows
 
@@ -114,7 +122,7 @@ Configuration is loaded from environment variables:
 
 - Unit tests use `testing` package with table-driven tests
 - E2E tests simulate full SAML flows with test certificates
-- Test certificates are in `/e2e/` directory
+- Integration tests and certificates are in `/example/` directory
 - Use `httptest` for HTTP handler testing
 - Mock SAML responses for IdP testing
 
