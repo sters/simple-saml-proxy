@@ -22,77 +22,18 @@
           "temporary": false
         }
       ]
-    },
-    {
-      "username": "testuser",
-      "enabled": true,
-      "email": "testuser@company.com",
-      "firstName": "Test",
-      "lastName": "User (IDP2)",
-      "credentials": [
-        {
-          "type": "password",
-          "value": "testpassword",
-          "temporary": false
-        }
-      ]
     }
   ],
   "clients": [
     {
-      "clientId": "http://localhost:10000/saml/metadata",
-      "name": "SAML Proxy Client (crewjam)",
-      "enabled": true,
-      "protocol": "saml",
-      "frontchannelLogout": true,
-      "attributes": {
-        "saml.assertion.signature": "true",
-        "saml.force.post.binding": "true",
-        "saml.multivalued.roles": "false",
-        "saml.encrypt": "false",
-        "saml.server.signature": "true",
-        "saml.signature.algorithm": "RSA_SHA256",
-        "saml.client.signature": "false",
-        "saml.authnstatement": "true",
-        "display.on.consent.screen": "false",
-        "saml.assertion.consumer.url.post": "http://localhost:10000/acs"
-      },
-      "redirectUris": [
-        "http://localhost:10000/acs"
-      ],
-      "baseUrl": "http://localhost:10000/acs",
-      "adminUrl": "http://localhost:10000"
-    },
-    {
-      "clientId": "http://localhost:10000/metadata",
-      "name": "SAML Proxy Client (zitadel)",
-      "enabled": true,
-      "protocol": "saml",
-      "frontchannelLogout": true,
-      "attributes": {
-        "saml.assertion.signature": "true",
-        "saml.force.post.binding": "true",
-        "saml.multivalued.roles": "false",
-        "saml.encrypt": "false",
-        "saml.server.signature": "true",
-        "saml.signature.algorithm": "RSA_SHA256",
-        "saml.client.signature": "false",
-        "saml.authnstatement": "true",
-        "display.on.consent.screen": "false",
-        "saml.assertion.consumer.url.post": "http://localhost:10000/metadata/acs"
-      },
-      "redirectUris": [
-        "http://localhost:10000/metadata/acs"
-      ],
-      "baseUrl": "http://localhost:10000",
-      "adminUrl": "http://localhost:10000"
-    },
-    {
       "clientId": "http://localhost:10000",
-      "name": "SAML Proxy Client (base)",
+      "name": "SAML Proxy Client",
       "enabled": true,
       "protocol": "saml",
       "frontchannelLogout": true,
+      "publicClient": true,
+      "fullScopeAllowed": true,
+      "consentRequired": false,
       "attributes": {
         "saml.assertion.signature": "true",
         "saml.force.post.binding": "true",
@@ -102,15 +43,14 @@
         "saml.signature.algorithm": "RSA_SHA256",
         "saml.client.signature": "false",
         "saml.authnstatement": "true",
-        "display.on.consent.screen": "false",
-        "saml.assertion.consumer.url.post": "http://localhost:10000/acs"
+        "display.on.consent.screen": "false"
       },
       "redirectUris": [
-        "http://localhost:10000/metadata/acs",
-        "http://localhost:10000/saml/acs"
+        "http://localhost:10000/*"
       ],
       "baseUrl": "http://localhost:10000",
-      "adminUrl": "http://localhost:10000"
+      "adminUrl": "http://localhost:10000",
+      "protocolMappers": []
     }
   ]
 }

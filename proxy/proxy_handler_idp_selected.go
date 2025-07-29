@@ -79,7 +79,7 @@ func handleIDPSelected(idp *saml.IDP, providers *saml.ServiceProviders) http.Han
 		slog.Info("Original issuer", slog.String("issuer", authReq.Issuer.Value))
 		authReq.Issuer.Value = idp.EntityID
 		slog.Info("Updated issuer", slog.String("issuer", authReq.Issuer.Value))
-		
+
 		// Log the ACS URL being used
 		slog.Info("ACS URL in SAML request", slog.String("acs_url", authReq.AssertionConsumerServiceURL))
 

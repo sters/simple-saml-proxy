@@ -208,5 +208,4 @@ func TestLoadConfig(t *testing.T) {
 		assert.Empty(t, config.IDP[0].EntityID)
 		assert.Empty(t, config.IDP[0].SSOURL)
 	})
-
 }

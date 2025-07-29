@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"encoding/base64"
 	"log/slog"
 	"net/http"
 	"time"
@@ -106,9 +107,34 @@ func handleSAMLACS(idp *proxySaml.IDP, providers *proxySaml.ServiceProviders) ht
 			possibleRequestIDs = nil
 		}
 
+		// Log the SP configuration for debugging
+		slog.Info("SP Configuration",
+			slog.String("EntityID", provider.Middleware.ServiceProvider.EntityID),
+			slog.String("AcsURL", provider.Middleware.ServiceProvider.AcsURL.String()),
+			slog.Any("possibleRequestIDs", possibleRequestIDs),
+		)
+
+		// Log form data for debugging
+		slog.Info("SAML Response Form Data",
+			slog.String("SAMLResponse", r.FormValue("SAMLResponse")),
+			slog.String("RelayState", r.FormValue("RelayState")),
+		)
+
 		assertion, err := provider.Middleware.ServiceProvider.ParseResponse(r, possibleRequestIDs)
 		if err != nil {
-			slog.Error("Failed to parse response", slog.String("error", err.Error()))
+			slog.Error("Failed to parse response",
+				slog.String("error", err.Error()),
+				slog.String("entityID", provider.Middleware.ServiceProvider.EntityID),
+				slog.String("acsURL", provider.Middleware.ServiceProvider.AcsURL.String()),
+			)
+
+			// Try to decode and log the SAML response for debugging
+			if samlResp := r.FormValue("SAMLResponse"); samlResp != "" {
+				if decoded, decErr := base64.StdEncoding.DecodeString(samlResp); decErr == nil {
+					slog.Error("SAML Response Content", slog.String("content", string(decoded)))
+				}
+			}
+
 			http.Error(w, "Invalid request", http.StatusBadRequest)
 
 			return

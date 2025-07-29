@@ -18,7 +18,6 @@ import (
 func SetupHTTPHandlers(idp *saml.IDP, providers *saml.ServiceProviders, cfg config.Config) http.Handler {
 	mux := http.NewServeMux()
 
-	// Add request logging middleware
 	loggingHandler := func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			slog.Info("Received request", slog.String("path", r.URL.Path))
@@ -26,13 +25,12 @@ func SetupHTTPHandlers(idp *saml.IDP, providers *saml.ServiceProviders, cfg conf
 		})
 	}
 
-	// Health check endpoint
 	mux.HandleFunc("/ping", handlePing)
 
-	// Root endpoint
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
+
 			return
 		}
 		w.Header().Set("Content-Type", "text/plain")
@@ -42,16 +40,13 @@ func SetupHTTPHandlers(idp *saml.IDP, providers *saml.ServiceProviders, cfg conf
 		}
 	})
 
-	// IdP endpoints (proxy acts as IdP for SPs)
 	mux.HandleFunc("/idp/slo", handleSLO(idp, providers, cfg))
 	mux.HandleFunc("/idp/slo/response", handleSLOResponse(idp, providers, cfg))
 	mux.HandleFunc("/idp/idp_select", handleIDPSelect(idp, providers))
 	mux.HandleFunc("/idp/idp_selected", handleIDPSelected(idp, providers))
 
-	// Forward all other /idp/* paths to the zitadel/saml library
 	mux.Handle("/idp/", idp.IDP.HttpHandler())
 
-	// SP endpoints (proxy acts as SP for IdPs)
 	mux.HandleFunc("/sp/acs", handleSAMLACS(idp, providers))
 	mux.HandleFunc("/sp/sls", handleSLS(idp, providers))
 	mux.HandleFunc("/sp/idp_select", handleIDPSelect(idp, providers))

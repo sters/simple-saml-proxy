@@ -1,0 +1,24 @@
+# Node modules
+node_modules/
+
+# Test results
+test-results/
+playwright-report/
+
+# Test videos and screenshots
+*.webm
+*.png
+*.jpg
+
+# Temporary files
+*.tmp
+*.temp
+
+# Log files
+*.log
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo

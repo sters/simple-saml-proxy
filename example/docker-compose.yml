@@ -22,7 +22,7 @@ x-keycloak-common: &keycloak-common
   networks:
     - saml-network
   healthcheck: &keycloak-healthcheck
-    test: ["CMD", "/opt/keycloak/bin/kc.sh", "show-config", "--all"]
+    test: ["CMD", "/opt/keycloak/bin/kc.sh", "show-config"]
     interval: 5s
     timeout: 3s
     retries: 3
@@ -110,7 +110,7 @@ services:
       
       # Allowed Service Providers (Keycloak SP)
       PROXY_ALLOWED_SP_0_ENTITY_ID: "http://localhost:12000/realms/sp-realm"
-      PROXY_ALLOWED_SP_0_ACS_URL: "http://localhost:12000/realms/sp-realm/protocol/saml"
+      PROXY_ALLOWED_SP_0_ACS_URL: "http://localhost:12000/realms/sp-realm/broker/saml-proxy/endpoint"
       
       # Server configuration
       SERVER_LISTEN_ADDRESS: ":8080"
