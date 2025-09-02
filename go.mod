@@ -8,7 +8,7 @@ require (
 	github.com/crewjam/saml v0.5.1
 	github.com/google/uuid v1.6.0
 	github.com/russellhaering/goxmldsig v1.5.0
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/zitadel/saml v0.3.5
 )
 
